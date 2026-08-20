@@ -1,6 +1,5 @@
 # XRPL-Based-FX-Remittance-Platform-Using-RLUSD
 
-# XRPL-Based FX Remittance Platform
 
 ECO5040W · Financial Software Engineering · University of Cape Town
 
