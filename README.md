@@ -1,8 +1,5 @@
 # XRPL-Based-FX-Remittance-Platform-Using-RLUSD
 
-Here's content for your `README.md` — copy and paste it in:
-
-```markdown
 # XRPL-Based FX Remittance Platform
 
 ECO5040W · Financial Software Engineering · University of Cape Town
@@ -116,6 +113,6 @@ make migration name="describe_change"   # Generate new migration
 - Real funds, real card processing, or XRPL Mainnet
 - Production KYC/AML vendor integration
 - Cash-out currencies other than USD and ZAR
-```
+
 
 Update the slice status table as you complete each one.
