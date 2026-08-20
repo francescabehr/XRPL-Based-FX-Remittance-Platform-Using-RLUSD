@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}KYC Review — {{ submission.full_name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="/admin/kyc" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h3 class="fw-bold mb-0">KYC Review — {{ submission.full_name }}</h3>
+</div>
+
+<div class="row g-4">
+  <!-- Submission details -->
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold">Submitted Information</div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-5 text-muted">Full name</dt>
+          <dd class="col-7">{{ submission.full_name }}</dd>
+
+          <dt class="col-5 text-muted">Date of birth</dt>
+          <dd class="col-7">{{ submission.date_of_birth.strftime('%d %B %Y') }}</dd>
+
+          <dt class="col-5 text-muted">Nationality</dt>
+          <dd class="col-7">{{ submission.nationality }}</dd>
+
+          <dt class="col-5 text-muted">ID / Passport</dt>
+          <dd class="col-7"><code>{{ submission.id_number }}</code></dd>
+
+          <dt class="col-5 text-muted">Address</dt>
+          <dd class="col-7">{{ submission.residential_address }}</dd>
+
+          <dt class="col-5 text-muted">Mobile</dt>
+          <dd class="col-7">{{ submission.mobile }}</dd>
+
+          <dt class="col-5 text-muted">Email</dt>
+          <dd class="col-7">{{ submission.email }}</dd>
+
+          <dt class="col-5 text-muted">Source of funds</dt>
+          <dd class="col-7">{{ submission.source_of_funds }}</dd>
+
+          <dt class="col-5 text-muted">Submitted at</dt>
+          <dd class="col-7 text-muted small">{{ submission.submitted_at.strftime('%d %b %Y %H:%M UTC') }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <!-- Decision panel -->
+  <div class="col-lg-5">
+    <div class="card shadow-sm border-success mb-3">
+      <div class="card-header fw-semibold text-success">Approve</div>
+      <div class="card-body">
+        <p class="text-muted small">Approving will let this user initiate remittances immediately.</p>
+        <form method="post" action="/admin/kyc/{{ submission.id }}/approve"
+              onsubmit="return confirm('Approve KYC for {{ submission.full_name }}?')">
+          <button type="submit" class="btn btn-success w-100">
+            <i class="bi bi-check-lg me-1"></i>Approve
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card shadow-sm border-danger">
+      <div class="card-header fw-semibold text-danger">Reject</div>
+      <div class="card-body">
+        <form method="post" action="/admin/kyc/{{ submission.id }}/reject"
+              onsubmit="return confirm('Reject KYC for {{ submission.full_name }}?')">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Reason <span class="text-danger">*</span></label>
+            <textarea name="reason" class="form-control" rows="3" required
+                      placeholder="Explain clearly so the user knows what to fix…"></textarea>
+          </div>
+          <button type="submit" class="btn btn-danger w-100">
+            <i class="bi bi-x-lg me-1"></i>Reject
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

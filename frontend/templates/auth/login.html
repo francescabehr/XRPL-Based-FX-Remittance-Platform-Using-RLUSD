@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Log In — XRPL Remit{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-sm-10 col-md-6 col-lg-5">
+    <div class="card shadow-sm mt-4">
+      <div class="card-body p-4">
+        <h4 class="card-title mb-4 fw-bold">
+          <i class="bi bi-box-arrow-in-right me-2 text-primary"></i>Log In
+        </h4>
+
+        {% if error %}
+        <div class="alert alert-danger py-2">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" action="/login" novalidate>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Email address</label>
+            <input type="email" name="email" class="form-control"
+                   value="{{ prefill_email or '' }}" required autofocus>
+          </div>
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Password</label>
+            <input type="password" name="password" class="form-control" required>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">Log In</button>
+        </form>
+
+        <hr class="my-3">
+        <p class="text-center mb-0 text-muted small">
+          Don't have an account? <a href="/register">Register</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

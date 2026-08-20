@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Register — XRPL Remit{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-sm-10 col-md-7 col-lg-6">
+    <div class="card shadow-sm mt-4">
+      <div class="card-body p-4">
+        <h4 class="card-title mb-4 fw-bold">
+          <i class="bi bi-person-plus me-2 text-primary"></i>Create Account
+        </h4>
+
+        {% if errors %}
+        <div class="alert alert-danger py-2">
+          <ul class="mb-0 ps-3">
+            {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        <form method="post" action="/register" novalidate>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Full name</label>
+            <input type="text" name="full_name" class="form-control"
+                   value="{{ prefill.full_name if prefill else '' }}" required autofocus>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Email address</label>
+            <input type="email" name="email" class="form-control"
+                   value="{{ prefill.email if prefill else '' }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Mobile number</label>
+            <input type="tel" name="mobile" class="form-control" placeholder="+27..."
+                   value="{{ prefill.mobile if prefill else '' }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Password <span class="text-muted fw-normal">(min 8 characters)</span></label>
+            <input type="password" name="password" class="form-control" required minlength="8">
+          </div>
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Confirm password</label>
+            <input type="password" name="confirm_password" class="form-control" required>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">Create Account</button>
+        </form>
+
+        <hr class="my-3">
+        <p class="text-center mb-0 text-muted small">
+          Already registered? <a href="/login">Log in</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

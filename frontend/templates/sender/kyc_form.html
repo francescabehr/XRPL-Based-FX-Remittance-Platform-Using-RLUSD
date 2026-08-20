@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}KYC Verification — XRPL Remit{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <h3 class="fw-bold mb-1">Identity Verification (KYC)</h3>
+    <p class="text-muted mb-4">Required before you can send money. All fields are mandatory.</p>
+
+    <!-- Status banner if already submitted -->
+    {% if kyc %}
+    <div class="alert alert-{{ user.kyc_badge_class }} mb-4">
+      <strong>Current status: {{ user.kyc_status_label }}</strong>
+      {% if kyc.status.value == 'pending' %}
+        — Your submission is under review. You cannot edit it at this time.
+      {% elif kyc.status.value == 'approved' %}
+        — Your identity is verified. No further action needed.
+      {% elif kyc.status.value == 'rejected' %}
+        — Reason: <em>{{ kyc.rejection_reason }}</em><br>
+        <span class="small">Please correct the issues and resubmit below.</span>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    {% if user.kyc_status.value in ['not_submitted', 'rejected'] %}
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <form method="post" action="/kyc" novalidate>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Full legal name</label>
+              <input type="text" name="full_name" class="form-control"
+                     value="{{ prefill.full_name if prefill else user.full_name }}" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Date of birth</label>
+              <input type="date" name="date_of_birth" class="form-control"
+                     value="{{ prefill.date_of_birth if prefill else '' }}" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Nationality</label>
+              <select name="nationality" class="form-select" required>
+                <option value="">— Select —</option>
+                {% for n in nationalities %}
+                <option value="{{ n }}" {% if prefill and prefill.nationality == n %}selected{% endif %}>{{ n }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">ID / Passport number</label>
+              <input type="text" name="id_number" class="form-control"
+                     value="{{ prefill.id_number if prefill else '' }}" required minlength="6">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Residential address</label>
+              <textarea name="residential_address" class="form-control" rows="2" required>{{ prefill.residential_address if prefill else '' }}</textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Mobile number</label>
+              <input type="tel" name="mobile" class="form-control"
+                     value="{{ prefill.mobile if prefill else user.mobile }}" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Email address</label>
+              <input type="email" name="email" class="form-control"
+                     value="{{ prefill.email if prefill else user.email }}" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Source of funds</label>
+              <textarea name="source_of_funds" class="form-control" rows="2"
+                        placeholder="e.g. Salary, business income, savings…" required>{{ prefill.source_of_funds if prefill else '' }}</textarea>
+            </div>
+          </div>
+
+          <div class="mt-4 d-flex gap-2">
+            <button type="submit" class="btn btn-primary px-4">
+              {% if kyc and kyc.status.value == 'rejected' %}Resubmit KYC{% else %}Submit KYC{% endif %}
+            </button>
+            <a href="/dashboard" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

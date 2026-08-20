@@ -1,0 +1,23 @@
+body {
+  min-height: 100vh;
+}
+
+.navbar-brand {
+  letter-spacing: 0.5px;
+}
+
+.card {
+  border-radius: 0.6rem;
+}
+
+.progress {
+  border-radius: 1rem;
+}
+
+dl.row dt {
+  font-weight: 500;
+}
+
+code {
+  font-size: 0.9em;
+}

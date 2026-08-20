@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — XRPL Remit{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h3 class="fw-bold mb-0">Welcome, {{ user.full_name.split()[0] }}</h3>
+  <a href="/send" class="btn btn-primary {% if user.kyc_status.value != 'approved' %}disabled{% endif %}">
+    <i class="bi bi-send me-1"></i>Send Money
+  </a>
+</div>
+
+<!-- KYC Status Banner -->
+<div class="card mb-4 border-{{ user.kyc_badge_class }}">
+  <div class="card-body d-flex align-items-center gap-3">
+    <span class="badge bg-{{ user.kyc_badge_class }} fs-6 px-3 py-2">{{ user.kyc_status_label }}</span>
+    <div>
+      {% if user.kyc_status.value == 'not_submitted' %}
+        <strong>Identity verification required.</strong>
+        You must complete KYC before you can send money.
+        <a href="/kyc" class="ms-2 btn btn-sm btn-outline-primary">Start KYC</a>
+      {% elif user.kyc_status.value == 'pending' %}
+        <strong>KYC under review.</strong>
+        An administrator will review your submission shortly. You'll be able to send money once approved.
+      {% elif user.kyc_status.value == 'approved' %}
+        <strong>KYC approved.</strong>
+        You are fully verified and can send money.
+      {% elif user.kyc_status.value == 'rejected' %}
+        <strong>KYC rejected.</strong>
+        {% if kyc and kyc.rejection_reason %}Reason: {{ kyc.rejection_reason }}{% endif %}
+        <a href="/kyc" class="ms-2 btn btn-sm btn-outline-danger">Resubmit KYC</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Limits card (placeholder until Slice 2) -->
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-bar-chart me-1"></i>Remittance Limits</div>
+      <div class="card-body">
+        {% if user.kyc_status.value != 'approved' %}
+          <p class="text-muted mb-1">Daily limit</p>
+          <div class="progress mb-3" style="height:10px"><div class="progress-bar bg-secondary" style="width:0%"></div></div>
+          <p class="text-muted mb-1">Monthly limit</p>
+          <div class="progress" style="height:10px"><div class="progress-bar bg-secondary" style="width:0%"></div></div>
+          <p class="small text-muted mt-2">Limits are activated after KYC approval.</p>
+        {% else %}
+          <p class="text-muted mb-1">Daily limit</p>
+          <div class="progress mb-3" style="height:10px"><div class="progress-bar" style="width:0%"></div></div>
+          <p class="text-muted mb-1">Monthly limit</p>
+          <div class="progress" style="height:10px"><div class="progress-bar" style="width:0%"></div></div>
+          <p class="small text-muted mt-2">R0 used today · R0 used this month</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent transactions (placeholder until Slice 3+) -->
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header fw-semibold"><i class="bi bi-clock-history me-1"></i>Recent Transactions</div>
+      <div class="card-body">
+        <p class="text-muted text-center my-4">No transactions yet.</p>
+        <div class="text-end">
+          <a href="/transactions" class="btn btn-sm btn-outline-secondary">View all</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick actions -->
+<div class="row g-3 mt-2">
+  <div class="col-6 col-md-3">
+    <a href="/send" class="btn btn-outline-primary w-100 {% if user.kyc_status.value != 'approved' %}disabled{% endif %}">
+      <i class="bi bi-send d-block fs-4 mb-1"></i>Send Money
+    </a>
+  </div>
+  <div class="col-6 col-md-3">
+    <a href="/beneficiaries" class="btn btn-outline-secondary w-100">
+      <i class="bi bi-people d-block fs-4 mb-1"></i>Beneficiaries
+    </a>
+  </div>
+  <div class="col-6 col-md-3">
+    <a href="/transactions" class="btn btn-outline-secondary w-100">
+      <i class="bi bi-list-ul d-block fs-4 mb-1"></i>History
+    </a>
+  </div>
+  <div class="col-6 col-md-3">
+    <a href="/kyc" class="btn btn-outline-secondary w-100">
+      <i class="bi bi-card-list d-block fs-4 mb-1"></i>KYC
+    </a>
+  </div>
+</div>
+{% endblock %}
