@@ -75,7 +75,7 @@ make test
 | Slice | Scope | Status |
 |---|---|---|
 | 1 | Scaffold · Auth (FR-AUTH) · KYC (FR-KYC) · Admin KYC approval | ✅ Done |
-| 2 | Beneficiaries (FR-BEN) · Remittance limits (FR-LIM) | 🔨 In progress |
+| 2 | Beneficiaries (FR-BEN) · Remittance limits (FR-LIM) | Done |
 | 3 | FX quote engine (FR-FX) | ⬜ |
 | 4 | Simulated cash-in (FR-CI) · Message queue skeleton (FR-MQ) | ⬜ |
 | 5 | XRPL standalone integration — account, TrustSet, RLUSD transfer | ⬜ |
