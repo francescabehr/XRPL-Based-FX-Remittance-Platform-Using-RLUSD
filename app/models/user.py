@@ -52,6 +52,12 @@ class User(Base):
         foreign_keys="KYCSubmission.user_id",
         order_by="KYCSubmission.submitted_at.desc()",
     )
+    beneficiaries: Mapped[list[Beneficiary]] = relationship(
+        "Beneficiary",
+        back_populates="sender",
+        foreign_keys="Beneficiary.sender_id",
+        order_by="Beneficiary.created_at.desc()",
+    )
 
     @property
     def kyc_status_label(self) -> str:

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}{{ "Edit" if editing else "Add" }} Beneficiary — XRPL Remit{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="/beneficiaries" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h3 class="fw-bold mb-0">{{ "Edit" if editing else "Add" }} Beneficiary</h3>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<div class="card shadow-sm">
+  <div class="card-body p-4">
+    {% set action = "/beneficiaries/" + ben.id|string + "/edit" if editing else "/beneficiaries/new" %}
+    <form method="post" action="{{ action }}" novalidate>
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Full name <span class="text-danger">*</span></label>
+          <input type="text" name="full_name" class="form-control" required
+                 value="{{ ben.full_name if editing else (prefill.full_name if prefill else '') }}">
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Relationship <span class="text-danger">*</span></label>
+          <select name="relationship" class="form-select" required>
+            <option value="">— Select —</option>
+            {% for r in relationships %}
+            <option value="{{ r }}"
+              {% if editing and ben.relationship == r %}selected
+              {% elif prefill and prefill.relationship == r %}selected{% endif %}>{{ r }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Email</label>
+          <input type="email" name="email" class="form-control"
+                 value="{{ ben.email if editing else (prefill.email if prefill else '') }}"
+                 placeholder="optional if mobile provided">
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Mobile</label>
+          <input type="tel" name="mobile" class="form-control"
+                 value="{{ ben.mobile if editing else (prefill.mobile if prefill else '') }}"
+                 placeholder="optional if email provided">
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Country <span class="text-danger">*</span></label>
+          <select name="country" class="form-select" required>
+            <option value="">— Select —</option>
+            {% for c in countries %}
+            <option value="{{ c }}"
+              {% if editing and ben.country == c %}selected
+              {% elif prefill and prefill.country == c %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Payout currency <span class="text-danger">*</span></label>
+          <div class="d-flex gap-3 mt-1">
+            {% for cur in ["USD", "ZAR"] %}
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="payout_currency"
+                     id="cur_{{ cur }}" value="{{ cur }}"
+                     {% if editing and ben.payout_currency.value == cur %}checked
+                     {% elif prefill and prefill.payout_currency == cur %}checked
+                     {% elif not editing and not prefill and cur == "USD" %}checked{% endif %}
+                     required>
+              <label class="form-check-label" for="cur_{{ cur }}">{{ cur }}</label>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <p class="text-muted small mt-3 mb-0">
+        <i class="bi bi-info-circle me-1"></i>
+        If the email or mobile matches an existing platform account, the beneficiary will be
+        automatically linked to that account (FR-BEN-04).
+      </p>
+
+      <div class="mt-4 d-flex gap-2">
+        <button type="submit" class="btn btn-primary px-4">
+          {{ "Save Changes" if editing else "Add Beneficiary" }}
+        </button>
+        <a href="/beneficiaries" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

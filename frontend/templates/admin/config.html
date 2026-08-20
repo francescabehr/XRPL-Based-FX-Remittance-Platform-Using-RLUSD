@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Fee & Limit Configuration — Admin{% endblock %}
+
+{% block content %}
+<h3 class="fw-bold mb-1"><i class="bi bi-gear me-2"></i>Fee & Limit Configuration</h3>
+<p class="text-muted mb-4">Changes apply to all quotes generated after saving. No retroactive effect.</p>
+
+<!-- Limit Tiers (FR-LIM-05) -->
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold">Remittance Limits by KYC Tier</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Tier</th>
+            <th>Daily limit (ZAR)</th>
+            <th>Monthly limit (ZAR)</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for tier in tiers %}
+          <tr>
+            <form method="post" action="/admin/config/tiers/{{ tier.id }}">
+              <td>
+                <span class="fw-semibold text-capitalize">{{ tier.tier_name }}</span>
+                {% if tier.tier_name == "unverified" %}
+                  <span class="badge bg-secondary ms-1">No KYC</span>
+                {% else %}
+                  <span class="badge bg-success ms-1">KYC approved</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="input-group input-group-sm" style="max-width:180px">
+                  <span class="input-group-text">R</span>
+                  <input type="number" name="daily_limit_zar" class="form-control"
+                         value="{{ tier.daily_limit_zar }}" min="0" step="100" required>
+                </div>
+              </td>
+              <td>
+                <div class="input-group input-group-sm" style="max-width:180px">
+                  <span class="input-group-text">R</span>
+                  <input type="number" name="monthly_limit_zar" class="form-control"
+                         value="{{ tier.monthly_limit_zar }}" min="0" step="100" required>
+                </div>
+              </td>
+              <td class="text-end">
+                <button type="submit" class="btn btn-sm btn-outline-primary">Save</button>
+              </td>
+            </form>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Fee Configuration placeholder — populated in Slice 3 (FR-FX-08) -->
+<div class="card shadow-sm opacity-50">
+  <div class="card-header fw-semibold d-flex justify-content-between">
+    FX Fee Parameters
+    <span class="badge bg-secondary">Available in Slice 3</span>
+  </div>
+  <div class="card-body text-muted">
+    Fixed fee, percentage fee, FX margin and cash-out fee will be configurable here
+    once the FX quote engine is implemented.
+  </div>
+</div>
+{% endblock %}

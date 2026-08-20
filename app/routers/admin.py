@@ -13,6 +13,7 @@ from app.services.kyc_service import (
     get_submission_by_id,
     reject_kyc,
 )
+from app.services.limit_service import get_all_tiers, get_tier_by_id, update_tier
 
 router = APIRouter(prefix="/admin")
 templates = Jinja2Templates(directory="frontend/templates")
@@ -122,3 +123,60 @@ async def kyc_reject(
 
     set_flash(request, f"KYC rejected for {submission.user.full_name}.", "warning")
     return RedirectResponse(url="/admin/kyc", status_code=302)
+
+
+# ── Fee & Limit Configuration (FR-LIM-05, FR-FX-08) ──────────────────────────
+
+@router.get("/config", response_class=HTMLResponse)
+async def config_page(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    redirect = _require_admin(user)
+    if redirect:
+        return redirect
+
+    tiers = await get_all_tiers(db)
+    return templates.TemplateResponse(
+        "admin/config.html",
+        {
+            "request": request,
+            "user": user,
+            "tiers": tiers,
+            "flash": get_flash(request),
+        },
+    )
+
+
+@router.post("/config/tiers/{tier_id}")
+async def update_tier_limits(
+    tier_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+    daily_limit_zar: str = Form(...),
+    monthly_limit_zar: str = Form(...),
+):
+    redirect = _require_admin(user)
+    if redirect:
+        return redirect
+
+    from decimal import Decimal, InvalidOperation
+    try:
+        daily = Decimal(daily_limit_zar)
+        monthly = Decimal(monthly_limit_zar)
+        if daily < 0 or monthly < 0:
+            raise ValueError("Limits cannot be negative.")
+    except (InvalidOperation, ValueError) as exc:
+        set_flash(request, f"Invalid value: {exc}", "danger")
+        return RedirectResponse(url="/admin/config", status_code=302)
+
+    tier = await get_tier_by_id(db, tier_id)
+    if not tier:
+        set_flash(request, "Tier not found.", "danger")
+        return RedirectResponse(url="/admin/config", status_code=302)
+
+    await update_tier(db, tier, daily, monthly)
+    set_flash(request, f"Limits for '{tier.tier_name}' updated.", "success")
+    return RedirectResponse(url="/admin/config", status_code=302)

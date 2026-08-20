@@ -7,7 +7,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import settings
 from app.database import engine
-from app.routers import admin, auth, kyc, sender
+from app.routers import admin, auth, beneficiaries, kyc, sender
 
 
 @asynccontextmanager
@@ -25,6 +25,7 @@ app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
 app.include_router(auth.router)
 app.include_router(sender.router)
 app.include_router(kyc.router)
+app.include_router(beneficiaries.router)
 app.include_router(admin.router)
 
 

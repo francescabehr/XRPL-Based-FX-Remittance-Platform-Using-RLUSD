@@ -34,7 +34,7 @@
 </div>
 
 <div class="row g-4">
-  <!-- Limits card (placeholder until Slice 2) -->
+  <!-- Limits card (FR-LIM-01..03) -->
   <div class="col-md-6">
     <div class="card h-100">
       <div class="card-header fw-semibold"><i class="bi bi-bar-chart me-1"></i>Remittance Limits</div>
@@ -45,12 +45,23 @@
           <p class="text-muted mb-1">Monthly limit</p>
           <div class="progress" style="height:10px"><div class="progress-bar bg-secondary" style="width:0%"></div></div>
           <p class="small text-muted mt-2">Limits are activated after KYC approval.</p>
+        {% elif tier %}
+          <p class="text-muted mb-1">Daily — R{{ "%.0f"|format(daily_used) }} of R{{ "%.0f"|format(daily_limit) }}</p>
+          <div class="progress mb-3" style="height:10px">
+            <div class="progress-bar {% if daily_pct >= 90 %}bg-danger{% elif daily_pct >= 70 %}bg-warning{% endif %}"
+                 style="width:{{ daily_pct }}%"></div>
+          </div>
+          <p class="text-muted mb-1">Monthly — R{{ "%.0f"|format(monthly_used) }} of R{{ "%.0f"|format(monthly_limit) }}</p>
+          <div class="progress" style="height:10px">
+            <div class="progress-bar {% if monthly_pct >= 90 %}bg-danger{% elif monthly_pct >= 70 %}bg-warning{% endif %}"
+                 style="width:{{ monthly_pct }}%"></div>
+          </div>
+          <p class="small text-muted mt-2">
+            R{{ "%.2f"|format(daily_remaining) }} remaining today ·
+            R{{ "%.2f"|format(monthly_remaining) }} remaining this month
+          </p>
         {% else %}
-          <p class="text-muted mb-1">Daily limit</p>
-          <div class="progress mb-3" style="height:10px"><div class="progress-bar" style="width:0%"></div></div>
-          <p class="text-muted mb-1">Monthly limit</p>
-          <div class="progress" style="height:10px"><div class="progress-bar" style="width:0%"></div></div>
-          <p class="small text-muted mt-2">R0 used today · R0 used this month</p>
+          <p class="small text-muted">Limit configuration unavailable. Contact support.</p>
         {% endif %}
       </div>
     </div>

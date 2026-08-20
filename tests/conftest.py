@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.config import settings
 from app.database import Base, get_db
 from app.main import app
+import app.models  # noqa: F401 — ensures all models register with Base.metadata
 
 # Uses a separate test DB so migrations aren't required; tables are created fresh.
 _test_engine = create_async_engine(settings.test_database_url, echo=False)
@@ -27,6 +28,26 @@ async def db():
     async with _TestSession() as session:
         yield session
         await session.rollback()
+
+
+@pytest_asyncio.fixture
+async def seed_tiers(db: AsyncSession):
+    """Populate default limit tiers for tests that exercise the limit service."""
+    from decimal import Decimal
+    from app.models.platform_config import LimitTier
+    import uuid
+
+    unverified = LimitTier(
+        id=uuid.uuid4(), tier_name="unverified",
+        daily_limit_zar=Decimal("0"), monthly_limit_zar=Decimal("0"),
+    )
+    standard = LimitTier(
+        id=uuid.uuid4(), tier_name="standard",
+        daily_limit_zar=Decimal("10000"), monthly_limit_zar=Decimal("50000"),
+    )
+    db.add_all([unverified, standard])
+    await db.commit()
+    return {"unverified": unverified, "standard": standard}
 
 
 @pytest_asyncio.fixture
