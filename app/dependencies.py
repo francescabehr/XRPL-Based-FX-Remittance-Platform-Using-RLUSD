@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 
@@ -33,3 +33,12 @@ def get_flash(request: Request) -> Optional[dict]:
 
 def set_flash(request: Request, message: str, kind: str = "info") -> None:
     request.session["flash"] = {"message": message, "kind": kind}
+
+
+async def require_admin(user: Optional[User] = Depends(get_current_user)) -> User:
+    """Single enforcement point for all admin-only routes (FR-ADM-01..07)."""
+    if not user:
+        raise HTTPException(status_code=302, headers={"Location": "/login"})
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required.")
+    return user

@@ -35,7 +35,7 @@ class Beneficiary(Base):
     payout_currency: Mapped[PayoutCurrency] = mapped_column(
         SAEnum(PayoutCurrency, name="payoutcurrency"), nullable=False
     )
-    relationship: Mapped[str] = mapped_column(String(100), nullable=False)
+    relation_type: Mapped[str] = mapped_column("relationship", String(100), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

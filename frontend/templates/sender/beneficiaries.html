@@ -34,7 +34,7 @@
           </td>
           <td>{{ b.country }}</td>
           <td><span class="badge bg-secondary">{{ b.payout_currency.value }}</span></td>
-          <td class="text-muted">{{ b.relationship }}</td>
+          <td class="text-muted">{{ b.relation_type }}</td>
           <td>
             {% if b.recipient_user_id %}
               <span class="badge bg-success"><i class="bi bi-check-lg me-1"></i>Linked</span>

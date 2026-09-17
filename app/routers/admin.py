@@ -6,7 +6,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import get_current_user, get_flash, set_flash
+from app.dependencies import get_flash, require_admin, set_flash
 from app.services.kyc_service import (
     approve_kyc,
     get_pending_submissions,
@@ -19,25 +19,12 @@ router = APIRouter(prefix="/admin")
 templates = Jinja2Templates(directory="frontend/templates")
 
 
-def _require_admin(user):
-    """Return user if admin, else return a RedirectResponse."""
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-    if not user.is_admin:
-        return RedirectResponse(url="/dashboard", status_code=302)
-    return None
-
-
 @router.get("/kyc", response_class=HTMLResponse)
 async def kyc_queue(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_admin),
 ):
-    redirect = _require_admin(user)
-    if redirect:
-        return redirect
-
     submissions = await get_pending_submissions(db)
     return templates.TemplateResponse(
         "admin/kyc_queue.html",
@@ -55,12 +42,8 @@ async def kyc_detail(
     submission_id: uuid.UUID,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_admin),
 ):
-    redirect = _require_admin(user)
-    if redirect:
-        return redirect
-
     submission = await get_submission_by_id(db, submission_id)
     if not submission:
         set_flash(request, "Submission not found.", "danger")
@@ -82,12 +65,8 @@ async def kyc_approve(
     submission_id: uuid.UUID,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_admin),
 ):
-    redirect = _require_admin(user)
-    if redirect:
-        return redirect
-
     submission = await get_submission_by_id(db, submission_id)
     if not submission:
         set_flash(request, "Submission not found.", "danger")
@@ -103,13 +82,9 @@ async def kyc_reject(
     submission_id: uuid.UUID,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_admin),
     reason: str = Form(...),
 ):
-    redirect = _require_admin(user)
-    if redirect:
-        return redirect
-
     submission = await get_submission_by_id(db, submission_id)
     if not submission:
         set_flash(request, "Submission not found.", "danger")
@@ -131,12 +106,8 @@ async def kyc_reject(
 async def config_page(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_admin),
 ):
-    redirect = _require_admin(user)
-    if redirect:
-        return redirect
-
     tiers = await get_all_tiers(db)
     return templates.TemplateResponse(
         "admin/config.html",
@@ -154,14 +125,10 @@ async def update_tier_limits(
     tier_id: uuid.UUID,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_admin),
     daily_limit_zar: str = Form(...),
     monthly_limit_zar: str = Form(...),
 ):
-    redirect = _require_admin(user)
-    if redirect:
-        return redirect
-
     from decimal import Decimal, InvalidOperation
     try:
         daily = Decimal(daily_limit_zar)

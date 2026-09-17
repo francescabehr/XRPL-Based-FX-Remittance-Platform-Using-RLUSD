@@ -76,7 +76,7 @@ async def create_beneficiary(
         mobile=mobile.strip() if mobile else None,
         country=country,
         payout_currency=PayoutCurrency(payout_currency),
-        relationship=relationship,
+        relation_type=relationship,
         is_active=True,
     )
     db.add(ben)
@@ -104,7 +104,7 @@ async def update_beneficiary(
     ben.mobile = mobile.strip() if mobile else None
     ben.country = country
     ben.payout_currency = PayoutCurrency(payout_currency)
-    ben.relationship = relationship
+    ben.relation_type = relationship
     ben.recipient_user_id = await _resolve_recipient(db, email, mobile, ben.sender_id)
 
     db.add(ben)

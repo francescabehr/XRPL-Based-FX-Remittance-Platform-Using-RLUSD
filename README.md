@@ -3,7 +3,7 @@
 
 ECO5040W · Financial Software Engineering · University of Cape Town
 
-A simulated cross-border remittance platform built on the XRPL Testnet using RLUSD. Senders in South Africa convert ZAR to RLUSD via a transparent FX quote; recipients hold RLUSD in custodial XRPL wallets and cash out to USD or ZAR.
+A simulated cross-border remittance platform built on the XRPL Testnet using UCTUSD (a UCT-issued test IOU). Senders in South Africa convert ZAR to UCTUSD via a transparent FX quote; recipients hold UCTUSD in custodial XRPL wallets and cash out to USD or ZAR.
 
 ---
 
@@ -65,7 +65,7 @@ make test
 | Role | Description |
 |---|---|
 | **Sender** | Registers, completes KYC, adds beneficiaries, initiates ZAR remittances |
-| **Recipient** | Receives RLUSD into a custodial XRPL wallet, requests cash-out |
+| **Recipient** | Receives UCTUSD into a custodial XRPL wallet, requests cash-out |
 | **Admin** | Approves KYC, confirms cash-ins, approves cash-outs, monitors transactions |
 
 ---
@@ -78,7 +78,7 @@ make test
 | 2 | Beneficiaries (FR-BEN) · Remittance limits (FR-LIM) | Done |
 | 3 | FX quote engine (FR-FX) | ⬜ |
 | 4 | Simulated cash-in (FR-CI) · Message queue skeleton (FR-MQ) | ⬜ |
-| 5 | XRPL standalone integration — account, TrustSet, RLUSD transfer | ⬜ |
+| 5 | XRPL standalone integration — account, TrustSet, UCTUSD transfer | ⬜ |
 | 6 | Settlement worker end-to-end (FR-WAL) | ⬜ |
 | 7 | Cash-out (FR-CO) · Remaining admin queues (FR-ADM) | ⬜ |
 | 8 | Performance test scripts (brief §7.iv) | ⬜ |
@@ -104,6 +104,7 @@ make migration name="describe_change"   # Generate new migration
 - XRPL private keys are Fernet-encrypted at rest; the encryption key lives in the environment, not the database (FR-WAL-03)
 - Private keys are never returned via the API, never logged, and are decrypted only in the signing path (FR-WAL-04)
 - Admin routes are enforced at the dependency layer — not just hidden from the UI
+- Auth uses server-side sessions (`SessionMiddleware` + signed cookie) — JWT is not used; this is a deliberate design choice
 
 ---
 

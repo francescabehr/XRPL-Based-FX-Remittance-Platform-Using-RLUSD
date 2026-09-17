@@ -29,8 +29,8 @@
             <option value="">— Select —</option>
             {% for r in relationships %}
             <option value="{{ r }}"
-              {% if editing and ben.relationship == r %}selected
-              {% elif prefill and prefill.relationship == r %}selected{% endif %}>{{ r }}</option>
+              {% if editing and ben.relation_type == r %}selected
+              {% elif prefill and prefill.relation_type == r %}selected{% endif %}>{{ r }}</option>
             {% endfor %}
           </select>
         </div>

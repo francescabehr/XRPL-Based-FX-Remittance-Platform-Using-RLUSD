@@ -112,7 +112,7 @@ async def create(
                 "prefill": {
                     "full_name": full_name, "email": email, "mobile": mobile,
                     "country": country, "payout_currency": payout_currency,
-                    "relationship": relationship,
+                    "relation_type": relationship,
                 },
             },
             status_code=400,
