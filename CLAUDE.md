@@ -1,7 +1,33 @@
-# CLAUDE.md — XRPL FX Remittance Platform
+# CLAUDE.md — XRPL FX Remittance Platform (UCTUSD)
 
 Reference document for Claude Code. Covers locked-in stack decisions and the phased build plan.
 Source of truth for implementation choices that must not be revisited without a team decision.
+
+> **Revision note.** This supersedes the original RLUSD-based plan. The project now settles in
+> **UCTUSD**, a UCT-issued test IOU. All references to RLUSD are historical. See
+> "Settlement asset & wallets" below for the authoritative addresses and the currency-code rule.
+
+---
+
+## Settlement Asset & Wallets
+
+| Thing | Value | Role |
+|---|---|---|
+| Settlement token | **UCTUSD** (UCT-issued IOU on XRPL Testnet) | The asset moved on-ledger |
+| Issuer / burn address | `rELez4x4Zqv3KYqboYVfrYPF8521Ycbxa5` | Issues UCTUSD; withdrawals **burn** tokens by sending them here |
+| Platform treasury wallet | `rMcBddj7AD6aEFoPSeSL8HpqVJMMxaezoz` | Pre-funded with UCTUSD; **signs outgoing payments** to recipients |
+| Currency code | **Read from the ledger — do not guess** | See rule below |
+
+**Currency-code rule (critical).** XRPL standard currency codes are exactly 3 characters; anything
+else is a 160-bit (40-hex-char) value. "UCTUSD" is 6 characters, so on-ledger it is **either** a
+40-char hex string **or** the issuer may simply use `USD`. Determine the real value empirically by
+reading the trust line on the pre-funded wallet (`AccountLines` on `rMcBddj7…`) and copy the
+`currency` field **verbatim** into config. Getting this wrong produces the classic
+"TrustSet succeeds but no payment ever finds a path" failure. Never hardcode it.
+
+**Treasury wallet is config, not a table row.** `rMcBddj7…` is the platform's source-of-funds
+wallet. It lives in configuration (`XRPL_PLATFORM_WALLET_ADDRESS` + encrypted seed), **not** in
+`users` or `wallets`. Its seed is the crown-jewel secret — it controls all UCTUSD liquidity.
 
 ---
 
@@ -13,18 +39,41 @@ Source of truth for implementation choices that must not be revisited without a 
 | Database | **PostgreSQL** | Row-level locking (`SELECT FOR UPDATE`) needed for concurrent wallet balance writes from web + worker |
 | ORM / migrations | **SQLAlchemy** (async) + **Alembic** | Standard pairing for FastAPI + Postgres |
 | Message queue | **Redis + RQ** | Simpler than Celery for a single-queue settlement flow; clear retry/failure semantics |
+| Session / auth | **Server-side sessions** (`SessionMiddleware`) | See correction note below — **not** JWT |
 | Password hashing | **bcrypt** (via `passlib`) | FR-AUTH-02 |
-| XRPL private key encryption | **Fernet** (via `cryptography`) | Key stored separately from encrypted blob — FR-WAL-03 |
+| XRPL private key encryption | **Fernet** (via `cryptography`) | Per-user seed encrypted; key stored separately from blob — FR-WAL-03 |
 | XRPL client | **xrpl-py** | Official Python SDK for XRPL Testnet |
-| Templates | **Jinja2** (server-rendered) | Served directly by FastAPI via `Jinja2Templates` |
+| Templates | **Jinja2 + Bootstrap 5** (server-rendered) | Served directly by FastAPI via `Jinja2Templates` |
 
-### Confirmed design decisions (from requirements.md §2)
+### Confirmed design decisions
+- Settlement token is **UCTUSD** (see table above); issuer address, currency code and platform
+  wallet address/seed are all **config values**, never hardcoded constants.
 - Each recipient gets a **dedicated, platform-managed XRPL Testnet account** — no pooled wallet.
-- TrustSet to RLUSD issuer must be established before any RLUSD transfer.
+  The **treasury wallet `rMcBddj7…` sources UCTUSD** to each recipient; per-user liquidity is no
+  longer a risk because the treasury is pre-funded.
+- A recipient's account needs a **TrustSet to the issuer** before it can receive UCTUSD.
+- Same-issuer holder-to-holder movement (treasury → recipient) relies on the issuer having
+  **Default Ripple** enabled. We do not configure this (the issuer does); confirm it works with one
+  test payment early, and explain it in the spec's settlement section.
 - Cash-in is **simulated card only** — no real card network.
-- Cash-out currencies: **USD and ZAR only**.
-- RLUSD balance debit on **approval**, with automatic reversal on failure (FR-CO-06).
+- Cash-out currencies: **USD and ZAR only.**
+- **Cash-out executes an on-chain burn:** the recipient's account sends UCTUSD back to the issuer
+  `rELez4x4…`; the transaction hash is stored, and the fiat conversion is simulated in the DB.
+  (This replaces the earlier DB-only status-change model.)
+- UCTUSD balance is debited on **approval**, with automatic reversal on failure (FR-CO-06).
 - One user account may hold **both sender and recipient roles** (`users.roles` is an array).
+
+### Corrections vs the original plan (now authoritative)
+- **Auth is session-based, not JWT.** The code uses `SessionMiddleware` (server-side cookie
+  sessions). This is an accepted limitation documented in "Assumptions & Limitations" of the spec —
+  do **not** rip in JWT. Any doc that still says "JWT" is stale.
+- **Admin enforcement must be centralized.** `dependencies.py:require_admin` is the single
+  enforcement point (see Critical Rules). The current code uses an ad-hoc `_require_admin` helper
+  inside `admin.py` — this is to be replaced during the reconciliation pass.
+- **Message queue role.** With per-user accounts, the queue/worker performs the **on-chain
+  settlement** (treasury → recipient UCTUSD payment). This is its primary job. (If the team ever
+  switched to a platform-wallet model, the queue would instead handle background tasks such as the
+  burn-on-withdrawal and notifications — but the per-user model is the chosen path.)
 
 ---
 
@@ -33,35 +82,41 @@ Source of truth for implementation choices that must not be revisited without a 
 Do not start a phase until the one above it has passing tests.
 
 ```
-Phase 0  Foundation
+Phase 0  Foundation                    ✅ DONE
          App skeleton, config (.env), DB session, Alembic init
 
-Phase 1  Auth & Users                  FR-AUTH-01..07
-         Registration, login/logout, bcrypt, JWT session
+Phase 1  Auth & Users                  ✅ DONE   FR-AUTH-01..07
+         Registration, login/logout, bcrypt, server-side session
 
-Phase 2  KYC                           FR-KYC-01..05
+Phase 2  KYC                           ✅ DONE   FR-KYC-01..05
          Submit form, admin approval, status propagation
 
-Phase 3  Beneficiaries & Limits        FR-BEN-01..05  FR-LIM-01..05
-         (parallel — both unblock Phase 4)
+Phase 3  Beneficiaries & Limits        ✅ DONE   FR-BEN-01..05  FR-LIM-01..05
+         NOTE: limit usage tracking is stubbed (returns 0) until the
+         Transaction model lands in Phase 4 — un-stub then.
 
-Phase 4  FX Quote Engine               FR-FX-01..08
-         Rate source, fee/margin calc, GET /quote endpoint
+Phase 4  FX Quote Engine               ⬜        FR-FX-01..08
+         Transaction model, rate source, fee/margin calc, GET /quote.
+         Introduces the Transaction model → un-stubs limit usage tracking.
 
-Phase 5  XRPL Wallet Provisioning      FR-WAL-01..04
-         Testnet account creation, TrustSet, Fernet key encryption
+Phase 5  XRPL Standalone (de-risk)     ⬜        FR-WAL-01..04
+         Throwaway script FIRST: create recipient account, TrustSet with the
+         verified currency code, send UCTUSD from treasury, validate hash,
+         Fernet-encrypt per-user seed. Prove the XRPL surface before wiring it in.
 
-Phase 6  Cash-In + Queue + Settlement  FR-CI-01..05  FR-MQ-01..06  FR-WAL-05..07
-         Simulated card → queue publish → RQ worker → XRPL transfer → validation
+Phase 6  Cash-In + Queue + Settlement  ⬜        FR-CI-01..05  FR-MQ-01..06  FR-WAL-05..07
+         Simulated card → queue publish → RQ worker → treasury→recipient
+         UCTUSD payment → validation. Idempotency check is the anti-double-credit control.
 
-Phase 7  Cash-Out                      FR-CO-01..06
-         Request, admin approve, balance debit/reversal
+Phase 7  Cash-Out (burn)               ⬜        FR-CO-01..06
+         Request → admin approve → balance debit → on-chain burn to issuer →
+         store burn hash → simulate fiat payout. Reversal on failure.
 
-Phase 8  Admin Portal                  FR-ADM-01..07
-         KYC queue, cash-in queue, cash-out queue, monitor, config screen
+Phase 8  Admin Portal                  ⬜(partial) FR-ADM-01..07
+         KYC queue DONE; add cash-in queue, cash-out queue, monitor, config screen.
 
-Phase 9  UI Templates
-         Wire Jinja2 templates onto every router
+Phase 9  Performance Tests             ⬜        Brief §7.iv
+         Locust scenarios once a full flow runs; synthetic data via Faker.
 ```
 
 ---
@@ -72,236 +127,122 @@ Phase 9  UI Templates
 xrpl-remittance/
 ├── app/
 │   ├── main.py                   # FastAPI app init, router mounting, lifespan
-│   ├── config.py                 # Pydantic Settings (reads .env)
+│   ├── config.py                 # Pydantic Settings (reads .env) — incl. UCTUSD/wallet config
 │   ├── database.py               # SQLAlchemy async engine + session factory
-│   ├── dependencies.py           # Depends(): get_db, current_user, require_admin
+│   ├── dependencies.py           # Depends(): get_db, current_user, require_admin  ← single admin gate
 │   │
 │   ├── models/
 │   │   ├── user.py
 │   │   ├── kyc.py
 │   │   ├── beneficiary.py
-│   │   ├── transaction.py
-│   │   ├── wallet.py
-│   │   ├── cashout.py
+│   │   ├── transaction.py        # (Phase 4)
+│   │   ├── wallet.py             # (Phase 5)
+│   │   ├── cashout.py            # (Phase 7)
 │   │   └── platform_config.py    # fee_config + limit_tiers
 │   │
-│   ├── schemas/
-│   │   ├── auth.py
-│   │   ├── kyc.py
-│   │   ├── beneficiary.py
-│   │   ├── transaction.py        # QuoteRequest / QuoteResponse
-│   │   ├── wallet.py
-│   │   └── cashout.py
-│   │
-│   ├── routers/
-│   │   ├── auth.py
-│   │   ├── kyc.py
-│   │   ├── beneficiaries.py
-│   │   ├── transactions.py       # quote + send-money flow
-│   │   ├── wallet.py             # recipient wallet views
-│   │   ├── cashout.py
-│   │   └── admin.py
+│   ├── schemas/                  # auth, kyc, beneficiary, transaction, wallet, cashout
+│   ├── routers/                  # auth, kyc, beneficiaries, transactions, wallet, cashout, admin
 │   │
 │   ├── services/
 │   │   ├── auth_service.py
 │   │   ├── kyc_service.py
 │   │   ├── beneficiary_service.py
-│   │   ├── fx_service.py         # rate fetch + fee/margin/RLUSD calc
+│   │   ├── fx_service.py         # rate fetch + fee/margin/UCTUSD calc  (Phase 4)
 │   │   ├── limit_service.py      # daily/monthly cumulative checks
-│   │   ├── cashin_service.py     # mock card + status transitions
-│   │   ├── cashout_service.py    # request → approved → completed/failed
-│   │   ├── queue_service.py      # enqueue settlement messages (RQ)
-│   │   └── xrpl_service.py       # account provision, TrustSet, Payment tx
+│   │   ├── cashin_service.py     # mock card + status transitions  (Phase 6)
+│   │   ├── cashout_service.py    # request → approved → burn → completed/failed  (Phase 7)
+│   │   ├── queue_service.py      # enqueue settlement messages (RQ)  (Phase 6)
+│   │   └── xrpl_service.py       # account provision, TrustSet, Payment, burn  (Phase 5/6/7)
 │   │
 │   ├── workers/
-│   │   └── settlement_worker.py  # RQ job: consume → XRPL transfer → update DB
+│   │   └── settlement_worker.py  # RQ job: consume → UCTUSD transfer → update DB  (Phase 6)
 │   │
 │   └── security/
 │       ├── crypto.py             # Fernet encrypt/decrypt for XRPL private keys
 │       └── hashing.py            # bcrypt hash/verify
 │
-├── migrations/
-│   ├── env.py
-│   └── versions/
-│
-├── tests/
-│   ├── conftest.py               # pytest fixtures: test DB, test client, mock XRPL
-│   ├── test_auth.py
-│   ├── test_kyc.py
-│   ├── test_beneficiaries.py
-│   ├── test_fx.py
-│   ├── test_limits.py
-│   ├── test_cashin.py
-│   ├── test_queue.py
-│   ├── test_xrpl.py
-│   ├── test_cashout.py
-│   └── test_admin.py
-│
-├── frontend/
-│   ├── templates/
-│   │   ├── base.html
-│   │   ├── auth/
-│   │   ├── sender/
-│   │   ├── recipient/
-│   │   └── admin/
-│   └── static/
-│       ├── css/
-│       └── js/
-│
-├── .env.example
-├── requirements.txt
-├── alembic.ini
-└── Makefile                      # targets: dev, worker, test, migrate
+├── migrations/ · tests/ · frontend/{templates,static}
+├── .env.example · requirements.txt · alembic.ini · Makefile
 ```
+
+---
+
+## Configuration (.env keys)
+
+```
+# Core
+DATABASE_URL=postgresql+asyncpg://...
+SECRET_KEY=...                       # session signing
+REDIS_URL=redis://localhost:6379/0
+
+# XRPL / UCTUSD
+XRPL_JSON_RPC=https://s.altnet.rippletest.net:51234
+XRPL_ISSUER_ADDRESS=rELez4x4Zqv3KYqboYVfrYPF8521Ycbxa5
+XRPL_CURRENCY_CODE=<exact code from AccountLines on the treasury wallet — verbatim>
+XRPL_PLATFORM_WALLET_ADDRESS=rMcBddj7AD6aEFoPSeSL8HpqVJMMxaezoz
+XRPL_PLATFORM_WALLET_SEED=<treasury seed — obtain from lecturer; NEVER commit>
+
+# Key management
+XRPL_ENCRYPTION_KEY=<Fernet key for per-user seeds — separate store from the DB>
+```
+
+Switching between the official issuer and any fallback IOU must remain a **config change, not a
+rewrite** (brief §4). The currency code and both addresses are the only things that change.
 
 ---
 
 ## Data Model
 
-### `users`
-| Column | Type | Notes |
-|---|---|---|
-| id | UUID PK | |
-| email | VARCHAR UNIQUE | |
-| mobile | VARCHAR UNIQUE | |
-| full_name | VARCHAR | |
-| password_hash | VARCHAR | bcrypt — never plaintext |
-| roles | VARCHAR[] | `{sender, recipient, admin}` |
-| kyc_status | ENUM | `not_submitted / pending / approved / rejected` |
-| created_at | TIMESTAMPTZ | |
-| updated_at | TIMESTAMPTZ | |
+Unchanged tables from the original plan: `users`, `kyc_submissions`, `beneficiaries`, `wallets`
+(one row per recipient: `xrpl_address`, `encrypted_private_key`, `key_encryption_key_id`,
+`trust_set_complete`, `balance_uctusd` cache), `transactions`, `fee_config`, `limit_tiers`.
 
-### `kyc_submissions`
-| Column | Type | Notes |
-|---|---|---|
-| id | UUID PK | |
-| user_id | FK → users | |
-| full_name | VARCHAR | |
-| date_of_birth | DATE | |
-| nationality | VARCHAR | |
-| id_number | VARCHAR | |
-| residential_address | TEXT | |
-| mobile | VARCHAR | |
-| email | VARCHAR | |
-| source_of_funds | TEXT | |
-| status | ENUM | `pending / approved / rejected` |
-| rejection_reason | TEXT | nullable |
-| reviewed_by | FK → users | nullable; admin only |
-| reviewed_at | TIMESTAMPTZ | nullable |
-| submitted_at | TIMESTAMPTZ | |
+Changes for UCTUSD:
+- **`wallets.balance_rlusd` → `balance_uctusd`** (platform-side cache; authoritative source is XRPL).
+- **`transactions.rlusd_amount` → `uctusd_amount`**; `xrpl_tx_hash` holds the treasury→recipient
+  settlement hash.
+- **`cashout_requests`**: `rlusd_amount` → `uctusd_amount`; **add `xrpl_burn_tx_hash` (nullable)**
+  to store the on-chain burn hash (recipient → issuer). Add this column when Phase 7 is built.
+- **Treasury wallet is NOT a row** — it is config (see above).
 
-### `beneficiaries`
-| Column | Type | Notes |
-|---|---|---|
-| id | UUID PK | |
-| sender_id | FK → users | |
-| recipient_user_id | FK → users | nullable — may not have an account yet |
-| full_name | VARCHAR | |
-| email | VARCHAR | nullable |
-| mobile | VARCHAR | nullable |
-| country | VARCHAR | |
-| payout_currency | ENUM | `USD / ZAR` |
-| relationship | VARCHAR | |
-| is_active | BOOLEAN | soft-delete for FR-BEN-05 |
-| created_at | TIMESTAMPTZ | |
-
-### `wallets`
-| Column | Type | Notes |
-|---|---|---|
-| id | UUID PK | |
-| user_id | FK → users UNIQUE | one wallet per recipient |
-| xrpl_address | VARCHAR | public |
-| encrypted_private_key | TEXT | Fernet-encrypted blob |
-| key_encryption_key_id | VARCHAR | pointer into separate key store (env var / Vault) |
-| trust_set_complete | BOOLEAN | must be true before any RLUSD send |
-| balance_rlusd | DECIMAL(20,6) | platform-side cache; authoritative source is XRPL |
-| created_at | TIMESTAMPTZ | |
-
-### `transactions`
-| Column | Type | Notes |
-|---|---|---|
-| id | UUID PK | |
-| sender_id | FK → users | |
-| beneficiary_id | FK → beneficiaries | |
-| recipient_wallet_id | FK → wallets | |
-| zar_amount | DECIMAL(20,2) | gross send amount |
-| exchange_rate | DECIMAL(20,6) | market rate at quote time |
-| fx_margin | DECIMAL(6,4) | e.g. 0.02 = 2% |
-| transaction_fee | DECIMAL(20,2) | fixed + % combined, in ZAR |
-| net_zar_converted | DECIMAL(20,2) | zar_amount − transaction_fee |
-| rlusd_amount | DECIMAL(20,6) | net_zar_converted / effective_rate |
-| cashout_fee_estimate | DECIMAL(20,6) | preview only, not binding |
-| idempotency_key | UUID UNIQUE | queue dedup — 1:1 with this row |
-| cashin_status | ENUM | `pending / received / failed` |
-| settlement_status | ENUM | `not_queued / queued / processing / completed / failed` |
-| xrpl_tx_hash | VARCHAR | nullable; set after ledger confirmation |
-| xrpl_validated | BOOLEAN | false until on-ledger validation passes |
-| xrpl_error_reason | TEXT | nullable |
-| aml_flagged | BOOLEAN | default false |
-| created_at | TIMESTAMPTZ | |
-| settled_at | TIMESTAMPTZ | nullable |
-
-### `cashout_requests`
-| Column | Type | Notes |
-|---|---|---|
-| id | UUID PK | |
-| recipient_id | FK → users | |
-| wallet_id | FK → wallets | |
-| rlusd_amount | DECIMAL(20,6) | |
-| target_currency | ENUM | `USD / ZAR` |
-| exchange_rate | DECIMAL(20,6) | rate at request time |
-| cashout_fee | DECIMAL(20,6) | |
-| net_payout | DECIMAL(20,6) | (rlusd × rate) − fee |
-| status | ENUM | `requested / approved / completed / failed` |
-| approved_by | FK → users | nullable; admin only |
-| approved_at | TIMESTAMPTZ | nullable |
-| completed_at | TIMESTAMPTZ | nullable |
-| failure_reason | TEXT | nullable |
-| created_at | TIMESTAMPTZ | |
-
-### `fee_config` (single active row, admin-editable)
-| Column | Type |
-|---|---|
-| id | PK |
-| fixed_fee_zar | DECIMAL |
-| percentage_fee | DECIMAL |
-| fx_margin | DECIMAL |
-| cashout_fee_percentage | DECIMAL |
-| updated_by | FK → users |
-| updated_at | TIMESTAMPTZ |
-
-### `limit_tiers` (one row per tier)
-| Column | Type |
-|---|---|
-| id | PK |
-| tier_name | VARCHAR UNIQUE |
-| daily_limit_zar | DECIMAL |
-| monthly_limit_zar | DECIMAL |
+Keep `transactions.idempotency_key` (UUID UNIQUE) as the queue-dedup / anti-double-credit key.
 
 ---
 
 ## FR-XXX → Code Module Map
 
-| FR Group | Router | Service | Model | Schema | Test |
-|---|---|---|---|---|---|
-| FR-AUTH-01..07 | `routers/auth.py` | `auth_service.py` | `user.py` | `schemas/auth.py` | `test_auth.py` |
-| FR-KYC-01..05 | `routers/kyc.py` | `kyc_service.py` | `kyc.py` | `schemas/kyc.py` | `test_kyc.py` |
-| FR-BEN-01..05 | `routers/beneficiaries.py` | `beneficiary_service.py` | `beneficiary.py` | `schemas/beneficiary.py` | `test_beneficiaries.py` |
-| FR-LIM-01..05 | via `routers/transactions.py` | `limit_service.py` | `platform_config.py` | inline transaction schema | `test_limits.py` |
-| FR-FX-01..08 | `routers/transactions.py` GET /quote | `fx_service.py` | `platform_config.py` | `schemas/transaction.py` | `test_fx.py` |
-| FR-CI-01..05 | `routers/transactions.py` POST + PATCH | `cashin_service.py` | `transaction.py` | `schemas/transaction.py` | `test_cashin.py` |
-| FR-MQ-01..06 | n/a (triggered from cashin_service) | `queue_service.py` | `transaction.py` | — | `test_queue.py` |
-| FR-WAL-01..07 | `routers/wallet.py` | `xrpl_service.py` | `wallet.py` | `schemas/wallet.py` | `test_xrpl.py` |
-| FR-CO-01..06 | `routers/cashout.py` | `cashout_service.py` | `cashout.py` | `schemas/cashout.py` | `test_cashout.py` |
-| FR-ADM-01..07 | `routers/admin.py` | (delegates to domain services) | all | all | `test_admin.py` |
+| FR Group | Router | Service | Model | Test |
+|---|---|---|---|---|
+| FR-AUTH-01..07 | `routers/auth.py` | `auth_service.py` | `user.py` | `test_auth.py` |
+| FR-KYC-01..05 | `routers/kyc.py` | `kyc_service.py` | `kyc.py` | `test_kyc.py` |
+| FR-BEN-01..05 | `routers/beneficiaries.py` | `beneficiary_service.py` | `beneficiary.py` | `test_beneficiaries.py` |
+| FR-LIM-01..05 | via `routers/transactions.py` | `limit_service.py` | `platform_config.py` | `test_limits.py` |
+| FR-FX-01..08 | `routers/transactions.py` GET /quote | `fx_service.py` | `transaction.py` | `test_fx.py` |
+| FR-CI-01..05 | `routers/transactions.py` POST + PATCH | `cashin_service.py` | `transaction.py` | `test_cashin.py` |
+| FR-MQ-01..06 | (triggered from cashin_service) | `queue_service.py` | `transaction.py` | `test_queue.py` |
+| FR-WAL-01..07 | `routers/wallet.py` | `xrpl_service.py` | `wallet.py` | `test_xrpl.py` |
+| FR-CO-01..06 | `routers/cashout.py` | `cashout_service.py` | `cashout.py` | `test_cashout.py` |
+| FR-ADM-01..07 | `routers/admin.py` | (delegates to domain services) | all | `test_admin.py` |
 
 ---
 
 ## Critical Implementation Rules
 
-- **`dependencies.py:require_admin`** is the single enforcement point for all admin-only routes. Every admin router must use it — if it's bypassed, FR-ADM-01 through FR-ADM-07 all fail.
-- **`limit_service.py`** must run inside the same DB transaction as the transaction insert (not before it) to prevent a TOCTOU race under concurrent sends from the same user.
-- **`settlement_worker.py`** must check `idempotency_key` before processing. The first DB write claiming that key wins; subsequent redeliveries of the same message are a no-op (FR-MQ-04).
-- **`security/crypto.py`** is used only by `xrpl_service.py` for key decryption and wallet provisioning — nowhere else. Do not widen this surface.
-- **`test_xrpl.py`** mocks `xrpl-py`'s async client — unit tests must not hit the real Testnet. Optional integration tests may, but only in CI with a dedicated Testnet account.
-- Plaintext private keys must never appear in logs, API responses, or DB rows — enforced in `xrpl_service.py` and auditable via `security/crypto.py`.
+- **`dependencies.py:require_admin`** is the single enforcement point for all admin-only routes.
+  Every admin router must use it. The current ad-hoc `_require_admin` in `admin.py` must be replaced
+  during the reconciliation pass — if admin gating is inconsistent, FR-ADM-01..07 are all at risk.
+- **Currency code is read from the ledger, never hardcoded.** `xrpl_service.py` uses
+  `settings.XRPL_CURRENCY_CODE` for every `TrustSet` and `IssuedCurrencyAmount`.
+- **`limit_service.py`** must run inside the same DB transaction as the transaction insert (not
+  before it) to prevent a TOCTOU race under concurrent sends from the same user. Un-stub
+  `get_daily_usage`/`get_monthly_usage` as soon as the Transaction model exists (Phase 4).
+- **`settlement_worker.py`** must check `idempotency_key` before processing. The first DB write
+  claiming that key wins; subsequent redeliveries of the same message are a no-op (FR-MQ-04).
+- **Cash-out burn** submits a real Payment from the recipient's account to the issuer `rELez4x4…`,
+  stores `xrpl_burn_tx_hash`, and only then marks the fiat payout complete in the DB.
+- **`security/crypto.py`** is used only by `xrpl_service.py` for key decryption and wallet
+  provisioning — nowhere else. Do not widen this surface.
+- **The treasury seed and per-user seeds** must never appear in logs, API responses, or DB rows in
+  plaintext — enforced in `xrpl_service.py`, auditable via `security/crypto.py`.
+- **`test_xrpl.py`** mocks `xrpl-py`'s client — unit tests must not hit the real Testnet. Optional
+  integration tests may, but only against the dedicated Testnet accounts above.
