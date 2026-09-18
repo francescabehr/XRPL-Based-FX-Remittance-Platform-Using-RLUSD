@@ -98,10 +98,12 @@ Phase 4  FX Quote Engine               ✅ DONE   FR-FX-01..08
          Transaction model, rate source, fee/margin calc, GET /quote.
          Introduced the Transaction model → limit usage tracking un-stubbed.
 
-Phase 5  XRPL Standalone (de-risk)     ⬜        FR-WAL-01..04
-         Throwaway script FIRST: create recipient account, TrustSet with the
-         verified currency code, send UCTUSD from treasury, validate hash,
-         Fernet-encrypt per-user seed. Prove the XRPL surface before wiring it in.
+Phase 5  XRPL Standalone (de-risk)     ✅ DONE   FR-WAL-01..04
+         scripts/xrpl_smoke.py proved the path on Testnet (TrustSet, treasury
+         payment, burn, Fernet). Ported to xrpl_service.py + wallets table
+         (migration 0004). Observed failure codes: tecPATH_DRY (no trust line),
+         tecPATH_PARTIAL (insufficient UCTUSD); bad currency code is rejected
+         client-side by xrpl-py. Default Ripple on the issuer confirmed working.
 
 Phase 6  Cash-In + Queue + Settlement  ⬜        FR-CI-01..05  FR-MQ-01..06  FR-WAL-05..07
          Simulated card → queue publish → RQ worker → treasury→recipient
@@ -135,7 +137,7 @@ xrpl-remittance/
 │   │   ├── kyc.py
 │   │   ├── beneficiary.py
 │   │   ├── transaction.py        # (Phase 4) ✅
-│   │   ├── wallet.py             # (Phase 5)
+│   │   ├── wallet.py             # (Phase 5) ✅
 │   │   ├── cashout.py            # (Phase 7)
 │   │   └── platform_config.py    # fee_config + limit_tiers
 │   │
