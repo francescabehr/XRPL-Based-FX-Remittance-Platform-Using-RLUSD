@@ -1,4 +1,6 @@
-# XRPL-Based-FX-Remittance-Platform-Using-RLUSD
+# XRPL-Based FX Remittance Platform (UCTUSD)
+
+> The repository name still says "RLUSD" for historical reasons; the platform settles in UCTUSD.
 
 
 ECO5040W · Financial Software Engineering · University of Cape Town
@@ -35,7 +37,8 @@ pip install -r requirements.txt
 
 # 2. Configure environment
 cp .env.example .env
-# Edit .env — set DATABASE_URL, SECRET_KEY, and XRPL_ENCRYPTION_KEY
+# Edit .env — set DATABASE_URL, SECRET_KEY, REDIS_URL, XRPL_ENCRYPTION_KEY,
+# and the XRPL_* settlement values (issuer, currency code, treasury wallet + seed)
 
 # 3. Create the database
 createdb remittance_db
@@ -49,6 +52,13 @@ make seed-admin
 # 6. Start the app
 make dev
 # → http://localhost:8000
+```
+
+`XRPL_CURRENCY_CODE` is the 40-character hex code read from the treasury wallet's trust line —
+never guess it. Re-read it any time the issuer changes:
+
+```bash
+python scripts/check_currency.py
 ```
 
 ### Running tests
@@ -76,7 +86,7 @@ make test
 |---|---|---|
 | 1 | Scaffold · Auth (FR-AUTH) · KYC (FR-KYC) · Admin KYC approval | ✅ Done |
 | 2 | Beneficiaries (FR-BEN) · Remittance limits (FR-LIM) | Done |
-| 3 | FX quote engine (FR-FX) | ⬜ |
+| 3 | FX quote engine (FR-FX) | ✅ Done |
 | 4 | Simulated cash-in (FR-CI) · Message queue skeleton (FR-MQ) | ⬜ |
 | 5 | XRPL standalone integration — account, TrustSet, UCTUSD transfer | ⬜ |
 | 6 | Settlement worker end-to-end (FR-WAL) | ⬜ |

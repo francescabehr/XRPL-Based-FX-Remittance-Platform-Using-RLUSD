@@ -66,6 +66,15 @@ human to fill in.)
 - Confirm **every** admin route (KYC queue, approve/reject, config) goes through it.
 - **Acceptance:** `test_admin.py` asserts a non-admin user receives 403 on at least one admin route;
   no admin route bypasses `require_admin`.
+- VERIFY and report:
+  1. Every admin route, in admin.py AND any other router, is gated with
+     Depends(require_admin). List any admin endpoint that ISN'T.
+  2. No ad-hoc admin checks remain anywhere — grep for is_admin / role checks that sit
+     outside require_admin.
+  3. User.is_admin actually exists and is correct.
+  4. test_admin.py asserts 403 for a logged-in non-admin, and ideally the /login redirect
+     for an anonymous user.
+- Flag any issues identified 
 
 ### 6. Flag the limit-usage stubs
 - In `limit_service.py`, mark `get_daily_usage`/`get_monthly_usage` with a clear

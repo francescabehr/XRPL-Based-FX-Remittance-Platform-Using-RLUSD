@@ -1,10 +1,40 @@
-
 XRPL-Based FX Remittance Platform
 Functional Requirements & UI Design Document
 ECO5040W — Financial Software Engineering
 University of Cape Town
+Version 1.1
+Prepared: 20 August 2026 (v1.0) · Revised: 18 September 2026 (v1.1)
+Feeds into: Business and Technical Specification (Project Brief, Section 7.i)
+
+Revision Note — Version 1.1 (18 September 2026)
+This addendum records decisions confirmed since v1.0. The body of this document below is unchanged and remains accurate as at 20 August 2026; wherever it refers to "RLUSD", read "UCTUSD". The living source of truth for implementation is CLAUDE.md and BUILD_PLAN.md.
+
+Settlement asset changed: RLUSD → UCTUSD
+●	The platform now settles in UCTUSD, a UCT-issued test IOU on the XRPL Testnet.
+●	Issuer / burn address: rELez4x4Zqv3KYqboYVfrYPF8521Ycbxa5
+●	On-ledger currency code, confirmed from the ledger and used verbatim: 5543545553440000000000000000000000000000 (the 40-character hexadecimal form of "UCTUSD").
+●	A pre-funded platform treasury wallet (rMcBddj7AD6aEFoPSeSL8HpqVJMMxaezoz) is the source of UCTUSD for recipient credits. The "buy tokens from an exchange" step is not simulated.
+
+Cash-out is now an on-chain burn (updates Section 4 steps 10–11 and Section 5.9)
+●	Cash-out sends UCTUSD from the recipient's account back to the issuer address (a burn); the burn transaction hash is stored, and the fiat conversion is simulated in the database. This replaces any purely database-only status-change model.
+
+Open questions from Section 9 — now resolved
+●	Dual role: yes. A single account may be both sender and recipient. The User model uses independent boolean flags (is_admin, can_send, can_receive), not a roles array; can_send and can_receive may both be true.
+●	Cash-out balance debit (FR-CO-06): debited on approval, with automatic reversal on failure.
+●	Recipient onboarding (FR-BEN-04): adding a beneficiary auto-links to an existing account by email or mobile; otherwise the recipient registers self-service.
+
+Open questions from Section 9 — still open, to be settled in Phase 4
+●	Quote validity window: how long a quote holds before the rate must be re-fetched.
+●	Exchange-rate source: live API versus a mock or configurable rate table (starting with a configurable rate).
+
+Stack now locked (was left open in Sections 2 and 8)
+●	Backend: FastAPI. Database: PostgreSQL (SQLAlchemy async with Alembic). Message queue: Redis with RQ. Templates: Jinja2 with Bootstrap 5.
+●	Authentication is server-side sessions (SessionMiddleware), not JWT — a deliberate choice, logged as an assumption and limitation. Read the "session/token" wording in FR-AUTH-03 accordingly.
+
+Message queue
+●	The queue and worker requirement stands. Under the per-user-account model it carries the on-chain UCTUSD settlement; the lecturer has confirmed that an architecture that does not need the queue for on-chain transfers may use it for other background work instead.
+
 Version 1.0
-Prepared: 20 August 2026
 Feeds into: Business and Technical Specification (Project Brief, Section 7.i)
 
  Table of Contents

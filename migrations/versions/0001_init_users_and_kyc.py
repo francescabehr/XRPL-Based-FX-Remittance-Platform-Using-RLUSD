@@ -31,7 +31,7 @@ def upgrade() -> None:
         sa.Column("can_receive", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column(
             "kyc_status",
-            sa.Enum("not_submitted", "pending", "approved", "rejected", name="kycstatus", create_type=False),
+            postgresql.ENUM("not_submitted", "pending", "approved", "rejected", name="kycstatus", create_type=False),
             nullable=False,
             server_default="not_submitted",
         ),
@@ -71,7 +71,7 @@ def upgrade() -> None:
         sa.Column("source_of_funds", sa.Text(), nullable=False),
         sa.Column(
             "status",
-            sa.Enum("pending", "approved", "rejected", name="kycsubmissionstatus", create_type=False),
+            postgresql.ENUM("pending", "approved", "rejected", name="kycsubmissionstatus", create_type=False),
             nullable=False,
             server_default="pending",
         ),

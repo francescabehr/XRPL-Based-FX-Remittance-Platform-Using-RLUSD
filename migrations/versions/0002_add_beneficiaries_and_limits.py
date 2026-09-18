@@ -29,7 +29,7 @@ def upgrade() -> None:
         sa.Column("country", sa.String(100), nullable=False),
         sa.Column(
             "payout_currency",
-            sa.Enum("USD", "ZAR", name="payoutcurrency", create_type=False),
+            postgresql.ENUM("USD", "ZAR", name="payoutcurrency", create_type=False),
             nullable=False,
         ),
         sa.Column("relationship", sa.String(100), nullable=False),
