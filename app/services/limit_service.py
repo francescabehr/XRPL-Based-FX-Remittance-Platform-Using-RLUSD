@@ -1,18 +1,21 @@
 """
 FR-LIM-01..05  Remittance limit enforcement.
 
-get_daily_usage / get_monthly_usage are stubs that return Decimal("0") until
-the Transaction model is introduced in Slice 3, at which point they are replaced
-with real aggregate queries.
+Usage is summed over real `transactions` rows for the calendar day / month in UTC.
+Callers must pass the *same* AsyncSession they will insert the new transaction on,
+so the check and the insert commit as one transaction (prevents a TOCTOU race
+under concurrent sends from the same user).
 """
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.platform_config import LimitTier
+from app.models.transaction import CashInStatus, Transaction
 from app.models.user import KYCStatus, User
 
 _TIER_FOR_STATUS: dict[KYCStatus, str] = {
@@ -53,14 +56,39 @@ async def get_tier_by_id(db: AsyncSession, tier_id: uuid.UUID) -> Optional[Limit
     return result.scalar_one_or_none()
 
 
-# --- usage stubs (replaced in Slice 3) ---
+# --- usage ---
+
+async def _sum_zar_since(
+    db: AsyncSession, user_id: uuid.UUID, since: datetime
+) -> Decimal:
+    """Sum ZAR sent by a user since `since`.
+
+    A failed cash-in never moved money, so it does not consume allowance.
+    Everything else counts, including in-flight transactions, so that concurrent
+    sends cannot each see the same headroom.
+    """
+    result = await db.execute(
+        select(func.coalesce(func.sum(Transaction.zar_amount), 0)).where(
+            Transaction.sender_id == user_id,
+            Transaction.created_at >= since,
+            Transaction.cashin_status != CashInStatus.failed,
+        )
+    )
+    return Decimal(result.scalar_one())
+
 
 async def get_daily_usage(db: AsyncSession, user_id: uuid.UUID) -> Decimal:
-    return Decimal("0")
+    """ZAR sent by this user so far in the current UTC calendar day (FR-LIM-01)."""
+    now = datetime.now(timezone.utc)
+    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    return await _sum_zar_since(db, user_id, start_of_day)
 
 
 async def get_monthly_usage(db: AsyncSession, user_id: uuid.UUID) -> Decimal:
-    return Decimal("0")
+    """ZAR sent by this user so far in the current UTC calendar month (FR-LIM-02)."""
+    now = datetime.now(timezone.utc)
+    start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    return await _sum_zar_since(db, user_id, start_of_month)
 
 
 # --- main check ---

@@ -7,7 +7,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import settings
 from app.database import engine
-from app.routers import admin, auth, beneficiaries, kyc, sender
+from app.routers import admin, auth, beneficiaries, kyc, sender, transactions
 
 
 @asynccontextmanager
@@ -26,6 +26,7 @@ app.include_router(auth.router)
 app.include_router(sender.router)
 app.include_router(kyc.router)
 app.include_router(beneficiaries.router)
+app.include_router(transactions.router)
 app.include_router(admin.router)
 
 

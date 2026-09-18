@@ -61,15 +61,14 @@ wallet. It lives in configuration (`XRPL_PLATFORM_WALLET_ADDRESS` + encrypted se
   `rELez4x4…`; the transaction hash is stored, and the fiat conversion is simulated in the DB.
   (This replaces the earlier DB-only status-change model.)
 - UCTUSD balance is debited on **approval**, with automatic reversal on failure (FR-CO-06).
-- One user account may hold **both sender and recipient roles** (`users.roles` is an array).
+- One user account may hold both sender and recipient roles — the User model uses independent boolean flags is_admin, can_send, can_receive (both can_send and can_receive can be true), not a roles array.
 
 ### Corrections vs the original plan (now authoritative)
 - **Auth is session-based, not JWT.** The code uses `SessionMiddleware` (server-side cookie
   sessions). This is an accepted limitation documented in "Assumptions & Limitations" of the spec —
   do **not** rip in JWT. Any doc that still says "JWT" is stale.
 - **Admin enforcement must be centralized.** `dependencies.py:require_admin` is the single
-  enforcement point (see Critical Rules). The current code uses an ad-hoc `_require_admin` helper
-  inside `admin.py` — this is to be replaced during the reconciliation pass.
+  enforcement point (see Critical Rules). Admin enforcement is centralized in dependencies.py:require_admin; every admin route uses it and no ad-hoc helper remains. Done.
 - **Message queue role.** With per-user accounts, the queue/worker performs the **on-chain
   settlement** (treasury → recipient UCTUSD payment). This is its primary job. (If the team ever
   switched to a platform-wallet model, the queue would instead handle background tasks such as the
@@ -92,12 +91,12 @@ Phase 2  KYC                           ✅ DONE   FR-KYC-01..05
          Submit form, admin approval, status propagation
 
 Phase 3  Beneficiaries & Limits        ✅ DONE   FR-BEN-01..05  FR-LIM-01..05
-         NOTE: limit usage tracking is stubbed (returns 0) until the
-         Transaction model lands in Phase 4 — un-stub then.
+         Limit usage tracking un-stubbed in Phase 4 — it now sums real
+         transactions for the current UTC day/month.
 
-Phase 4  FX Quote Engine               ⬜        FR-FX-01..08
+Phase 4  FX Quote Engine               ✅ DONE   FR-FX-01..08
          Transaction model, rate source, fee/margin calc, GET /quote.
-         Introduces the Transaction model → un-stubs limit usage tracking.
+         Introduced the Transaction model → limit usage tracking un-stubbed.
 
 Phase 5  XRPL Standalone (de-risk)     ⬜        FR-WAL-01..04
          Throwaway script FIRST: create recipient account, TrustSet with the
@@ -135,7 +134,7 @@ xrpl-remittance/
 │   │   ├── user.py
 │   │   ├── kyc.py
 │   │   ├── beneficiary.py
-│   │   ├── transaction.py        # (Phase 4)
+│   │   ├── transaction.py        # (Phase 4) ✅
 │   │   ├── wallet.py             # (Phase 5)
 │   │   ├── cashout.py            # (Phase 7)
 │   │   └── platform_config.py    # fee_config + limit_tiers
@@ -147,7 +146,7 @@ xrpl-remittance/
 │   │   ├── auth_service.py
 │   │   ├── kyc_service.py
 │   │   ├── beneficiary_service.py
-│   │   ├── fx_service.py         # rate fetch + fee/margin/UCTUSD calc  (Phase 4)
+│   │   ├── fx_service.py         # rate fetch + fee/margin/UCTUSD calc  (Phase 4) ✅
 │   │   ├── limit_service.py      # daily/monthly cumulative checks
 │   │   ├── cashin_service.py     # mock card + status transitions  (Phase 6)
 │   │   ├── cashout_service.py    # request → approved → burn → completed/failed  (Phase 7)
@@ -207,6 +206,23 @@ Changes for UCTUSD:
 
 Keep `transactions.idempotency_key` (UUID UNIQUE) as the queue-dedup / anti-double-credit key.
 
+### `users`
+| Column | Type | Notes |
+|---|---|---|
+| id | UUID PK | |
+| email | VARCHAR(255) UNIQUE | indexed |
+| mobile | VARCHAR(50) UNIQUE | |
+| full_name | VARCHAR(255) | |
+| password_hash | VARCHAR(255) | bcrypt — never plaintext |
+| is_admin | BOOLEAN | default false |
+| can_send | BOOLEAN | default true |
+| can_receive | BOOLEAN | default false — both can_send & can_receive may be true (dual role) |
+| kyc_status | ENUM `kycstatus` | not_submitted / pending / approved / rejected |
+| created_at | TIMESTAMPTZ | |
+| updated_at | TIMESTAMPTZ | |
+
+No `roles` array — role membership is the three booleans above.
+
 ---
 
 ## FR-XXX → Code Module Map
@@ -229,13 +245,14 @@ Keep `transactions.idempotency_key` (UUID UNIQUE) as the queue-dedup / anti-doub
 ## Critical Implementation Rules
 
 - **`dependencies.py:require_admin`** is the single enforcement point for all admin-only routes.
-  Every admin router must use it. The current ad-hoc `_require_admin` in `admin.py` must be replaced
-  during the reconciliation pass — if admin gating is inconsistent, FR-ADM-01..07 are all at risk.
+  Every admin router must use it. 
 - **Currency code is read from the ledger, never hardcoded.** `xrpl_service.py` uses
   `settings.XRPL_CURRENCY_CODE` for every `TrustSet` and `IssuedCurrencyAmount`.
 - **`limit_service.py`** must run inside the same DB transaction as the transaction insert (not
-  before it) to prevent a TOCTOU race under concurrent sends from the same user. Un-stub
-  `get_daily_usage`/`get_monthly_usage` as soon as the Transaction model exists (Phase 4).
+  before it) to prevent a TOCTOU race under concurrent sends from the same user.
+  `get_daily_usage`/`get_monthly_usage` were un-stubbed in Phase 4 and now sum real
+  `transactions` rows for the current UTC day/month (a `failed` cash-in does not consume
+  allowance).
 - **`settlement_worker.py`** must check `idempotency_key` before processing. The first DB write
   claiming that key wins; subsequent redeliveries of the same message are a no-op (FR-MQ-04).
 - **Cash-out burn** submits a real Payment from the recipient's account to the issuer `rELez4x4…`,
