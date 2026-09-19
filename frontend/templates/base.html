@@ -26,6 +26,7 @@
           <li class="nav-item"><a class="nav-link" href="/admin/kyc"><i class="bi bi-person-check me-1"></i>KYC Queue</a></li>
           <li class="nav-item"><a class="nav-link" href="/admin/transactions"><i class="bi bi-list-ul me-1"></i>Transactions</a></li>
           <li class="nav-item"><a class="nav-link" href="/admin/cashin"><i class="bi bi-credit-card me-1"></i>Cash-In</a></li>
+          <li class="nav-item"><a class="nav-link" href="/admin/settlements"><i class="bi bi-exclamation-triangle me-1"></i>Settlements</a></li>
           <li class="nav-item"><a class="nav-link" href="/admin/cashout"><i class="bi bi-cash me-1"></i>Cash-Out</a></li>
           <li class="nav-item"><a class="nav-link" href="/admin/config"><i class="bi bi-gear me-1"></i>Config</a></li>
         {% else %}
@@ -33,6 +34,7 @@
           <li class="nav-item"><a class="nav-link" href="/kyc"><i class="bi bi-card-list me-1"></i>KYC</a></li>
           <li class="nav-item"><a class="nav-link" href="/beneficiaries"><i class="bi bi-people me-1"></i>Beneficiaries</a></li>
           <li class="nav-item"><a class="nav-link" href="/send"><i class="bi bi-send me-1"></i>Send Money</a></li>
+          <li class="nav-item"><a class="nav-link" href="/transactions"><i class="bi bi-list-ul me-1"></i>History</a></li>
           {% if user.can_receive %}
           <li class="nav-item"><a class="nav-link" href="/wallet"><i class="bi bi-wallet2 me-1"></i>Wallet</a></li>
           {% endif %}

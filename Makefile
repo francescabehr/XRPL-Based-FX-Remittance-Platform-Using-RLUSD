@@ -6,8 +6,9 @@ install:
 dev:
 	uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
+# SimpleWorker runs jobs in-process: macOS kills forked RQ work-horses (objc fork safety).
 worker:
-	rq worker settlement --with-scheduler
+	rq worker settlement --with-scheduler --worker-class rq.worker.SimpleWorker
 
 migrate:
 	alembic upgrade head

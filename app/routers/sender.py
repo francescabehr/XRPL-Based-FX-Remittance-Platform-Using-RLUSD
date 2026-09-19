@@ -2,16 +2,17 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_current_user, get_flash
+from app.services.cashin_service import list_for_sender
 from app.services.kyc_service import get_active_kyc
 from app.services.limit_service import get_daily_usage, get_limit_tier, get_monthly_usage
+from app.templating import make_templates
 
 router = APIRouter()
-templates = Jinja2Templates(directory="frontend/templates")
+templates = make_templates()
 
 
 @router.get("/dashboard", response_class=HTMLResponse)
@@ -57,5 +58,6 @@ async def dashboard(
             "monthly_remaining": monthly_remaining,
             "daily_pct": _pct(daily_used, daily_limit),
             "monthly_pct": _pct(monthly_used, monthly_limit),
+            "recent": await list_for_sender(db, user.id, limit=5),
         },
     )

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "_macros.html" import send_steps with context %}
+{% block title %}Send Money — XRPL Remit{% endblock %}
+
+{% block content %}
+<h3 class="fw-bold mb-3"><i class="bi bi-send me-2"></i>Send Money</h3>
+{{ send_steps(1) }}
+
+{% if not beneficiaries %}
+<div class="card shadow-sm">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-people fs-1 d-block mb-2 text-muted"></i>
+    <p class="mb-3">Add a beneficiary before sending money.</p>
+    <a href="/beneficiaries/new" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Add beneficiary</a>
+  </div>
+</div>
+{% else %}
+<div class="card shadow-sm" style="max-width: 560px">
+  <div class="card-body p-4">
+    <form method="get" action="/send/review">
+      <div class="mb-3">
+        <label class="form-label fw-semibold" for="beneficiary_id">Send to</label>
+        <select name="beneficiary_id" id="beneficiary_id" class="form-select" required>
+          {% for b in beneficiaries %}
+          <option value="{{ b.id }}" {% if b.id|string == beneficiary_id %}selected{% endif %}>
+            {{ b.full_name }} · {{ b.country }} · paid out in {{ b.payout_currency.value }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold" for="zar_amount">Amount (ZAR)</label>
+        <div class="input-group">
+          <span class="input-group-text">R</span>
+          <input type="number" name="zar_amount" id="zar_amount" class="form-control" min="1" step="0.01"
+                 value="{{ zar_amount }}" placeholder="1000.00" required>
+        </div>
+        <div class="form-text">
+          R{{ "{:,.2f}".format(limit.daily_remaining) }} available today ·
+          R{{ "{:,.2f}".format(limit.monthly_remaining) }} this month
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary w-100">Get quote <i class="bi bi-arrow-right ms-1"></i></button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

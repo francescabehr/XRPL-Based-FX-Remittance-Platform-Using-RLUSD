@@ -2,7 +2,6 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -10,9 +9,10 @@ from app.dependencies import get_current_user, get_flash, set_flash
 from app.models.kyc import KYCSubmissionStatus
 from app.models.user import KYCStatus
 from app.services.kyc_service import get_active_kyc, submit_kyc
+from app.templating import make_templates
 
 router = APIRouter(prefix="/kyc")
-templates = Jinja2Templates(directory="frontend/templates")
+templates = make_templates()
 
 NATIONALITIES = [
     "South African", "Zimbabwean", "Mozambican", "Zambian", "Namibian",

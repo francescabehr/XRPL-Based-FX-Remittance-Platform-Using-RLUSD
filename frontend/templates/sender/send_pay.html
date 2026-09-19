@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "_macros.html" import send_steps with context %}
+{% block title %}Pay — XRPL Remit{% endblock %}
+
+{% block content %}
+<h3 class="fw-bold mb-3"><i class="bi bi-send me-2"></i>Send Money</h3>
+{{ send_steps(3) }}
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold"><i class="bi bi-credit-card me-1"></i>Card payment (simulated)</div>
+      <div class="card-body p-4">
+        <p class="mb-1 text-muted">Amount due</p>
+        <p class="display-6 fw-bold mb-3">R{{ "{:,.2f}".format(quote.zar_amount) }}</p>
+
+        {% if card_error %}<div class="alert alert-danger">{{ card_error }}</div>{% endif %}
+
+        <form method="post" action="/remittances" autocomplete="off">
+          <input type="hidden" name="beneficiary_id" value="{{ beneficiary.id }}">
+          <input type="hidden" name="zar_amount" value="{{ quote.zar_amount }}">
+          <input type="hidden" name="exchange_rate" value="{{ quote.exchange_rate }}">
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold" for="card_name">Name on card</label>
+            <input type="text" name="card_name" id="card_name" class="form-control" value="{{ card_name }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold" for="card_number">Card number</label>
+            <input type="text" name="card_number" id="card_number" class="form-control" inputmode="numeric"
+                   placeholder="4242 4242 4242 4242" required>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-6">
+              <label class="form-label fw-semibold" for="card_expiry">Expiry</label>
+              <input type="text" name="card_expiry" id="card_expiry" class="form-control" placeholder="MM/YY" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold" for="card_cvv">CVV</label>
+              <input type="text" name="card_cvv" id="card_cvv" class="form-control" inputmode="numeric" placeholder="123" required>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-success w-100">
+            <i class="bi bi-lock me-1"></i>Pay R{{ "{:,.2f}".format(quote.zar_amount) }}
+          </button>
+        </form>
+      </div>
+      <div class="card-footer small text-muted">
+        Test mode: no card is charged and only the last 4 digits are stored.
+        Use <code>4242 4242 4242 4242</code>; <code>{{ declined_card[:4] }} {{ declined_card[4:8] }} {{ declined_card[8:12] }} {{ declined_card[12:] }}</code> is always declined.
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold">Sending to {{ beneficiary.full_name }}</div>
+      <div class="card-body p-0">{% include "sender/_quote_table.html" %}</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -2,11 +2,11 @@ import uuid
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_flash, require_admin, set_flash
+from app.services import cashin_service
 from app.services.kyc_service import (
     approve_kyc,
     get_pending_submissions,
@@ -14,9 +14,10 @@ from app.services.kyc_service import (
     reject_kyc,
 )
 from app.services.limit_service import get_all_tiers, get_tier_by_id, update_tier
+from app.templating import make_templates
 
 router = APIRouter(prefix="/admin")
-templates = Jinja2Templates(directory="frontend/templates")
+templates = make_templates()
 
 
 @router.get("/kyc", response_class=HTMLResponse)
@@ -147,3 +148,119 @@ async def update_tier_limits(
     await update_tier(db, tier, daily, monthly)
     set_flash(request, f"Limits for '{tier.tier_name}' updated.", "success")
     return RedirectResponse(url="/admin/config", status_code=302)
+
+
+# ── Cash-in queue (FR-CI-02, FR-ADM-03) ──────────────────────────────────────
+
+@router.get("/cashin", response_class=HTMLResponse)
+async def cashin_queue(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_admin),
+):
+    return templates.TemplateResponse(
+        "admin/cashin_queue.html",
+        {
+            "request": request,
+            "user": user,
+            "flash": get_flash(request),
+            "transactions": await cashin_service.list_pending_cashins(db),
+        },
+    )
+
+
+@router.post("/cashin/{txn_id}/received")
+async def cashin_received(
+    txn_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_admin),
+):
+    txn = await cashin_service.get_transaction(db, txn_id)
+    if not txn:
+        set_flash(request, "Transaction not found.", "danger")
+        return RedirectResponse(url="/admin/cashin", status_code=302)
+    try:
+        await cashin_service.mark_cashin_received(db, txn, user)
+    except cashin_service.RemittanceError as exc:
+        set_flash(request, str(exc), "warning")
+        return RedirectResponse(url="/admin/cashin", status_code=302)
+
+    if txn.settlement_status.value == "failed":
+        set_flash(request, f"Cash-in confirmed, but settlement could not be queued: {txn.xrpl_error_reason}", "danger")
+    else:
+        set_flash(request, f"Cash-in confirmed for R{txn.zar_amount:,.2f}. Settlement queued.", "success")
+    return RedirectResponse(url="/admin/cashin", status_code=302)
+
+
+@router.post("/cashin/{txn_id}/failed")
+async def cashin_failed(
+    txn_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_admin),
+    reason: str = Form(""),
+):
+    txn = await cashin_service.get_transaction(db, txn_id)
+    if not txn:
+        set_flash(request, "Transaction not found.", "danger")
+        return RedirectResponse(url="/admin/cashin", status_code=302)
+    try:
+        await cashin_service.mark_cashin_failed(db, txn, user, reason)
+    except cashin_service.RemittanceError as exc:
+        set_flash(request, str(exc), "warning")
+        return RedirectResponse(url="/admin/cashin", status_code=302)
+    set_flash(request, "Cash-in marked as failed. Nothing will be sent.", "warning")
+    return RedirectResponse(url="/admin/cashin", status_code=302)
+
+
+# ── Settlement monitor (FR-MQ-06, FR-ADM-05) ─────────────────────────────────
+
+@router.get("/settlements", response_class=HTMLResponse)
+async def settlement_monitor(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_admin),
+):
+    return templates.TemplateResponse(
+        "admin/settlements.html",
+        {
+            "request": request,
+            "user": user,
+            "flash": get_flash(request),
+            "transactions": await cashin_service.list_settlement_issues(db),
+        },
+    )
+
+
+@router.post("/settlements/{txn_id}/retry")
+async def settlement_retry(
+    txn_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_admin),
+):
+    txn = await cashin_service.get_transaction(db, txn_id)
+    if not txn:
+        set_flash(request, "Transaction not found.", "danger")
+        return RedirectResponse(url="/admin/settlements", status_code=302)
+    try:
+        if txn.settlement_status.value == "queued":
+            await cashin_service.requeue_stuck(db, txn)
+            outcome = "requeued"
+        else:
+            outcome = await cashin_service.retry_settlement(db, txn)
+    except cashin_service.RemittanceError as exc:
+        set_flash(request, str(exc), "warning")
+        return RedirectResponse(url="/admin/settlements", status_code=302)
+    except Exception as exc:  # noqa: BLE001 — e.g. Testnet unreachable during the ledger check
+        set_flash(request, f"Could not check the ledger ({type(exc).__name__}). Try again shortly.", "danger")
+        return RedirectResponse(url="/admin/settlements", status_code=302)
+
+    if outcome == "reconciled":
+        set_flash(request, "The earlier payment had succeeded on the ledger. Marked completed; nothing re-sent.", "success")
+    elif txn.settlement_status.value == "failed":
+        set_flash(request, f"Could not queue the retry: {txn.xrpl_error_reason}", "danger")
+    else:
+        set_flash(request, "Settlement re-queued.", "success")
+    return RedirectResponse(url="/admin/settlements", status_code=302)

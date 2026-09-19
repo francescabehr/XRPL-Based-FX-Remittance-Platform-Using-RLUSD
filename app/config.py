@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     fx_rate_source: str = "config"
     fx_static_market_rate: str = "18.50"
 
+    # IANA zone used to display timestamps. Storage and limit windows stay UTC.
+    display_timezone: str = "Africa/Johannesburg"
+
     # XRPL / UCTUSD — real values come from .env, never from defaults here.
     xrpl_json_rpc: str = "https://s.altnet.rippletest.net:51234"
     xrpl_issuer_address: str = ""
@@ -29,6 +32,8 @@ class Settings(BaseSettings):
     xrpl_platform_wallet_address: str = ""
     xrpl_platform_wallet_seed: str = ""
     xrpl_encryption_key: str = "change-me-32-byte-hex-key-here"
+    # Where a transaction hash can be opened in a browser (FR-WAL-05).
+    xrpl_explorer_tx_url: str = "https://testnet.xrpl.org/transactions/"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

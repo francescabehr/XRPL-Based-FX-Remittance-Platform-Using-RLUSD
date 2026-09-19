@@ -1,0 +1,16 @@
+{# XRPL hash as a link to the Testnet explorer (FR-WAL-05). #}
+{% macro hash_link(tx_hash) -%}
+{% if tx_hash %}<a href="{{ explorer_tx_url }}{{ tx_hash }}" target="_blank" rel="noopener" class="font-monospace small">{{ tx_hash[:10] }}…<i class="bi bi-box-arrow-up-right ms-1"></i></a>{% else %}<span class="text-muted small">—</span>{% endif %}
+{%- endmacro %}
+
+{# Send Money progress indicator. #}
+{% macro send_steps(step) -%}
+<ol class="list-inline small text-muted mb-4">
+  {% for n, label in [(1, "Amount"), (2, "Review quote"), (3, "Pay")] %}
+  <li class="list-inline-item me-3 {% if n == step %}fw-semibold text-dark{% endif %}">
+    <span class="badge rounded-pill {% if n == step %}bg-primary{% elif n < step %}bg-success{% else %}bg-secondary{% endif %}">{{ n }}</span>
+    {{ label }}
+  </li>
+  {% endfor %}
+</ol>
+{%- endmacro %}
