@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% from "_macros.html" import hash_link with context %}
+{% block title %}Settlement Monitor — Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h3 class="fw-bold mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Settlement Monitor</h3>
+  <span class="badge bg-{{ 'danger' if transactions else 'success' }} fs-6">{{ transactions|length }} need attention</span>
+</div>
+<p class="text-muted small mb-4">
+  Failed XRPL settlements, and any queued or in-progress for over 10 minutes (e.g. the worker stopped).
+  Retrying or recovering a signed payment checks the ledger first, so a payment that actually went through is never sent twice.
+</p>
+
+{% if transactions %}
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table mb-0 align-middle">
+      <thead class="table-light">
+        <tr><th>Updated</th><th>Transfer</th><th>Status</th><th>Reason</th><th>XRPL</th><th class="text-end">Action</th></tr>
+      </thead>
+      <tbody>
+        {% for t in transactions %}
+        <tr>
+          <td class="small text-muted">{{ t.updated_at|localtime('%d %b %H:%M') }}</td>
+          <td>
+            <a href="/transactions/{{ t.id }}" class="fw-semibold text-decoration-none">{{ t.sender.full_name }} → {{ t.beneficiary.full_name }}</a>
+            <div class="small text-muted">{{ "{:,.6f}".format(t.uctusd_amount) }} UCTUSD · {{ t.settlement_attempts }} attempt{{ "s" if t.settlement_attempts != 1 }}</div>
+          </td>
+          <td><span class="badge bg-{{ 'danger' if t.settlement_status.value == 'failed' else 'warning text-dark' }}">{{ t.settlement_status.value|capitalize }}</span></td>
+          <td class="small text-break" style="max-width: 320px">{{ t.xrpl_error_reason or "—" }}</td>
+          <td>{{ hash_link(t.xrpl_tx_hash) }}</td>
+          <td class="text-end">
+            {% set label = {"failed": "Retry", "queued": "Re-queue", "processing": "Recover"}[t.settlement_status.value] %}
+            <form method="post" action="/admin/settlements/{{ t.id }}/retry">
+              <button class="btn btn-sm btn-outline-primary text-nowrap"><i class="bi bi-arrow-repeat me-1"></i>{{ label }}</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-check-circle fs-1 d-block mb-2 text-success"></i>
+  <strong>No settlement problems.</strong>
+</div>
+{% endif %}
+{% endblock %}

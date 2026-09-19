@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Numeric, String
+from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -47,6 +47,11 @@ class Transaction(Base):
     beneficiary_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("beneficiaries.id"), nullable=False, index=True
     )
+    # The registered user who receives the UCTUSD, snapshotted at creation so a later
+    # beneficiary edit cannot redirect a settlement already in flight.
+    recipient_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True
+    )
 
     # --- money: ZAR 2 dp, UCTUSD 6 dp, rates 6 dp ---
     zar_amount: Mapped[Decimal] = mapped_column(Numeric(20, 2), nullable=False)
@@ -76,8 +81,21 @@ class Transaction(Base):
         server_default=SettlementStatus.not_queued.value,
     )
 
-    # Treasury -> recipient settlement hash; filled by the worker in Phase 6 (FR-WAL-05).
+    # --- cash-in (FR-CI-01..05). Only the card's last 4 digits are ever stored. ---
+    card_last4: Mapped[Optional[str]] = mapped_column(String(4), nullable=True)
+    cashin_updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    cashin_reviewed_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    cashin_failure_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # --- settlement (FR-MQ, FR-WAL-05..07) ---
+    # Treasury -> recipient hash. Written as soon as the payment is signed, before
+    # submission, so an interrupted settlement can be checked on the ledger.
     xrpl_tx_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    settlement_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    xrpl_error_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    settled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True
@@ -91,3 +109,35 @@ class Transaction(Base):
 
     sender: Mapped["User"] = relationship("User", foreign_keys=[sender_id])
     beneficiary: Mapped["Beneficiary"] = relationship("Beneficiary", foreign_keys=[beneficiary_id])
+    recipient: Mapped[Optional["User"]] = relationship("User", foreign_keys=[recipient_user_id])
+
+    @property
+    def status_label(self) -> str:
+        """One overall status for history screens (FR-CI-04, FR-MQ-05)."""
+        if self.cashin_status == CashInStatus.failed:
+            return "Failed"
+        if self.cashin_status == CashInStatus.pending:
+            return "Awaiting payment"
+        return {
+            SettlementStatus.not_queued: "Payment received",
+            SettlementStatus.queued: "Queued",
+            SettlementStatus.processing: "Sending",
+            SettlementStatus.completed: "Completed",
+            SettlementStatus.failed: "Failed",
+        }[self.settlement_status]
+
+    @property
+    def status_badge(self) -> str:
+        return {
+            "Failed": "danger",
+            "Awaiting payment": "warning",
+            "Completed": "success",
+        }.get(self.status_label, "info")
+
+    @property
+    def failure_reason(self) -> Optional[str]:
+        if self.cashin_status == CashInStatus.failed:
+            return self.cashin_failure_reason or "Card payment failed."
+        if self.settlement_status == SettlementStatus.failed:
+            return self.xrpl_error_reason
+        return None

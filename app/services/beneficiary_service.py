@@ -117,3 +117,24 @@ async def delete_beneficiary(db: AsyncSession, ben: Beneficiary) -> None:
     ben.is_active = False
     db.add(ben)
     await db.commit()
+
+
+async def find_recipient_user_id(db: AsyncSession, ben: Beneficiary) -> Optional[uuid.UUID]:
+    """The registered user behind a beneficiary, re-running FR-BEN-04 matching if unlinked.
+
+    Covers a recipient who registers after the sender added them. Read-only.
+    """
+    if ben.recipient_user_id is not None:
+        return ben.recipient_user_id
+    return await _resolve_recipient(db, ben.email, ben.mobile, ben.sender_id)
+
+
+async def refresh_recipient_link(db: AsyncSession, ben: Beneficiary) -> Optional[uuid.UUID]:
+    """Link an unlinked beneficiary to their account if they have since registered.
+
+    Does not commit: callers link inside their own transaction.
+    """
+    if ben.recipient_user_id is None:
+        ben.recipient_user_id = await find_recipient_user_id(db, ben)
+        db.add(ben)
+    return ben.recipient_user_id

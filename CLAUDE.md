@@ -105,16 +105,22 @@ Phase 5  XRPL Standalone (de-risk)     ✅ DONE   FR-WAL-01..04
          tecPATH_PARTIAL (insufficient UCTUSD); bad currency code is rejected
          client-side by xrpl-py. Default Ripple on the issuer confirmed working.
 
-Phase 6  Cash-In + Queue + Settlement  ⬜        FR-CI-01..05  FR-MQ-01..06  FR-WAL-05..07
-         Simulated card → queue publish → RQ worker → treasury→recipient
-         UCTUSD payment → validation. Idempotency check is the anti-double-credit control.
+Phase 6  Cash-In + Queue + Settlement  ✅ DONE   FR-CI-01..05  FR-MQ-01..06  FR-WAL-05..07
+         Send Money (amount → quote → simulated card) → admin/PATCH confirms cash-in →
+         RQ message (idempotency_key) → worker claims key with one conditional UPDATE →
+         provision wallet → treasury→recipient payment → credit wallet cache only on
+         tesSUCCESS. Hash saved before submit; post-signing failures never auto-retried;
+         admin retry/recover checks the ledger first. Recipients must be registered users
+         (beneficiary re-linked at send time). Migration 0005. Run the worker with
+         `make worker` (SimpleWorker — macOS kills forked RQ work-horses).
 
 Phase 7  Cash-Out (burn)               ⬜        FR-CO-01..06
          Request → admin approve → balance debit → on-chain burn to issuer →
          store burn hash → simulate fiat payout. Reversal on failure.
 
 Phase 8  Admin Portal                  ⬜(partial) FR-ADM-01..07
-         KYC queue DONE; add cash-in queue, cash-out queue, monitor, config screen.
+         KYC queue, cash-in queue and settlement monitor DONE; add cash-out queue,
+         full transaction monitor with filters (/admin/transactions), fee config screen.
 
 Phase 9  Performance Tests             ⬜        Brief §7.iv
          Locust scenarios once a full flow runs; synthetic data via Faker.

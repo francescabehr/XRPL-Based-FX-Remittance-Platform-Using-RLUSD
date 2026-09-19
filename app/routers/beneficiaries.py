@@ -2,7 +2,6 @@ import uuid
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -14,9 +13,10 @@ from app.services.beneficiary_service import (
     list_beneficiaries,
     update_beneficiary,
 )
+from app.templating import make_templates
 
 router = APIRouter(prefix="/beneficiaries")
-templates = Jinja2Templates(directory="frontend/templates")
+templates = make_templates()
 
 COUNTRIES = [
     "South Africa", "Zimbabwe", "Mozambique", "Zambia", "Namibia",

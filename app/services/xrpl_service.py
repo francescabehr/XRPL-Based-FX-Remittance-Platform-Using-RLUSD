@@ -23,7 +23,7 @@ import re
 import uuid
 from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional
+from typing import Awaitable, Callable, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,7 +32,7 @@ from xrpl.asyncio.transaction import autofill_and_sign, submit_and_wait
 from xrpl.asyncio.wallet import generate_faucet_wallet
 from xrpl.constants import XRPLException
 from xrpl.models.amounts import IssuedCurrencyAmount
-from xrpl.models.requests import AccountLines
+from xrpl.models.requests import AccountLines, Tx
 from xrpl.models.transactions import Payment, TrustSet
 from xrpl.models.transactions.transaction import Transaction as XRPLTransaction
 from xrpl.wallet import Wallet as XRPLWallet
@@ -49,6 +49,11 @@ TRUST_LINE_LIMIT = "1000000000"
 SUCCESS = "tesSUCCESS"
 
 _RESULT_CODE = re.compile(r"\bte[a-z][A-Z_]+\b")
+
+# Called with the tx hash after signing and before submission, so a caller can
+# persist the hash first — if the process dies mid-submit, the payment can still
+# be traced on the ledger instead of blindly re-sent.
+OnSigned = Callable[[str], Awaitable[None]]
 
 
 class XRPLConfigError(RuntimeError):
@@ -104,8 +109,17 @@ def _result_code(exc: Exception) -> str:
     return match.group(0) if match else "submission_error"
 
 
-async def submit(tx: XRPLTransaction, signer: XRPLWallet, client: AsyncJsonRpcClient) -> XRPLResult:
-    """Sign, submit, and wait for a validated outcome (FR-WAL-06)."""
+async def submit(
+    tx: XRPLTransaction,
+    signer: XRPLWallet,
+    client: AsyncJsonRpcClient,
+    on_signed: Optional[OnSigned] = None,
+) -> XRPLResult:
+    """Sign, submit, and wait for a validated outcome (FR-WAL-06).
+
+    A "sign_error" result means nothing reached the ledger, so it is safe to retry.
+    Any other failure has a hash and may need a ledger check before retrying.
+    """
     try:
         signed = await autofill_and_sign(tx, client, signer)
     except XRPLException as exc:
@@ -113,6 +127,8 @@ async def submit(tx: XRPLTransaction, signer: XRPLWallet, client: AsyncJsonRpcCl
         return XRPLResult(False, "sign_error", None, str(exc))
 
     tx_hash = signed.get_hash()
+    if on_signed is not None:
+        await on_signed(tx_hash)
     try:
         resp = await submit_and_wait(signed, client)
     except XRPLException as exc:
@@ -135,6 +151,17 @@ async def get_uctusd_balance(
         if line["currency"] == settings.xrpl_currency_code:
             return Decimal(line["balance"])
     return None
+
+
+async def get_transaction_result(
+    tx_hash: str, client: Optional[AsyncJsonRpcClient] = None
+) -> Optional[str]:
+    """Final result code of a transaction, or None if it is not in a validated ledger."""
+    client = client or get_client()
+    resp = await client.request(Tx(transaction=tx_hash))
+    if not resp.is_successful() or not resp.result.get("validated"):
+        return None
+    return resp.result["meta"]["TransactionResult"]
 
 
 async def get_wallet_for_user(db: AsyncSession, user_id: uuid.UUID) -> Optional[Wallet]:
@@ -194,6 +221,9 @@ async def provision_wallet(
             key_encryption_key_id=crypto.key_id(),
         )
         db.add(wallet)
+        # Holding a wallet makes them a recipient (shows the Wallet screen).
+        user.can_receive = True
+        db.add(user)
         await db.commit()
         await db.refresh(wallet)
         logger.info("Provisioned XRPL wallet %s for user %s", wallet.xrpl_address, user.id)
@@ -205,14 +235,18 @@ async def provision_wallet(
 
 
 async def send_from_treasury(
-    destination: str, amount: Decimal, client: Optional[AsyncJsonRpcClient] = None
+    destination: str,
+    amount: Decimal,
+    client: Optional[AsyncJsonRpcClient] = None,
+    on_signed: Optional[OnSigned] = None,
 ) -> XRPLResult:
-    """Treasury -> recipient UCTUSD settlement payment (used by the Phase 6 worker)."""
+    """Treasury -> recipient UCTUSD settlement payment (used by the settlement worker)."""
     treasury = load_treasury()
     return await submit(
         Payment(account=treasury.classic_address, destination=destination, amount=uctusd(amount)),
         treasury,
         client or get_client(),
+        on_signed,
     )
 
 

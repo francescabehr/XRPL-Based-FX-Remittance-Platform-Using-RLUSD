@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% from "_macros.html" import hash_link with context %}
+{% block title %}Wallet — XRPL Remit{% endblock %}
+
+{% block content %}
+<h3 class="fw-bold mb-4"><i class="bi bi-wallet2 me-2"></i>Wallet</h3>
+
+{% if not wallet %}
+<div class="card shadow-sm">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-wallet2 fs-1 d-block mb-2"></i>
+    <strong>No wallet yet.</strong> One is created for you automatically when you first receive money.
+  </div>
+</div>
+{% else %}
+<div class="row g-4 mb-4">
+  <div class="col-md-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <p class="text-muted mb-1">Balance</p>
+        <p class="display-6 fw-bold mb-1">{{ "{:,.6f}".format(wallet.balance_uctusd) }} <span class="fs-5">UCTUSD</span></p>
+        <p class="small text-muted mb-0">
+          {% if ledger_balance is not none %}
+            On-ledger balance: {{ "{:,.6f}".format(ledger_balance) }} UCTUSD
+            {% if ledger_balance != wallet.balance_uctusd %}<span class="text-warning">(differs from platform record)</span>{% endif %}
+          {% else %}
+            Ledger balance unavailable right now.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <p class="text-muted mb-1">XRPL Testnet address</p>
+        <p class="font-monospace small text-break mb-2">{{ wallet.xrpl_address }}</p>
+        <a href="{{ explorer_tx_url|replace("/transactions/", "/accounts/") }}{{ wallet.xrpl_address }}" target="_blank" rel="noopener" class="small">
+          View on explorer <i class="bi bi-box-arrow-up-right"></i>
+        </a>
+        {% if not wallet.trust_set_complete %}<p class="small text-warning mt-2 mb-0">Trust line setup is still pending.</p>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="card shadow-sm">
+  <div class="card-header fw-semibold">Incoming transfers</div>
+  {% if incoming %}
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light"><tr><th>Date</th><th>From</th><th class="text-end">UCTUSD</th><th>Status</th><th>XRPL transaction</th></tr></thead>
+      <tbody>
+        {% for t in incoming %}
+        <tr>
+          <td class="small text-muted">{{ (t.settled_at or t.created_at)|localtime('%d %b %Y %H:%M') }}</td>
+          <td><a href="/transactions/{{ t.id }}" class="text-decoration-none">{{ t.sender.full_name }}</a></td>
+          <td class="text-end fw-semibold">+{{ "{:,.6f}".format(t.uctusd_amount) }}</td>
+          <td>
+            <span class="badge bg-{{ t.status_badge }}">{{ t.status_label }}</span>
+            {% if t.settlement_status.value == "failed" %}<div class="small text-danger">{{ t.xrpl_error_reason }}</div>{% endif %}
+          </td>
+          <td>{{ hash_link(t.xrpl_tx_hash) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-body text-muted text-center py-4">No incoming transfers yet.</div>
+  {% endif %}
+</div>
+<p class="small text-muted mt-3">Outgoing transfers (cash-outs) will appear here once cash-out is available.</p>
+{% endblock %}

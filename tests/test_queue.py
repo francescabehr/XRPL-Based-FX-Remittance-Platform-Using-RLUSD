@@ -1,0 +1,371 @@
+"""FR-MQ-01..06, FR-WAL-05..07  Settlement queue + worker. XRPL and Redis are faked."""
+import asyncio
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+
+import pytest
+from sqlalchemy import select, update
+
+from app.models.transaction import SettlementStatus, Transaction
+from app.models.wallet import Wallet
+from app.services import cashin_service, queue_service, xrpl_service
+from app.workers import settlement_worker
+from app.workers.settlement_worker import MAX_ATTEMPTS, process_settlement
+from tests.conftest import _TestSession
+from tests.remit_helpers import FakeXRPL, RecordingEnqueue, RecordingRequeue, remittance
+
+pytestmark = pytest.mark.usefixtures("seed_tiers", "seed_fee_config")
+
+
+@pytest.fixture
+def xrpl(monkeypatch):
+    fake = FakeXRPL()
+    monkeypatch.setattr(xrpl_service, "provision_wallet", fake.provision_wallet)
+    monkeypatch.setattr(xrpl_service, "send_from_treasury", fake.send_from_treasury)
+    return fake
+
+
+async def _queued(db, amount="1000"):
+    txn, sender, recipient = await remittance(db, amount)
+    await cashin_service.mark_cashin_received(db, txn, reviewer=None, enqueue=RecordingEnqueue())
+    return txn, recipient
+
+
+async def _fresh(txn_id):
+    async with _TestSession() as s:
+        return await s.get(Transaction, txn_id)
+
+
+async def _balance(user_id):
+    async with _TestSession() as s:
+        w = (await s.execute(select(Wallet).where(Wallet.user_id == user_id))).scalar_one_or_none()
+        return None if w is None else w.balance_uctusd
+
+
+def _settle(txn, requeue=None):
+    return process_settlement(txn.idempotency_key, _TestSession, requeue=requeue or RecordingRequeue())
+
+
+# --- publishing (FR-MQ-01, FR-MQ-03) ---
+
+def test_enqueue_carries_idempotency_key_and_transaction_id(monkeypatch):
+    class Q:
+        def enqueue(self, func, *args, **kwargs):
+            self.call = (func, args, kwargs)
+            return type("Job", (), {"id": "j1"})()
+
+    q = Q()
+    monkeypatch.setattr(queue_service, "get_queue", lambda: q)
+
+    assert queue_service.enqueue_settlement("key-1", "txn-1") == "j1"
+    func, args, kwargs = q.call
+    assert func == "app.workers.settlement_worker.settle"
+    assert args == ("key-1",)
+    assert kwargs["meta"] == {"transaction_id": "txn-1"}
+
+
+# --- happy path (FR-MQ-02, FR-WAL-01, FR-WAL-05/06) ---
+
+async def test_settlement_completes_and_credits_once(db, xrpl):
+    txn, recipient = await _queued(db)
+
+    assert await _settle(txn) == "completed"
+
+    done = await _fresh(txn.id)
+    assert done.settlement_status == SettlementStatus.completed
+    assert done.xrpl_tx_hash and done.settled_at and done.xrpl_error_reason is None
+    assert done.settlement_attempts == 1
+    assert await _balance(recipient.id) == Decimal("50.874404")
+    assert xrpl.provisioned == 1 and len(xrpl.payments) == 1
+
+
+async def test_recipient_becomes_a_receiver(db, xrpl):
+    txn, recipient = await _queued(db)
+    await _settle(txn)
+    await db.refresh(recipient)
+    assert recipient.can_receive is True
+
+
+# --- idempotency (FR-MQ-04) ---
+
+async def test_redelivered_message_is_a_no_op(db, xrpl):
+    txn, recipient = await _queued(db)
+
+    assert await _settle(txn) == "completed"
+    assert await _settle(txn) == "skipped"
+
+    assert len(xrpl.payments) == 1
+    assert await _balance(recipient.id) == Decimal("50.874404")
+
+
+async def test_concurrent_deliveries_pay_once(db, xrpl):
+    txn, recipient = await _queued(db)
+    xrpl.delay = 0.05  # keep the first payment in flight while the second arrives
+
+    results = await asyncio.gather(_settle(txn), _settle(txn), _settle(txn))
+
+    assert sorted(results) == ["completed", "skipped", "skipped"]
+    assert len(xrpl.payments) == 1
+    assert await _balance(recipient.id) == Decimal("50.874404")
+
+
+async def test_message_for_unconfirmed_cashin_is_ignored(db, xrpl):
+    txn, _, _ = await remittance(db)  # cash-in still pending
+    assert await _settle(txn) == "skipped"
+    assert xrpl.payments == []
+    assert (await _fresh(txn.id)).settlement_status == SettlementStatus.not_queued
+
+
+async def test_complete_settlement_twice_credits_once(db, xrpl):
+    txn, recipient = await _queued(db)
+    await _settle(txn)
+    async with _TestSession() as s:
+        again = await s.get(Transaction, txn.id)
+        # Already completed, so the conditional update matches nothing: no second credit.
+        assert await settlement_worker.complete_settlement(s, again, again.xrpl_tx_hash) is False
+    assert await _balance(recipient.id) == Decimal("50.874404")
+
+
+# --- ledger failures (FR-WAL-07, FR-MQ-05) ---
+
+@pytest.mark.parametrize("code", ["tecPATH_DRY", "tecPATH_PARTIAL"])
+async def test_ledger_failure_is_recorded_and_not_retried(db, xrpl, code):
+    txn, recipient = await _queued(db)
+    xrpl.outcomes.append(code)
+    requeue = RecordingRequeue()
+
+    assert await _settle(txn, requeue) == "failed"
+
+    failed = await _fresh(txn.id)
+    assert failed.settlement_status == SettlementStatus.failed
+    assert failed.xrpl_error_reason.startswith(code)
+    assert failed.xrpl_tx_hash  # traceable on the ledger
+    assert failed.status_label == "Failed"
+    assert await _balance(recipient.id) == Decimal("0")
+    assert requeue.calls == []  # post-signing failures are never auto-retried
+
+
+async def test_failure_after_signing_is_outcome_unknown(db, xrpl):
+    txn, recipient = await _queued(db)
+    xrpl.outcomes.append(("raise_after_sign", TimeoutError("network dropped")))
+    requeue = RecordingRequeue()
+
+    assert await _settle(txn, requeue) == "failed"
+
+    failed = await _fresh(txn.id)
+    assert failed.xrpl_error_reason.startswith("outcome_unknown")
+    assert failed.xrpl_tx_hash
+    assert requeue.calls == []
+    assert await _balance(recipient.id) == Decimal("0")
+
+
+# --- transient failures + retry policy (FR-MQ-06) ---
+
+async def test_pre_signing_failure_is_requeued_with_backoff(db, xrpl):
+    txn, _ = await _queued(db)
+    xrpl.outcomes.append(ConnectionError("testnet unreachable"))
+    requeue = RecordingRequeue()
+
+    assert await _settle(txn, requeue) == "requeued"
+
+    row = await _fresh(txn.id)
+    assert row.settlement_status == SettlementStatus.queued
+    assert row.xrpl_error_reason.startswith("retrying")
+    assert requeue.calls == [(10, str(txn.idempotency_key), str(txn.id))]
+
+    # The retry then succeeds normally.
+    assert await _settle(txn, requeue) == "completed"
+    assert (await _fresh(txn.id)).settlement_attempts == 2
+
+
+async def test_untrusted_wallet_and_sign_errors_are_transient(db, xrpl):
+    txn, _ = await _queued(db)
+    xrpl.trust_ok = False
+    assert await _settle(txn) == "requeued"
+
+    xrpl.trust_ok = True
+    xrpl.outcomes.append("sign_error")
+    assert await _settle(txn) == "requeued"
+    assert xrpl.payments == []
+
+
+async def test_retries_stop_after_max_attempts(db, xrpl):
+    txn, _ = await _queued(db)
+    xrpl.outcomes.extend([ConnectionError("down")] * MAX_ATTEMPTS)
+    requeue = RecordingRequeue()
+
+    results = [await _settle(txn, requeue) for _ in range(MAX_ATTEMPTS)]
+
+    assert results == ["requeued"] * (MAX_ATTEMPTS - 1) + ["failed"]
+    row = await _fresh(txn.id)
+    assert row.settlement_status == SettlementStatus.failed
+    assert row.xrpl_error_reason.startswith("retries_exhausted")
+    assert txn.id in [t.id for t in await cashin_service.list_settlement_issues(db)]
+
+
+# --- admin retry (FR-MQ-06, FR-ADM-05) ---
+
+async def _age(txn_id, minutes):
+    async with _TestSession() as s:
+        await s.execute(
+            update(Transaction).where(Transaction.id == txn_id)
+            .values(updated_at=datetime.now(timezone.utc) - timedelta(minutes=minutes))
+        )
+        await s.commit()
+
+
+async def test_admin_retry_reconciles_a_payment_that_actually_landed(db, xrpl):
+    txn, recipient = await _queued(db)
+    xrpl.outcomes.append(("raise_after_sign", TimeoutError("lost response")))
+    await _settle(txn)
+
+    async def ledger_says_success(tx_hash):
+        return "tesSUCCESS"
+
+    async with _TestSession() as s:
+        row = await s.get(Transaction, txn.id)
+        enqueue = RecordingEnqueue()
+        assert await cashin_service.retry_settlement(s, row, enqueue=enqueue, ledger_result=ledger_says_success) == "reconciled"
+        assert enqueue.calls == []  # nothing re-sent
+
+    done = await _fresh(txn.id)
+    assert done.settlement_status == SettlementStatus.completed
+    assert await _balance(recipient.id) == Decimal("50.874404")
+    assert xrpl.payments == []  # the "lost" payment was never re-submitted
+
+
+async def test_admin_retry_waits_while_a_signed_payment_could_still_land(db, xrpl):
+    txn, _ = await _queued(db)
+    xrpl.outcomes.append(("raise_after_sign", TimeoutError("lost response")))
+    await _settle(txn)
+
+    async def not_found(tx_hash):
+        return None
+
+    async with _TestSession() as s:
+        row = await s.get(Transaction, txn.id)
+        with pytest.raises(cashin_service.RemittanceError, match="not final"):
+            await cashin_service.retry_settlement(s, row, enqueue=RecordingEnqueue(), ledger_result=not_found)
+
+    await _age(txn.id, minutes=10)  # past LastLedgerSequence: it can no longer land
+    async with _TestSession() as s:
+        row = await s.get(Transaction, txn.id)
+        enqueue = RecordingEnqueue()
+        assert await cashin_service.retry_settlement(s, row, enqueue=enqueue, ledger_result=not_found) == "requeued"
+        assert len(enqueue.calls) == 1
+
+    assert await _settle(txn) == "completed"
+
+
+async def test_admin_retry_of_ledger_failure_resends(db, xrpl):
+    txn, recipient = await _queued(db)
+    xrpl.outcomes.append("tecPATH_DRY")
+    await _settle(txn)
+
+    async def ledger_says_failed(tx_hash):
+        return "tecPATH_DRY"
+
+    async with _TestSession() as s:
+        row = await s.get(Transaction, txn.id)
+        assert await cashin_service.retry_settlement(
+            s, row, enqueue=RecordingEnqueue(), ledger_result=ledger_says_failed
+        ) == "requeued"
+
+    assert await _settle(txn) == "completed"
+    assert await _balance(recipient.id) == Decimal("50.874404")
+
+
+async def test_only_failed_settlements_can_be_retried(db, xrpl):
+    txn, _ = await _queued(db)
+    await _settle(txn)
+    async with _TestSession() as s:
+        row = await s.get(Transaction, txn.id)
+        with pytest.raises(cashin_service.RemittanceError):
+            await cashin_service.retry_settlement(s, row, enqueue=RecordingEnqueue())
+
+
+async def _claim_then_die(txn, xrpl=None, tx_hash=None):
+    """Simulate a worker that claimed the message and then crashed.
+
+    With tx_hash, it crashed after provisioning the wallet and signing the payment.
+    """
+    async with _TestSession() as s:
+        row = await settlement_worker.claim(s, txn.idempotency_key)
+        if tx_hash:
+            from app.models.user import User
+            await xrpl.provision_wallet(s, await s.get(User, row.recipient_user_id))
+            row.xrpl_tx_hash = tx_hash
+            await s.commit()
+
+
+async def test_stuck_processing_cannot_be_recovered_while_a_worker_may_own_it(db, xrpl):
+    txn, _ = await _queued(db)
+    await _claim_then_die(txn)
+
+    assert txn.id not in [t.id for t in await cashin_service.list_settlement_issues(db)]
+    async with _TestSession() as s:
+        row = await s.get(Transaction, txn.id)
+        with pytest.raises(cashin_service.RemittanceError, match="failed or stuck"):
+            await cashin_service.retry_settlement(s, row, enqueue=RecordingEnqueue())
+
+
+async def test_worker_died_before_signing_is_requeued_and_settles(db, xrpl):
+    txn, recipient = await _queued(db)
+    await _claim_then_die(txn)  # the macOS fork crash seen in the live run
+    await _age(txn.id, minutes=11)
+    assert txn.id in [t.id for t in await cashin_service.list_settlement_issues(db)]
+
+    async with _TestSession() as s:
+        row = await s.get(Transaction, txn.id)
+        enqueue = RecordingEnqueue()
+        assert await cashin_service.retry_settlement(s, row, enqueue=enqueue) == "requeued"
+        assert len(enqueue.calls) == 1
+
+    assert await _settle(txn) == "completed"
+    assert await _balance(recipient.id) == Decimal("50.874404")
+
+
+async def test_worker_died_after_signing_checks_ledger_first(db, xrpl):
+    txn, recipient = await _queued(db)
+    await _claim_then_die(txn, xrpl, tx_hash="SIGNEDHASH")
+    await _age(txn.id, minutes=11)
+
+    async def ledger_says_success(tx_hash):
+        assert tx_hash == "SIGNEDHASH"
+        return "tesSUCCESS"
+
+    async with _TestSession() as s:
+        row = await s.get(Transaction, txn.id)
+        enqueue = RecordingEnqueue()
+        assert await cashin_service.retry_settlement(
+            s, row, enqueue=enqueue, ledger_result=ledger_says_success
+        ) == "reconciled"
+        assert enqueue.calls == []
+
+    assert (await _fresh(txn.id)).settlement_status == SettlementStatus.completed
+    assert await _balance(recipient.id) == Decimal("50.874404")
+
+
+# --- recipient wallet screen (FR-WAL-05) ---
+
+async def test_wallet_page_lists_settled_transfer_with_hash(client, db, xrpl, monkeypatch):
+    from tests.remit_helpers import logged_in
+
+    async def no_ledger(address, client=None):
+        raise ConnectionError("offline")
+
+    monkeypatch.setattr(xrpl_service, "get_uctusd_balance", no_ledger)
+    txn, recipient = await _queued(db)
+    await _settle(txn)
+    done = await _fresh(txn.id)
+    # The worker wrote through its own session; drop this session's cached copies
+    # (in the app, every request gets a fresh session).
+    db.expire_all()
+    await db.refresh(recipient)
+
+    with logged_in(recipient):
+        r = await client.get("/wallet")
+    assert r.status_code == 200
+    assert "50.874404" in r.text
+    assert f"https://testnet.xrpl.org/transactions/{done.xrpl_tx_hash}" in r.text
+    assert "Ledger balance unavailable" in r.text

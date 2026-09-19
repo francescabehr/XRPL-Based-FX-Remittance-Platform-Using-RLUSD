@@ -9,6 +9,7 @@ python-multipart==0.0.18
 jinja2==3.1.4
 python-dotenv==1.0.1
 pydantic-settings==2.6.1
+tzdata==2024.2  # timezone database for zoneinfo on Windows (DISPLAY_TIMEZONE)
 
 # Testing
 pytest==8.3.4

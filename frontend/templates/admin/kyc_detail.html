@@ -39,7 +39,7 @@
           <dd class="col-7">{{ submission.source_of_funds }}</dd>
 
           <dt class="col-5 text-muted">Submitted at</dt>
-          <dd class="col-7 text-muted small">{{ submission.submitted_at.strftime('%d %b %Y %H:%M UTC') }}</dd>
+          <dd class="col-7 text-muted small">{{ submission.submitted_at|localtime('%d %b %Y %H:%M') }}</dd>
         </dl>
       </div>
     </div>

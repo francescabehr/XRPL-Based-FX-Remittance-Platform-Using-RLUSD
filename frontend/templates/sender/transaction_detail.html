@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% from "_macros.html" import hash_link with context %}
+{% block title %}Transaction — XRPL Remit{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{{ '/transactions' if is_sender else ('/wallet' if not user.is_admin else '/admin/settlements') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h3 class="fw-bold mb-0">Transfer to {{ txn.beneficiary.full_name }}</h3>
+  <span class="badge bg-{{ txn.status_badge }} fs-6 ms-2">{{ txn.status_label }}</span>
+</div>
+
+{% if txn.failure_reason %}
+<div class="alert alert-danger"><strong>Failed:</strong> {{ txn.failure_reason }}{% if txn.cashin_status.value == "failed" %} No money was sent.{% else %} The recipient's balance was not changed.{% endif %}</div>
+{% endif %}
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold">Progress</div>
+      <ul class="list-group list-group-flush">
+        <li class="list-group-item d-flex justify-content-between">
+          <span><i class="bi bi-credit-card me-2"></i>Card payment{% if txn.card_last4 %} (•••• {{ txn.card_last4 }}){% endif %}</span>
+          <span>{{ txn.cashin_status.value|capitalize }}{% if txn.cashin_updated_at %} <span class="text-muted small">· {{ txn.cashin_updated_at|localtime('%d %b %H:%M') }}</span>{% endif %}</span>
+        </li>
+        <li class="list-group-item d-flex justify-content-between">
+          <span><i class="bi bi-hdd-network me-2"></i>XRPL settlement</span>
+          <span>{{ txn.settlement_status.value|replace("_", " ")|capitalize }}{% if txn.settled_at %} <span class="text-muted small">· {{ txn.settled_at|localtime('%d %b %H:%M') }}</span>{% endif %}</span>
+        </li>
+        <li class="list-group-item d-flex justify-content-between">
+          <span><i class="bi bi-link-45deg me-2"></i>XRPL transaction</span>
+          <span>{{ hash_link(txn.xrpl_tx_hash) }}</span>
+        </li>
+      </ul>
+      {% if txn.cashin_status.value == "pending" %}
+      <div class="card-body small text-muted border-top">Waiting for the card payment to be confirmed. The transfer starts automatically afterwards.</div>
+      {% elif txn.settlement_status.value in ("queued", "processing") %}
+      <div class="card-body small text-muted border-top">Sending on the XRPL Testnet. This usually takes under a minute; refresh to update.</div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold">Amounts (fixed when you paid)</div>
+      <table class="table mb-0">
+        <tbody>
+          <tr><th class="fw-normal text-muted">Sent</th><td class="text-end">R{{ "{:,.2f}".format(txn.zar_amount) }}</td></tr>
+          <tr><th class="fw-normal text-muted">Transaction fee</th><td class="text-end">R{{ "{:,.2f}".format(txn.transaction_fee) }}</td></tr>
+          <tr><th class="fw-normal text-muted">Exchange rate</th><td class="text-end">R{{ "%.4f"|format(txn.exchange_rate) }} per USD</td></tr>
+          <tr class="table-light"><th>Recipient gets</th><td class="text-end fw-bold">{{ "{:,.6f}".format(txn.uctusd_amount) }} UCTUSD</td></tr>
+          <tr><th class="fw-normal text-muted">Created</th><td class="text-end small">{{ txn.created_at|localtime('%d %b %Y %H:%M') }}</td></tr>
+          <tr><th class="fw-normal text-muted">Reference</th><td class="text-end font-monospace small">{{ txn.id|string|truncate(13, True, "") }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

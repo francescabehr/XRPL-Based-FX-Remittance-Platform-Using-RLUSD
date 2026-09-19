@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "_macros.html" import hash_link with context %}
+{% block title %}Transactions — XRPL Remit{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h3 class="fw-bold mb-0"><i class="bi bi-list-ul me-2"></i>Transactions</h3>
+  <a href="/send" class="btn btn-primary"><i class="bi bi-send me-1"></i>Send Money</a>
+</div>
+
+{% if transactions %}
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr><th>Date</th><th>To</th><th class="text-end">Sent</th><th class="text-end">UCTUSD</th><th>Card payment</th><th>Status</th><th>XRPL</th></tr>
+      </thead>
+      <tbody>
+        {% for t in transactions %}
+        <tr>
+          <td class="small text-muted">{{ t.created_at|localtime('%d %b %Y %H:%M') }}</td>
+          <td><a href="/transactions/{{ t.id }}" class="fw-semibold text-decoration-none">{{ t.beneficiary.full_name }}</a></td>
+          <td class="text-end">R{{ "{:,.2f}".format(t.zar_amount) }}</td>
+          <td class="text-end">{{ "{:,.6f}".format(t.uctusd_amount) }}</td>
+          <td class="small">{{ t.cashin_status.value|capitalize }}</td>
+          <td><span class="badge bg-{{ t.status_badge }}">{{ t.status_label }}</span></td>
+          <td>{{ hash_link(t.xrpl_tx_hash if t.settlement_status.value == "completed" else None) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+  <strong>No transactions yet.</strong> <a href="/send">Send money</a> to get started.
+</div>
+{% endif %}
+{% endblock %}

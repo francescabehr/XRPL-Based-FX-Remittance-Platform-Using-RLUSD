@@ -1,0 +1,23 @@
+{# The seven quote figures (FR-FX-07). Expects `quote`. #}
+<table class="table mb-0">
+  <tbody>
+    <tr><th class="fw-normal text-muted">You send</th><td class="text-end fw-semibold">R{{ "{:,.2f}".format(quote.zar_amount) }}</td></tr>
+    <tr><th class="fw-normal text-muted">Transaction fee</th><td class="text-end">− R{{ "{:,.2f}".format(quote.transaction_fee) }}</td></tr>
+    <tr><th class="fw-normal text-muted">Amount converted</th><td class="text-end">R{{ "{:,.2f}".format(quote.net_zar_converted) }}</td></tr>
+    <tr>
+      <th class="fw-normal text-muted">Exchange rate</th>
+      <td class="text-end">R{{ "%.4f"|format(quote.exchange_rate) }} per USD
+        <div class="small text-muted">market R{{ "%.4f"|format(quote.market_rate) }} + {{ "%.2f"|format(quote.fx_margin * 100) }}% FX margin</div>
+      </td>
+    </tr>
+    <tr class="table-light"><th>Recipient gets</th><td class="text-end fw-bold">{{ "{:,.6f}".format(quote.uctusd_amount) }} UCTUSD</td></tr>
+    <tr><th class="fw-normal text-muted">Estimated cash-out fee</th><td class="text-end">{{ "{:,.2f}".format(quote.cashout_fee_estimate) }} UCTUSD</td></tr>
+    <tr>
+      <th class="fw-normal text-muted">Estimated payout</th>
+      <td class="text-end">
+        {% if quote.payout_currency.value == "USD" %}${{ "{:,.2f}".format(quote.payout_estimate) }}{% else %}R{{ "{:,.2f}".format(quote.payout_estimate) }}{% endif %}
+        {{ quote.payout_currency.value }}
+      </td>
+    </tr>
+  </tbody>
+</table>

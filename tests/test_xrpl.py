@@ -292,3 +292,105 @@ async def test_balance_reads_matching_trust_line():
 
 async def test_balance_none_without_trust_line():
     assert await xrpl_service.get_uctusd_balance("rX", client=FakeLinesClient([])) is None
+
+
+# --- Phase 6 additions: hash-before-submit hook + ledger lookup (FR-WAL-06, FR-MQ-06) ---
+
+async def test_on_signed_receives_hash_before_submission(ledger, monkeypatch):
+    events = []
+
+    async def tracking_submit(signed, client):
+        events.append("submitted")
+        return await ledger.submit_and_wait(signed, client)
+
+    monkeypatch.setattr(xrpl_service, "submit_and_wait", tracking_submit)
+
+    async def on_signed(tx_hash):
+        events.append(("signed", tx_hash))
+
+    result = await xrpl_service.send_from_treasury(
+        XRPLWallet.create().classic_address, Decimal("1"), client=object(), on_signed=on_signed
+    )
+
+    assert events == [("signed", result.tx_hash), "submitted"]
+
+
+async def test_on_signed_also_fires_when_ledger_rejects(ledger):
+    seen = []
+    ledger.outcomes.append("tecPATH_DRY")
+
+    async def on_signed(tx_hash):
+        seen.append(tx_hash)
+
+    result = await xrpl_service.send_from_treasury(
+        XRPLWallet.create().classic_address, Decimal("1"), client=object(), on_signed=on_signed
+    )
+    assert not result.success and seen == [result.tx_hash]
+
+
+async def test_on_signed_not_called_when_signing_fails(monkeypatch):
+    from xrpl.constants import XRPLException
+
+    async def boom(tx, client, signer):
+        raise XRPLException("autofill failed")
+
+    monkeypatch.setattr(xrpl_service, "autofill_and_sign", boom)
+    seen = []
+
+    async def on_signed(tx_hash):
+        seen.append(tx_hash)
+
+    result = await xrpl_service.send_from_treasury(
+        XRPLWallet.create().classic_address, Decimal("1"), client=object(), on_signed=on_signed
+    )
+    assert result.result_code == "sign_error" and seen == []
+
+
+class FakeTxClient:
+    """Answers the Tx lookup used by get_transaction_result."""
+
+    def __init__(self, ok, result):
+        self.ok, self.result, self.requests = ok, result, []
+
+    async def request(self, req):
+        self.requests.append(req)
+        ok, result = self.ok, self.result
+
+        class Resp:
+            def __init__(self):
+                self.result = result
+
+            def is_successful(self):
+                return ok
+
+        return Resp()
+
+
+async def test_transaction_result_for_validated_tx():
+    client = FakeTxClient(True, {"validated": True, "meta": {"TransactionResult": "tesSUCCESS"}})
+    assert await xrpl_service.get_transaction_result("ABC", client=client) == "tesSUCCESS"
+    assert client.requests[0].transaction == "ABC"
+
+
+async def test_transaction_result_for_validated_failure():
+    client = FakeTxClient(True, {"validated": True, "meta": {"TransactionResult": "tecPATH_DRY"}})
+    assert await xrpl_service.get_transaction_result("ABC", client=client) == "tecPATH_DRY"
+
+
+@pytest.mark.parametrize(
+    "ok, result",
+    [
+        (True, {"validated": False, "meta": {"TransactionResult": "tesSUCCESS"}}),  # not final yet
+        (False, {"error": "txnNotFound"}),  # never seen / expired
+    ],
+)
+async def test_transaction_result_none_until_final(ok, result):
+    assert await xrpl_service.get_transaction_result("ABC", client=FakeTxClient(ok, result)) is None
+
+
+async def test_provisioning_marks_user_as_receiver(db, ledger):
+    user = await _recipient(db)
+    assert user.can_receive is False
+    await xrpl_service.provision_wallet(db, user, client=object())
+    await db.refresh(user)
+    assert user.can_receive is True
