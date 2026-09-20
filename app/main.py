@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -6,12 +7,25 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import settings
-from app.database import engine
-from app.routers import admin, auth, beneficiaries, kyc, sender, transactions, wallet
+from app.database import AsyncSessionLocal, engine
+from app.services import cashout_service
+from app.routers import admin, auth, beneficiaries, cashout, kyc, sender, transactions, wallet
+
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Re-publish any cash-out burn whose message was lost between the approval
+    # commit and the enqueue (FR-CO-05). Idempotent: the worker's claim decides.
+    try:
+        async with AsyncSessionLocal() as db:
+            revived = await cashout_service.sweep_unpublished(db)
+        if revived:
+            logger.warning("Startup sweep re-published %s cash-out burn(s)", len(revived))
+    except Exception as exc:  # noqa: BLE001 — never block startup on Redis/DB
+        logger.error("Startup cash-out sweep skipped: %s", type(exc).__name__)
     yield
     await engine.dispose()
 
@@ -28,6 +42,7 @@ app.include_router(kyc.router)
 app.include_router(beneficiaries.router)
 app.include_router(transactions.router)
 app.include_router(wallet.router)
+app.include_router(cashout.router)
 app.include_router(admin.router)
 
 

@@ -28,11 +28,12 @@ from typing import Awaitable, Callable, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from xrpl.asyncio.clients import AsyncJsonRpcClient
+from xrpl.asyncio.ledger import get_latest_validated_ledger_sequence
 from xrpl.asyncio.transaction import autofill_and_sign, submit_and_wait
 from xrpl.asyncio.wallet import generate_faucet_wallet
 from xrpl.constants import XRPLException
 from xrpl.models.amounts import IssuedCurrencyAmount
-from xrpl.models.requests import AccountLines, Tx
+from xrpl.models.requests import AccountLines, ServerInfo, Tx
 from xrpl.models.transactions import Payment, TrustSet
 from xrpl.models.transactions.transaction import Transaction as XRPLTransaction
 from xrpl.wallet import Wallet as XRPLWallet
@@ -54,6 +55,27 @@ _RESULT_CODE = re.compile(r"\bte[a-z][A-Z_]+\b")
 # persist the hash first — if the process dies mid-submit, the payment can still
 # be traced on the ledger instead of blindly re-sent.
 OnSigned = Callable[[str], Awaitable[None]]
+
+
+@dataclass(frozen=True)
+class SignedTx:
+    """What a caller needs to recover a transaction whose outcome it never saw.
+
+    last_ledger_sequence and submitted_ledger_index bracket the only ledger range
+    in which this hash can ever appear. Without both, a missing transaction is
+    merely absent, not proven dead — see
+    https://xrpl.org/docs/concepts/transactions/reliable-transaction-submission
+    """
+
+    tx_hash: str
+    last_ledger_sequence: Optional[int]
+    submitted_ledger_index: Optional[int]
+
+
+# Richer variant of OnSigned, carrying the recovery metadata. If it raises, the
+# transaction is never submitted — persistence failure must not leave an
+# unrecorded payment on the ledger.
+OnSignedTx = Callable[[SignedTx], Awaitable[None]]
 
 
 class XRPLConfigError(RuntimeError):
@@ -114,11 +136,17 @@ async def submit(
     signer: XRPLWallet,
     client: AsyncJsonRpcClient,
     on_signed: Optional[OnSigned] = None,
+    on_signed_tx: Optional[OnSignedTx] = None,
+    submitted_ledger_index: Optional[int] = None,
 ) -> XRPLResult:
     """Sign, submit, and wait for a validated outcome (FR-WAL-06).
 
     A "sign_error" result means nothing reached the ledger, so it is safe to retry.
     Any other failure has a hash and may need a ledger check before retrying.
+
+    on_signed gets just the hash; on_signed_tx additionally gets the ledger range
+    needed to reconcile an unknown outcome. Both run after signing and before
+    submission, and an exception from either propagates before anything is sent.
     """
     try:
         signed = await autofill_and_sign(tx, client, signer)
@@ -127,8 +155,18 @@ async def submit(
         return XRPLResult(False, "sign_error", None, str(exc))
 
     tx_hash = signed.get_hash()
+    # Persist before submitting. If this raises, nothing is sent — better a
+    # transaction that never existed than one the database cannot account for.
     if on_signed is not None:
         await on_signed(tx_hash)
+    if on_signed_tx is not None:
+        await on_signed_tx(
+            SignedTx(
+                tx_hash=tx_hash,
+                last_ledger_sequence=signed.last_ledger_sequence,
+                submitted_ledger_index=submitted_ledger_index,
+            )
+        )
     try:
         resp = await submit_and_wait(signed, client)
     except XRPLException as exc:
@@ -251,9 +289,26 @@ async def send_from_treasury(
 
 
 async def burn_to_issuer(
-    wallet: Wallet, amount: Decimal, client: Optional[AsyncJsonRpcClient] = None
+    wallet: Wallet,
+    amount: Decimal,
+    client: Optional[AsyncJsonRpcClient] = None,
+    on_signed_tx: Optional[OnSignedTx] = None,
 ) -> XRPLResult:
-    """Recipient -> issuer UCTUSD payment, which destroys the tokens (used by Phase 7 cash-out)."""
+    """Recipient -> issuer UCTUSD payment, which destroys the tokens (FR-CO-05).
+
+    Same Payment proven in Phase 5, plus pre-submission persistence: the validated
+    ledger index is read before signing so on_signed_tx receives the full range
+    [submitted_ledger_index, last_ledger_sequence] in which the hash could land.
+    A cash-out whose outcome is never observed is resolved from that range alone.
+    """
+    client = client or get_client()
+
+    submitted_ledger_index: Optional[int] = None
+    if on_signed_tx is not None:
+        # Read before signing: a later reading could sit after the tx was already
+        # included, which would narrow the search range and lose the transaction.
+        submitted_ledger_index = await get_latest_validated_ledger_sequence(client)
+
     return await submit(
         Payment(
             account=wallet.xrpl_address,
@@ -261,5 +316,47 @@ async def burn_to_issuer(
             amount=uctusd(amount),
         ),
         _signer_for(wallet),
-        client or get_client(),
+        client,
+        on_signed_tx=on_signed_tx,
+        submitted_ledger_index=submitted_ledger_index,
     )
+
+
+async def get_latest_validated_ledger(client: Optional[AsyncJsonRpcClient] = None) -> int:
+    """Index of the most recently validated ledger."""
+    return await get_latest_validated_ledger_sequence(client or get_client())
+
+
+def _parse_complete_ledgers(complete_ledgers: str) -> list[tuple[int, int]]:
+    """Parse a server's `complete_ledgers` string, e.g. "32570-97531234,97531240-97531250"."""
+    ranges: list[tuple[int, int]] = []
+    for chunk in (complete_ledgers or "").split(","):
+        chunk = chunk.strip()
+        if not chunk or chunk == "empty":
+            continue
+        try:
+            if "-" in chunk:
+                low, high = chunk.split("-", 1)
+                ranges.append((int(low), int(high)))
+            else:
+                ranges.append((int(chunk), int(chunk)))
+        except ValueError:
+            continue  # unparseable chunk: treat as no coverage rather than guessing
+    return ranges
+
+
+async def has_complete_ledger_range(
+    start: int, end: int, client: Optional[AsyncJsonRpcClient] = None
+) -> bool:
+    """True only if the server holds every ledger in [start, end] in one unbroken range.
+
+    Reconcile needs this before it can call a missing transaction definitively
+    failed: if the server has a gap in that window, the transaction could have
+    been validated in a ledger the server simply cannot see.
+    """
+    client = client or get_client()
+    resp = await client.request(ServerInfo())
+    if not resp.is_successful():
+        return False
+    complete = resp.result.get("info", {}).get("complete_ledgers", "")
+    return any(low <= start and end <= high for low, high in _parse_complete_ledgers(complete))

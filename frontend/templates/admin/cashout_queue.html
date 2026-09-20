@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% from "_macros.html" import hash_link with context %}
+{% block title %}Cash-Out Queue — Admin{% endblock %}
+
+{% block content %}
+<h3 class="fw-bold mb-1"><i class="bi bi-cash-stack me-2"></i>Cash-out queue</h3>
+<p class="text-muted small mb-4">
+  Approving reserves the recipient's UCTUSD and queues an on-chain burn to the issuer.
+  Fiat payouts are simulated.
+</p>
+
+<div class="card shadow-sm">
+  {% if requests %}
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Requested</th><th>Recipient</th><th class="text-end">UCTUSD</th>
+          <th class="text-end">Payout</th><th>Status</th><th>Burn</th><th class="text-end">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in requests %}
+        <tr>
+          <td class="small text-muted">{{ r.created_at|localtime('%d %b %Y %H:%M') }}</td>
+          <td>
+            {{ r.recipient.full_name }}
+            <div class="small text-muted">{{ r.recipient.email }}</div>
+          </td>
+          <td class="text-end fw-semibold">{{ "{:,.6f}".format(r.uctusd_amount) }}</td>
+          <td class="text-end">
+            {% if r.target_currency.value == "ZAR" %}R{{ "{:,.2f}".format(r.net_payout) }}{% else %}${{ "{:,.6f}".format(r.net_payout) }}{% endif %}
+            <span class="small text-muted">{{ r.target_currency.value }}</span>
+          </td>
+          <td>
+            <span class="badge bg-{{ r.status_badge }}">{{ r.status_label }}</span>
+            {% if r.failure_reason %}<div class="small text-warning">{{ r.failure_reason }}</div>{% endif %}
+            {% if r.approver %}<div class="small text-muted">by {{ r.approver.full_name }}</div>{% endif %}
+          </td>
+          <td>{{ hash_link(r.xrpl_burn_tx_hash) }}</td>
+          <td class="text-end text-nowrap">
+            {% if r.status.value == "requested" %}
+            <form method="post" action="/admin/cashout/{{ r.id }}/approve" class="d-inline">
+              <button class="btn btn-success btn-sm"><i class="bi bi-check-lg me-1"></i>Approve</button>
+            </form>
+            <button class="btn btn-outline-danger btn-sm" data-bs-toggle="collapse" data-bs-target="#reject{{ loop.index }}">
+              Reject
+            </button>
+            {% elif r.awaiting_ledger_confirmation %}
+            <form method="post" action="/admin/cashout/{{ r.id }}/reconcile" class="d-inline">
+              <button class="btn btn-warning btn-sm"><i class="bi bi-search me-1"></i>Reconcile</button>
+            </form>
+            {% else %}
+            <span class="small text-muted">Burn in progress…</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% if r.status.value == "requested" %}
+        <tr class="collapse" id="reject{{ loop.index }}">
+          <td colspan="7" class="bg-light">
+            <form method="post" action="/admin/cashout/{{ r.id }}/reject" class="row g-2 align-items-center">
+              <div class="col-md-9">
+                <input type="text" name="reason" class="form-control form-control-sm"
+                       placeholder="Reason for rejecting this cash-out">
+              </div>
+              <div class="col-md-3">
+                <button class="btn btn-danger btn-sm w-100">Confirm rejection</button>
+              </div>
+            </form>
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-body text-muted text-center py-5">
+    <i class="bi bi-check2-circle fs-1 d-block mb-2"></i>
+    No cash-out requests awaiting action.
+  </div>
+  {% endif %}
+</div>
+
+<p class="small text-muted mt-3">
+  <strong>Reconcile</strong> resolves a burn whose outcome was never confirmed. It checks the XRPL
+  directly: a validated success completes the request, and a burn proven never to have been included
+  (past its LastLedgerSequence, with unbroken ledger history) fails it and returns the reserved UCTUSD.
+  If neither can be proven, the reserve stays held and nothing changes.
+</p>
+{% endblock %}

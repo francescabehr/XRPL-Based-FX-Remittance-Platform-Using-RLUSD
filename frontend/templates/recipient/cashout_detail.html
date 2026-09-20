@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% from "_macros.html" import hash_link with context %}
+{% block title %}Cash-Out Detail — XRPL Remit{% endblock %}
+
+{% block content %}
+<a href="/cashout/history" class="small text-decoration-none"><i class="bi bi-arrow-left me-1"></i>Back to my cash-outs</a>
+<h3 class="fw-bold my-3"><i class="bi bi-cash-coin me-2"></i>Cash-out detail</h3>
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Request</span>
+        <span class="badge bg-{{ req.status_badge }}">{{ req.status_label }}</span>
+      </div>
+      <table class="table mb-0">
+        <tbody>
+          <tr><td class="text-muted">Requested</td><td class="text-end">{{ req.created_at|localtime('%d %b %Y %H:%M') }}</td></tr>
+          <tr><td class="text-muted">UCTUSD burned</td><td class="text-end fw-semibold">{{ "{:,.6f}".format(req.uctusd_amount) }}</td></tr>
+          <tr>
+            <td class="text-muted">Cash-out fee</td>
+            <td class="text-end text-danger">− {{ "{:,.6f}".format(req.cashout_fee_usd) }} USD</td>
+          </tr>
+          <tr>
+            <td class="text-muted">Exchange rate</td>
+            <td class="text-end">
+              {% if req.target_currency.value == "ZAR" %}1 USD = {{ "{:,.6f}".format(req.market_rate) }} ZAR{% else %}1 UCTUSD = 1 USD{% endif %}
+            </td>
+          </tr>
+          <tr class="table-light">
+            <td class="fw-semibold">Payout <span class="small text-muted">(simulated)</span></td>
+            <td class="text-end fw-bold">
+              {% if req.target_currency.value == "ZAR" %}R{{ "{:,.2f}".format(req.net_payout) }}{% else %}${{ "{:,.6f}".format(req.net_payout) }}{% endif %}
+              <span class="small text-muted">{{ req.target_currency.value }}</span>
+            </td>
+          </tr>
+          {% if req.approved_at %}
+          <tr><td class="text-muted">Approved</td><td class="text-end">{{ req.approved_at|localtime('%d %b %Y %H:%M') }}</td></tr>
+          {% endif %}
+          {% if req.completed_at %}
+          <tr><td class="text-muted">Completed</td><td class="text-end">{{ req.completed_at|localtime('%d %b %Y %H:%M') }}</td></tr>
+          {% endif %}
+          {% if req.fiat_payout_reference %}
+          <tr>
+            <td class="text-muted">Simulated payout reference</td>
+            <td class="text-end font-monospace small">{{ req.fiat_payout_reference }}</td>
+          </tr>
+          {% endif %}
+          <tr><td class="text-muted">Burn transaction</td><td class="text-end">{{ hash_link(req.xrpl_burn_tx_hash) }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    {% if req.status.value == "requested" %}
+    <div class="alert alert-secondary small">
+      <i class="bi bi-hourglass-split me-1"></i>
+      Waiting for an administrator to review this request. Your UCTUSD has not been reserved yet.
+    </div>
+    {% elif req.awaiting_ledger_confirmation %}
+    <div class="alert alert-warning small">
+      <i class="bi bi-hourglass-split me-1"></i>
+      <strong>Awaiting ledger confirmation.</strong> The burn was submitted but its outcome has not
+      been confirmed yet. Your UCTUSD stays reserved until it is verified on the XRPL — it will be
+      returned if the burn did not go through.
+    </div>
+    {% elif req.status.value == "approved" %}
+    <div class="alert alert-info small">
+      <i class="bi bi-arrow-repeat me-1"></i>
+      Approved. {{ "{:,.6f}".format(req.uctusd_amount) }} UCTUSD is reserved and the burn is being processed.
+    </div>
+    {% elif req.status.value == "completed" %}
+    <div class="alert alert-success small">
+      <i class="bi bi-check2-circle me-1"></i>
+      Completed. The UCTUSD was burned on the XRPL Testnet and the
+      <strong>simulated</strong> payout was recorded.
+    </div>
+    {% elif req.status.value == "failed" %}
+    <div class="alert alert-danger small">
+      <i class="bi bi-x-circle me-1"></i>
+      <strong>Failed.</strong> {{ req.failure_reason }}
+      <div class="mt-1">Any reserved UCTUSD has been returned to your wallet.</div>
+    </div>
+    {% endif %}
+    <a href="/wallet" class="btn btn-outline-secondary btn-sm"><i class="bi bi-wallet2 me-1"></i>View wallet</a>
+  </div>
+</div>
+{% endblock %}

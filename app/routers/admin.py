@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_flash, require_admin, set_flash
-from app.services import cashin_service
+from app.services import cashin_service, cashout_service
 from app.services.kyc_service import (
     approve_kyc,
     get_pending_submissions,
@@ -264,3 +264,107 @@ async def settlement_retry(
     else:
         set_flash(request, "Settlement re-queued.", "success")
     return RedirectResponse(url="/admin/settlements", status_code=302)
+
+
+# ── Cash-out approval queue (FR-CO-05, FR-ADM-05) ────────────────────────────
+
+@router.get("/cashout", response_class=HTMLResponse)
+async def cashout_queue(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_admin),
+):
+    return templates.TemplateResponse(
+        "admin/cashout_queue.html",
+        {
+            "request": request,
+            "user": user,
+            "flash": get_flash(request),
+            "requests": await cashout_service.list_open(db),
+        },
+    )
+
+
+@router.post("/cashout/{request_id}/approve")
+async def cashout_approve(
+    request_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_admin),
+):
+    """FR-CO-05/06: reserve the UCTUSD and queue the on-chain burn."""
+    req = await cashout_service.get_request(db, request_id)
+    if not req:
+        set_flash(request, "Cash-out request not found.", "danger")
+        return RedirectResponse(url="/admin/cashout", status_code=302)
+    try:
+        await cashout_service.approve(db, req, user)
+    except cashout_service.CashOutError as exc:
+        set_flash(request, str(exc), "warning")
+        return RedirectResponse(url="/admin/cashout", status_code=302)
+
+    if req.status.value == "failed":
+        set_flash(request, f"Could not queue the burn: {req.failure_reason}", "danger")
+    else:
+        set_flash(
+            request,
+            f"Approved. {req.uctusd_amount:,.6f} UCTUSD reserved and the burn is queued.",
+            "success",
+        )
+    return RedirectResponse(url="/admin/cashout", status_code=302)
+
+
+@router.post("/cashout/{request_id}/reject")
+async def cashout_reject(
+    request_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_admin),
+    reason: str = Form(""),
+):
+    req = await cashout_service.get_request(db, request_id)
+    if not req:
+        set_flash(request, "Cash-out request not found.", "danger")
+        return RedirectResponse(url="/admin/cashout", status_code=302)
+    try:
+        await cashout_service.reject(db, req, user, reason)
+    except cashout_service.CashOutError as exc:
+        set_flash(request, str(exc), "warning")
+        return RedirectResponse(url="/admin/cashout", status_code=302)
+    set_flash(request, "Cash-out rejected. No UCTUSD was reserved or burned.", "warning")
+    return RedirectResponse(url="/admin/cashout", status_code=302)
+
+
+@router.post("/cashout/{request_id}/reconcile")
+async def cashout_reconcile(
+    request_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_admin),
+):
+    """Resolve a held cash-out against the ledger — never against the clock."""
+    req = await cashout_service.get_request(db, request_id)
+    if not req:
+        set_flash(request, "Cash-out request not found.", "danger")
+        return RedirectResponse(url="/admin/cashout", status_code=302)
+    try:
+        outcome = await cashout_service.reconcile(db, req)
+    except cashout_service.CashOutError as exc:
+        set_flash(request, str(exc), "warning")
+        return RedirectResponse(url="/admin/cashout", status_code=302)
+    except Exception as exc:  # noqa: BLE001 — e.g. Testnet unreachable
+        set_flash(request, f"Could not reach the ledger ({type(exc).__name__}). Try again shortly.", "danger")
+        return RedirectResponse(url="/admin/cashout", status_code=302)
+
+    if outcome == "completed":
+        set_flash(request, "The burn had succeeded on-ledger. Marked completed; the payout is simulated.", "success")
+    elif outcome == "failed":
+        set_flash(request, "The burn provably never landed. Marked failed and the reserved UCTUSD was restored.", "warning")
+    else:
+        set_flash(
+            request,
+            "Still unresolved: the burn could yet be validated, so the reserve stays held. "
+            "Nothing was changed.",
+            "info",
+        )
+    return RedirectResponse(url="/admin/cashout", status_code=302)

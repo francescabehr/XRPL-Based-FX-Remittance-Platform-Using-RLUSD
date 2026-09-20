@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Cash Out — XRPL Remit{% endblock %}
+
+{% block content %}
+<h3 class="fw-bold mb-4"><i class="bi bi-cash-coin me-2"></i>Cash Out</h3>
+
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+
+{% if not wallet %}
+<div class="card shadow-sm">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-wallet2 fs-1 d-block mb-2"></i>
+    <strong>No wallet yet.</strong> You can cash out once you have received UCTUSD.
+  </div>
+</div>
+{% else %}
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold">Request a cash-out</div>
+      <div class="card-body">
+        <form method="post" action="/cashout/preview">
+          <div class="mb-3">
+            <label class="form-label" for="uctusd_amount">Amount to cash out (UCTUSD)</label>
+            <input type="text" inputmode="decimal" class="form-control" id="uctusd_amount"
+                   name="uctusd_amount" value="{{ amount_value or '' }}" required
+                   placeholder="0.000000" autocomplete="off">
+            <div class="form-text">
+              Available: <strong>{{ "{:,.6f}".format(available) }} UCTUSD</strong>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="target_currency">Payout currency</label>
+            <select class="form-select" id="target_currency" name="target_currency">
+              <option value="USD" {% if currency_value == "ZAR" %}{% else %}selected{% endif %}>USD — US Dollar</option>
+              <option value="ZAR" {% if currency_value == "ZAR" %}selected{% endif %}>ZAR — South African Rand</option>
+            </select>
+            <div class="form-text">Cash-out is available in USD and ZAR only.</div>
+          </div>
+          <button type="submit" class="btn btn-primary">
+            Preview payout <i class="bi bi-arrow-right ms-1"></i>
+          </button>
+          <a href="/cashout/history" class="btn btn-link">View my cash-outs</a>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <p class="text-muted mb-1">Wallet balance</p>
+        <p class="h4 fw-bold mb-3">{{ "{:,.6f}".format(wallet.balance_uctusd) }} <span class="fs-6">UCTUSD</span></p>
+        {% if held > 0 %}
+        <p class="small text-muted mb-1">
+          Less {{ "{:,.6f}".format(held) }} UCTUSD held by cash-outs awaiting approval
+        </p>
+        {% endif %}
+        <p class="small mb-0">Available to cash out: <strong>{{ "{:,.6f}".format(available) }} UCTUSD</strong></p>
+      </div>
+    </div>
+    <div class="alert alert-secondary small mt-3 mb-0">
+      <i class="bi bi-info-circle me-1"></i>
+      Cashing out burns your UCTUSD on the XRPL Testnet and records a
+      <strong>simulated</strong> fiat payout. No real money is transferred.
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

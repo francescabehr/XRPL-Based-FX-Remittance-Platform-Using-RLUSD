@@ -114,13 +114,21 @@ Phase 6  Cash-In + Queue + Settlement  ✅ DONE   FR-CI-01..05  FR-MQ-01..06  FR
          (beneficiary re-linked at send time). Migration 0005. Run the worker with
          `make worker` (SimpleWorker — macOS kills forked RQ work-horses).
 
-Phase 7  Cash-Out (burn)               ⬜        FR-CO-01..06
-         Request → admin approve → balance debit → on-chain burn to issuer →
-         store burn hash → simulate fiat payout. Reversal on failure.
+Phase 7  Cash-Out (burn)               ✅ DONE   FR-CO-01..06
+         Request (priced preview, snapshot persisted) → admin approve (wallet row
+         locked, balance debited once) → RQ burn message → worker claims → recipient
+         →issuer burn → completed + simulated fiat payout. Three post-signing
+         outcomes: validated success completes; a validated tec*/tef* restores the
+         reserve once; an UNKNOWN outcome holds the reserve (status stays approved,
+         "Awaiting ledger confirmation") and is never auto-resubmitted — an admin
+         Reconcile resolves it from LastLedgerSequence + complete_ledgers coverage,
+         never from elapsed time. Migration 0006. Worker: cashout_worker.py.
 
 Phase 8  Admin Portal                  ⬜(partial) FR-ADM-01..07
-         KYC queue, cash-in queue and settlement monitor DONE; add cash-out queue,
-         full transaction monitor with filters (/admin/transactions), fee config screen.
+         KYC queue, cash-in queue, settlement monitor and cash-out queue DONE
+         (cash-out queue shipped with Phase 7); add the full transaction monitor
+         with filters (/admin/transactions — still a dead link), fee config screen,
+         AML flag.
 
 Phase 9  Performance Tests             ⬜        Brief §7.iv
          Locust scenarios once a full flow runs; synthetic data via Faker.
@@ -144,7 +152,7 @@ xrpl-remittance/
 │   │   ├── beneficiary.py
 │   │   ├── transaction.py        # (Phase 4) ✅
 │   │   ├── wallet.py             # (Phase 5) ✅
-│   │   ├── cashout.py            # (Phase 7)
+│   │   ├── cashout.py            # (Phase 7) ✅
 │   │   └── platform_config.py    # fee_config + limit_tiers
 │   │
 │   ├── schemas/                  # auth, kyc, beneficiary, transaction, wallet, cashout
@@ -162,7 +170,8 @@ xrpl-remittance/
 │   │   └── xrpl_service.py       # account provision, TrustSet, Payment, burn  (Phase 5/6/7)
 │   │
 │   ├── workers/
-│   │   └── settlement_worker.py  # RQ job: consume → UCTUSD transfer → update DB  (Phase 6)
+│   │   ├── settlement_worker.py  # RQ job: consume → UCTUSD transfer → update DB  (Phase 6)
+│   │   └── cashout_worker.py     # RQ job: claim → burn → complete/reverse/hold  (Phase 7) ✅
 │   │
 │   └── security/
 │       ├── crypto.py             # Fernet encrypt/decrypt for XRPL private keys
@@ -208,8 +217,16 @@ Changes for UCTUSD:
 - **`wallets.balance_rlusd` → `balance_uctusd`** (platform-side cache; authoritative source is XRPL).
 - **`transactions.rlusd_amount` → `uctusd_amount`**; `xrpl_tx_hash` holds the treasury→recipient
   settlement hash.
-- **`cashout_requests`**: `rlusd_amount` → `uctusd_amount`; **add `xrpl_burn_tx_hash` (nullable)**
-  to store the on-chain burn hash (recipient → issuer). Add this column when Phase 7 is built.
+- **`cashout_requests`** (created by migration 0006, Phase 7): `uctusd_amount`, `target_currency`
+  (reuses the existing `payoutcurrency` enum — exactly USD/ZAR), the pricing snapshot
+  (`market_rate`, `cashout_fee_percentage`, `cashout_fee_min_usd`, `cashout_fee_usd`,
+  `net_payout`), `status` (`cashoutstatus`: requested/approved/completed/failed),
+  `approved_by` + `approved_at`, `idempotency_key` (UUID UNIQUE), `xrpl_burn_tx_hash` (nullable),
+  the reliable-submission recovery pair `burn_last_ledger_sequence` +
+  `burn_submitted_ledger_index`, the worker claim flag `burn_started_at` + `burn_attempts`,
+  `failure_reason`, and the simulated payout fields `fiat_payout_reference` + `fiat_paid_at`.
+  There is deliberately **no `processing` status** — FR-CO-03 names four states, so the worker
+  claims a row with `burn_started_at` rather than inventing a fifth.
 - **Treasury wallet is NOT a row** — it is config (see above).
 
 Keep `transactions.idempotency_key` (UUID UNIQUE) as the queue-dedup / anti-double-credit key.
@@ -264,7 +281,24 @@ No `roles` array — role membership is the three booleans above.
 - **`settlement_worker.py`** must check `idempotency_key` before processing. The first DB write
   claiming that key wins; subsequent redeliveries of the same message are a no-op (FR-MQ-04).
 - **Cash-out burn** submits a real Payment from the recipient's account to the issuer `rELez4x4…`,
-  stores `xrpl_burn_tx_hash`, and only then marks the fiat payout complete in the DB.
+  stores `xrpl_burn_tx_hash` **before submitting**, and only then marks the (simulated) fiat payout
+  complete in the DB. The **full `uctusd_amount` is burned**; the cash-out fee is deducted only when
+  computing the fiat payout, never from the burn.
+- **Cash-out money rules (FR-CO-06).** `balance_uctusd` is debited exactly once, at approval, inside
+  the same transaction as the `requested → approved` claim and while the wallet row is held
+  `FOR UPDATE`. It is restored only by the single conditional `approved → failed` transition, so a
+  reversal cannot fire twice. Restores only add, so the balance can never go negative. A burn whose
+  outcome is **unknown must never be reversed** — that would credit back UCTUSD that may already be
+  destroyed on-ledger. Available balance for a new request = `balance_uctusd` minus the sum of
+  **`requested`** rows only; `approved` rows have already left the balance.
+- **Never treat elapsed time as proof of a failed burn.** Reconcile may only fail-and-restore when
+  the transaction is absent *and* the validated ledger is past its `LastLedgerSequence` *and* the
+  server's `complete_ledgers` covers the whole submission range. The 10-minute `STUCK_AFTER` claim
+  expiry is a liveness check for a dead worker only, and applies solely to rows that never reached
+  signing (`xrpl_burn_tx_hash IS NULL`). Once a row has a hash, no worker may ever re-claim it.
+- **Late-bind queue publishers** in cash-out (`enqueue or queue_service.enqueue_burn` inside the
+  function). A default argument binds the function object at import time, which silently defeats
+  substitution in tests and publishes real jobs.
 - **`security/crypto.py`** is used only by `xrpl_service.py` for key decryption and wallet
   provisioning — nowhere else. Do not widen this surface.
 - **The treasury seed and per-user seeds** must never appear in logs, API responses, or DB rows in

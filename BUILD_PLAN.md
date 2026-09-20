@@ -166,40 +166,95 @@ wallet, and the idempotency test passes.
 
 ---
 
-## Phase 7 — Cash-Out with On-Chain Burn  (FR-CO-01..06)
+## Phase 7 — Cash-Out with On-Chain Burn  (FR-CO-01..06)  ✅ DONE
 
 **Objective:** recipient converts UCTUSD to USD/ZAR; the platform burns tokens to the issuer and
 simulates the fiat payout.
 
 **Depends on:** Phase 6 (recipients hold real balances).
 
+> **Revision note.** The steps below supersede the original Phase 7 draft. Three things changed
+> during implementation and are now authoritative: the ZAR payout formula, the definition of
+> available balance, and the handling of a burn whose outcome is unknown.
+
 ### Steps
 1. **Request.** `POST /cashout` with `uctusd_amount` + `target_currency` (USD/ZAR only). Reject
    amounts exceeding available balance. `status=requested`. *(FR-CO-01)*
-2. **Payout math.** `net_payout = (uctusd_amount * rate) - cashout_fee` for the selected currency;
-   display before submit. *(FR-CO-02)*
-3. **Status flow** `requested → approved → completed/failed`, forward-only (no skips/reversals).
-   *(FR-CO-03)*
-4. **Admin approve.** Admin approves; on approval **debit** `balance_uctusd` (reserve the amount),
-   attributed + timestamped. *(FR-CO-05, FR-CO-06)*
-5. **Burn on completion.** Submit `Payment` recipient → issuer `rELez4x4…` for `uctusd_amount`;
-   on `tesSUCCESS` store `xrpl_burn_tx_hash`, set `completed`, and simulate the fiat conversion in
-   the DB. Do the burn via the queue/worker for consistency with Phase 6.
-6. **Reversal.** If the burn fails, set `failed`, restore the reserved UCTUSD, record
-   `failure_reason`. Balance must never go negative. *(FR-CO-06)*
-7. **Migration.** Add `cashout_requests.xrpl_burn_tx_hash` (nullable). UI: Cash-Out Request +
-   Cash-Out Status/History screens. *(FR-CO-04)*
+2. **Payout math — shared with the quote engine.** The helpers live in `fx_service`
+   (`cashout_fee_usd`, `cashout_payout`) and `calculate_quote` calls the same code, so a quote's
+   estimate and a real cash-out cannot drift:
+   - `fee_usd = max(uctusd_amount * cashout_fee_percentage, cashout_fee_min_usd)`
+   - USD: `payout = uctusd_amount - fee_usd`  (6 dp)
+   - ZAR: `payout = (uctusd_amount - fee_usd) * market_rate`  (2 dp)
+   The fee is charged in USD **before** conversion, so ZAR is `(uctusd - fee) * rate`, **not**
+   `(uctusd * rate) - fee`. Non-positive payouts are rejected. *(FR-CO-02)*
+3. **Pricing is snapshotted, never recomputed.** The rate, fee and payout are persisted on the
+   request and approval honours those saved values. The preview the recipient accepted is echoed
+   back on submit and compared against a fresh server-side computation; if it moved, a refreshed
+   preview is required. Client-supplied figures are only ever compared, never persisted.
+4. **Available balance** = `balance_uctusd` − SUM(`uctusd_amount` WHERE `status='requested'`).
+   `approved` rows are **not** subtracted — their amount already left `balance_uctusd` at approval,
+   so counting them again would double-subtract. The wallet row is locked `FOR UPDATE` across the
+   availability check and the insert. *(FR-CO-01)*
+5. **Status flow** `requested → approved → completed/failed`, forward-only (no skips/reversals).
+   Every transition is a conditional UPDATE guarded on the current status. There is no `processing`
+   state: the worker claims with `burn_started_at`. *(FR-CO-03)*
+6. **Admin approve** (`require_admin`), in one transaction and in this order: lock the wallet
+   `FOR UPDATE` → re-check the balance under the lock → conditional `requested → approved` claim →
+   debit → commit. Status and money land together or not at all, and no network call happens inside
+   the lock. Publishing the burn message happens after the commit. *(FR-CO-05, FR-CO-06)*
+7. **Burn via the queue/worker**, reusing `xrpl_service.burn_to_issuer` — the Phase 5 calls are not
+   re-derived. `burn_to_issuer` reads the validated ledger index before signing and hands the caller
+   hash + `LastLedgerSequence` + that index **before submitting**; if persistence raises, nothing is
+   submitted. The worker's claim requires `status=approved AND xrpl_burn_tx_hash IS NULL`, so once
+   anything has been signed **no worker may ever claim the row again**. The full `uctusd_amount` is
+   burned; the fee only reduces the simulated fiat payout.
+8. **Three post-signing outcomes, and only these:**
+   | Outcome | Status | Balance |
+   |---|---|---|
+   | validated `tesSUCCESS` | `completed`, hash kept, simulated payout written | untouched (already debited) |
+   | validated `tec*`/`tef*` (tokens provably did not move) | `failed` + reason | **restored once** |
+   | unknown (timeout / connection / no validated result) | stays `approved`, `failure_reason=outcome_unknown`, shown as "Awaiting ledger confirmation" | **stays debited**, never auto-resubmitted |
+   Failures before signing are retried with backoff after releasing the claim; on exhaustion the
+   row fails and the reserve is restored. Balance never goes negative. *(FR-CO-06)*
+9. **Admin Reconcile.** Resolves a held row from the ledger only: validated success → complete once;
+   validated failure → fail + restore once; absent → failed **only if** the validated ledger is past
+   `LastLedgerSequence` **and** the server's `complete_ledgers` covers
+   `[burn_submitted_ledger_index, burn_last_ledger_sequence]`; otherwise unresolved and the hold
+   stays. Elapsed wall-clock time is never evidence. Reconcile cannot race the worker into a double
+   submit (a hashed row is unclaimable) or a double complete/restore (both go through conditional
+   updates). The 10-minute `STUCK_AFTER` claim expiry recovers only a worker that died *before*
+   signing.
+10. **Re-enqueue sweep.** Approval commits before it publishes, so a crash in between would leave a
+    row approved and debited with no message. `cashout_service.sweep_unpublished` finds approved rows
+    with no hash, no claim, and an `approved_at` older than `PUBLISH_GRACE`, and re-publishes them.
+    It runs at app startup and is safe to run repeatedly — the worker's claim enforces exactly-once.
+11. **Migration 0006** creates `cashout_requests` (new table, reusing the `payoutcurrency` enum).
+    **UI:** Cash-Out Request with priced preview, Status/History, and detail (recipient); admin
+    approval queue with Approve / Reject / Reconcile at `/admin/cashout`, wired to the nav link that
+    was previously a dead 404. Fiat payouts are labelled **simulated** throughout. *(FR-CO-04)*
 
 ### Acceptance
-- Displayed payout equals `(uctusd × rate) − fee` for the chosen currency. *(FR-CO-02)*
-- A failed cash-out restores the reserved balance; balance never negative. *(FR-CO-06)*
+- Displayed payout equals `(uctusd − fee_usd)` for USD and `(uctusd − fee_usd) × rate` for ZAR, and
+  matches what the quote engine estimates. *(FR-CO-02)*
+- A failed cash-out restores the reserved balance exactly once; balance never negative. *(FR-CO-06)*
 - Completed cash-out has a resolvable burn hash to the issuer.
+- An unknown outcome holds the reserve rather than reversing it, and is resolvable by Reconcile.
 
-### Tests (`test_cashout.py`)
-- Over-balance request rejected; status flow can't skip/reverse; failure reverses the debit.
+### Tests (`test_cashout.py`) — 59 tests
+- USD/ZAR math, the minimum-fee floor, rounding, and non-positive payouts.
+- Over-balance and concurrent requests (real PostgreSQL row locks); approved rows not
+  double-subtracted; saved pricing unchanged by a later fee-config edit.
+- Duplicate approval and duplicate/concurrent queue delivery debit and burn exactly once.
+- Definitive failure restores once; unknown outcome retains the debit; reconcile to success and to
+  failure including repeated calls; tx-not-found stays unresolved without proof of expiry.
+- Queue-publish failure restores the reserve; worker-crash recovery before and after signing;
+  the sweep re-publishes a lost message and is safe to run twice.
+- Recipient ownership scoping and admin authorization (403 for non-admins).
+- xrpl-py and Redis are faked — no live Testnet.
 
 **Done when:** a recipient cash-out debits, burns on-ledger, and shows `completed` with a hash — and
-the failure path restores balance.
+the failure path restores balance. ✅
 
 ---
 
@@ -213,8 +268,8 @@ data these screens act on.
 ### Steps
 1. **Cash-in confirmation queue** — list pending cash-ins; Confirm → enqueues settlement, Fail →
    cancels + notifies. *(FR-ADM-03, ties FR-CI-02)*
-2. **Cash-out approval queue** — Approve/Complete/Fail moving requests through the flow.
-   *(FR-ADM-05, ties FR-CO-05)*
+2. ~~**Cash-out approval queue**~~ — ✅ delivered in Phase 7 (`/admin/cashout`: Approve, Reject,
+   Reconcile). *(FR-ADM-05, ties FR-CO-05)*
 3. **Transaction monitor** — filter by status, date range, user; drill-down showing cash-in status,
    settlement status, XRPL hash, validation result. *(FR-ADM-04)*
 4. **Fee & limit config screen** — edit `fee_config` + `limit_tiers` live. *(FR-ADM-06, ties

@@ -17,6 +17,7 @@ from app.config import settings
 
 QUEUE_NAME = "settlement"
 SETTLE_JOB = "app.workers.settlement_worker.settle"
+BURN_JOB = "app.workers.cashout_worker.burn"
 JOB_TIMEOUT = 300  # seconds; a Testnet payment validates in ~4-10 s
 
 _queue: Optional[Queue] = None
@@ -29,10 +30,10 @@ def get_queue() -> Queue:
     return _queue
 
 
-def _job_kwargs(transaction_id: str) -> dict:
+def _job_kwargs(transaction_id: str, what: str = "settle transaction") -> dict:
     return {
         "job_timeout": JOB_TIMEOUT,
-        "description": f"settle transaction {transaction_id}",
+        "description": f"{what} {transaction_id}",
         "meta": {"transaction_id": transaction_id},
     }
 
@@ -47,5 +48,26 @@ def enqueue_settlement_in(seconds: int, idempotency_key: str, transaction_id: st
     """Publish a delayed retry. Needs a worker started with --with-scheduler."""
     job = get_queue().enqueue_in(
         timedelta(seconds=seconds), SETTLE_JOB, idempotency_key, **_job_kwargs(transaction_id)
+    )
+    return job.id
+
+
+def enqueue_burn(idempotency_key: str, cashout_id: str) -> str:
+    """FR-CO-05: publish one cash-out burn message now. Returns the RQ job id.
+
+    Shares the settlement queue and worker — the burn is the settlement path in
+    reverse, and a single worker keeps ordering and ops simple.
+    """
+    job = get_queue().enqueue(
+        BURN_JOB, idempotency_key, **_job_kwargs(cashout_id, "burn cash-out")
+    )
+    return job.id
+
+
+def enqueue_burn_in(seconds: int, idempotency_key: str, cashout_id: str) -> str:
+    """Publish a delayed burn retry. Needs a worker started with --with-scheduler."""
+    job = get_queue().enqueue_in(
+        timedelta(seconds=seconds), BURN_JOB, idempotency_key,
+        **_job_kwargs(cashout_id, "burn cash-out"),
     )
     return job.id

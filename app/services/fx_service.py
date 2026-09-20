@@ -80,6 +80,42 @@ async def get_market_rate(db: AsyncSession, fee_config: Optional[FeeConfig] = No
     raise FXConfigError(f"Unsupported FX rate source: {source!r}")
 
 
+def cashout_fee_usd(
+    uctusd_amount: Decimal, cashout_fee_percentage: Decimal, cashout_fee_min_usd: Decimal
+) -> Decimal:
+    """The cash-out fee in USD, with its configured floor (FR-FX-06, FR-CO-02).
+
+    Shared by the sender's quote estimate and the recipient's real cash-out so the
+    two cannot drift apart. Phase 7 calls this; do not re-implement it elsewhere.
+    """
+    return _q(
+        max(Decimal(cashout_fee_percentage) * Decimal(uctusd_amount), Decimal(cashout_fee_min_usd)),
+        QUANT_UCTUSD,
+    )
+
+
+def cashout_payout(
+    uctusd_amount: Decimal,
+    fee_usd: Decimal,
+    market_rate: Decimal,
+    payout_currency: PayoutCurrency,
+) -> Decimal:
+    """Fiat payout for a cash-out: the fee is taken in USD, then converted.
+
+    USD: uctusd - fee            (6 dp)
+    ZAR: (uctusd - fee) * rate   (2 dp)
+
+    The fee is charged in USD before conversion, so a ZAR payout is
+    (uctusd - fee) * rate rather than (uctusd * rate) - fee. That keeps one fee
+    definition for both currencies and makes the completed payout match the
+    estimate the sender was shown at quote time.
+    """
+    net_uctusd = Decimal(uctusd_amount) - Decimal(fee_usd)
+    if payout_currency == PayoutCurrency.USD:
+        return _q(net_uctusd, QUANT_UCTUSD)
+    return _q(net_uctusd * Decimal(market_rate), QUANT_ZAR)
+
+
 def calculate_quote(
     zar_send: Decimal,
     market_rate: Decimal,
@@ -106,16 +142,14 @@ def calculate_quote(
     net_zar = _q(zar_send - transaction_fee, QUANT_ZAR)
     # FR-FX-05
     uctusd_amount = _q(net_zar / effective_rate, QUANT_UCTUSD)
-    # FR-FX-06
-    cashout_fee_estimate = _q(
-        max(Decimal(cashout_fee_percentage) * uctusd_amount, Decimal(cashout_fee_min_usd)),
-        QUANT_UCTUSD,
+    # FR-FX-06 — same helpers the Phase 7 cash-out uses, so the estimate shown here
+    # and the payout actually paid out are computed by one piece of code.
+    cashout_fee_estimate = cashout_fee_usd(
+        uctusd_amount, cashout_fee_percentage, cashout_fee_min_usd
     )
-    net_uctusd = uctusd_amount - cashout_fee_estimate
-    if payout_currency == PayoutCurrency.USD:
-        payout_estimate = _q(net_uctusd, QUANT_UCTUSD)
-    else:
-        payout_estimate = _q(net_uctusd * market_rate, QUANT_ZAR)
+    payout_estimate = cashout_payout(
+        uctusd_amount, cashout_fee_estimate, market_rate, payout_currency
+    )
 
     return Quote(
         zar_amount=zar_send,

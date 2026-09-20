@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Review Cash-Out — XRPL Remit{% endblock %}
+
+{% block content %}
+<h3 class="fw-bold mb-4"><i class="bi bi-cash-coin me-2"></i>Review your cash-out</h3>
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-header fw-semibold">Payout breakdown</div>
+      <table class="table mb-0">
+        <tbody>
+          <tr>
+            <td class="text-muted">UCTUSD to burn</td>
+            <td class="text-end fw-semibold">{{ "{:,.6f}".format(pricing.uctusd_amount) }} UCTUSD</td>
+          </tr>
+          <tr>
+            <td class="text-muted">
+              Cash-out fee
+              <span class="small d-block">{{ "{:.2%}".format(pricing.cashout_fee_percentage) }}, minimum ${{ "{:,.2f}".format(pricing.cashout_fee_min_usd) }}</span>
+            </td>
+            <td class="text-end text-danger">− {{ "{:,.6f}".format(pricing.cashout_fee_usd) }} USD</td>
+          </tr>
+          <tr>
+            <td class="text-muted">Exchange rate</td>
+            <td class="text-end">
+              {% if pricing.target_currency.value == "ZAR" %}
+                1 USD = {{ "{:,.6f}".format(pricing.market_rate) }} ZAR
+              {% else %}
+                1 UCTUSD = 1 USD
+              {% endif %}
+            </td>
+          </tr>
+          <tr class="table-light">
+            <td class="fw-semibold">You receive</td>
+            <td class="text-end fw-bold fs-5">
+              {% if pricing.target_currency.value == "ZAR" %}R{{ "{:,.2f}".format(pricing.net_payout) }}{% else %}${{ "{:,.6f}".format(pricing.net_payout) }}{% endif %}
+              <span class="fs-6 text-muted">{{ pricing.target_currency.value }}</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="card-body border-top">
+        <form method="post" action="/cashout">
+          {# Echoed back so the server can detect a price change between preview and
+             submit. These are compared, never persisted — the row is written from
+             the server's own recomputation. #}
+          <input type="hidden" name="uctusd_amount" value="{{ pricing.uctusd_amount }}">
+          <input type="hidden" name="target_currency" value="{{ pricing.target_currency.value }}">
+          <input type="hidden" name="market_rate" value="{{ pricing.market_rate }}">
+          <input type="hidden" name="cashout_fee_usd" value="{{ pricing.cashout_fee_usd }}">
+          <input type="hidden" name="net_payout" value="{{ pricing.net_payout }}">
+          <button type="submit" class="btn btn-success">
+            <i class="bi bi-check2-circle me-1"></i>Confirm cash-out
+          </button>
+          <a href="/cashout" class="btn btn-link">Change amount</a>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="alert alert-warning small mb-3">
+      <i class="bi bi-exclamation-triangle me-1"></i>
+      Your UCTUSD is reserved when an administrator approves this request, then burned
+      on the XRPL Testnet. If the burn fails, the reserved amount is returned to you.
+    </div>
+    <div class="alert alert-secondary small mb-0">
+      The fiat payout is <strong>simulated</strong> and recorded in this system only.
+      No bank transfer takes place.
+    </div>
+  </div>
+</div>
+{% endblock %}

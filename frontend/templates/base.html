@@ -27,7 +27,7 @@
           <li class="nav-item"><a class="nav-link" href="/admin/transactions"><i class="bi bi-list-ul me-1"></i>Transactions</a></li>
           <li class="nav-item"><a class="nav-link" href="/admin/cashin"><i class="bi bi-credit-card me-1"></i>Cash-In</a></li>
           <li class="nav-item"><a class="nav-link" href="/admin/settlements"><i class="bi bi-exclamation-triangle me-1"></i>Settlements</a></li>
-          {# Cash-Out queue arrives with Phase 7; the link stays out until the route exists. #}
+          <li class="nav-item"><a class="nav-link" href="/admin/cashout"><i class="bi bi-cash-stack me-1"></i>Cash-Out</a></li>
           <li class="nav-item"><a class="nav-link" href="/admin/config"><i class="bi bi-gear me-1"></i>Config</a></li>
         {% else %}
           <li class="nav-item"><a class="nav-link" href="/dashboard"><i class="bi bi-house me-1"></i>Dashboard</a></li>
@@ -37,6 +37,7 @@
           <li class="nav-item"><a class="nav-link" href="/transactions"><i class="bi bi-list-ul me-1"></i>History</a></li>
           {% if user.can_receive %}
           <li class="nav-item"><a class="nav-link" href="/wallet"><i class="bi bi-wallet2 me-1"></i>Wallet</a></li>
+          <li class="nav-item"><a class="nav-link" href="/cashout"><i class="bi bi-cash-coin me-1"></i>Cash Out</a></li>
           {% endif %}
         {% endif %}
         <li class="nav-item dropdown">
