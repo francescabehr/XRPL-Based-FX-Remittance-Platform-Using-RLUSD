@@ -31,7 +31,8 @@ class Settings(BaseSettings):
     xrpl_currency_code: str = ""
     xrpl_platform_wallet_address: str = ""
     xrpl_platform_wallet_seed: str = ""
-    xrpl_encryption_key: str = "change-me-32-byte-hex-key-here"
+    # Fernet key (url-safe base64, NOT hex) — generate with Fernet.generate_key().
+    xrpl_encryption_key: str = "change-me-fernet-key"
     # Where a transaction hash can be opened in a browser (FR-WAL-05).
     xrpl_explorer_tx_url: str = "https://testnet.xrpl.org/transactions/"
 
