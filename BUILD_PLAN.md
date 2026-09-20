@@ -258,7 +258,7 @@ the failure path restores balance. ✅
 
 ---
 
-## Phase 8 — Admin Portal (remaining)  (FR-ADM-01..07)
+## Phase 8 — Admin Portal (remaining)  (FR-ADM-01..07)  ✅ DONE
 
 **Objective:** the admin surfaces beyond the KYC queue that already exists.
 
@@ -283,7 +283,12 @@ data these screens act on.
 - Non-admin receives 403 on every admin route.
 - Filters return only matching rows; config edits affect subsequent quotes/limits.
 
-**Done when:** all admin queues function and every admin route is behind `require_admin`.
+**Done when:** all admin queues function and every admin route is behind `require_admin`. ✅
+
+Delivered: `/admin/transactions` (+ `/admin/transactions/{id}` drill-down) with status, UTC date
+range, user and AML filters; the fee editor on `/admin/config` beside the limit tiers; the AML flag
+(migration 0007). The cash-in queue, settlement monitor and cash-out queue already existed and were
+left as built. `require_admin` coverage is asserted by walking `app.routes` in `test_admin.py`.
 
 ---
 

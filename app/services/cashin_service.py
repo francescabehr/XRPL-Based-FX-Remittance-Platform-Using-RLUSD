@@ -11,14 +11,15 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from typing import Callable, Optional
 
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.beneficiary import Beneficiary
 from app.models.transaction import CashInStatus, SettlementStatus, Transaction
 from app.models.user import KYCStatus, User
 from app.services import queue_service, xrpl_service
@@ -369,3 +370,77 @@ async def list_settlement_issues(db: AsyncSession) -> list[Transaction]:
         .order_by(Transaction.updated_at.desc())
     )
     return list((await db.execute(stmt)).scalars().all())
+
+
+# --- admin transaction monitor (FR-ADM-04, FR-ADM-07) ---
+
+# Ceiling on a single monitor page: the filters narrow the set, this stops an
+# unfiltered view from loading the whole table.
+MONITOR_LIMIT = 500
+
+
+def _day_bounds(day: date) -> datetime:
+    """UTC midnight at the start of `day` — timestamps are stored in UTC."""
+    return datetime.combine(day, time.min, tzinfo=timezone.utc)
+
+
+async def list_transactions(
+    db: AsyncSession,
+    *,
+    cashin_status: Optional[CashInStatus] = None,
+    settlement_status: Optional[SettlementStatus] = None,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    user_query: Optional[str] = None,
+    aml_flagged: Optional[bool] = None,
+    limit: int = MONITOR_LIMIT,
+) -> list[Transaction]:
+    """Every transaction matching the monitor's filters, newest first.
+
+    Filters are AND-ed; a `None` means "no constraint". `user_query` matches the
+    sender, the linked recipient, or the beneficiary by name or email.
+    """
+    stmt = _with_parties(select(Transaction))
+
+    if cashin_status is not None:
+        stmt = stmt.where(Transaction.cashin_status == cashin_status)
+    if settlement_status is not None:
+        stmt = stmt.where(Transaction.settlement_status == settlement_status)
+    if date_from is not None:
+        stmt = stmt.where(Transaction.created_at >= _day_bounds(date_from))
+    if date_to is not None:
+        # Inclusive of the whole end day.
+        stmt = stmt.where(Transaction.created_at < _day_bounds(date_to + timedelta(days=1)))
+    if aml_flagged is not None:
+        stmt = stmt.where(Transaction.aml_flagged.is_(aml_flagged))
+
+    term = (user_query or "").strip()
+    if term:
+        pattern = f"%{term}%"
+        matches_user = or_(User.full_name.ilike(pattern), User.email.ilike(pattern))
+        stmt = stmt.where(
+            or_(
+                select(User.id).where(User.id == Transaction.sender_id, matches_user).exists(),
+                select(User.id).where(User.id == Transaction.recipient_user_id, matches_user).exists(),
+                select(Beneficiary.id)
+                .where(
+                    Beneficiary.id == Transaction.beneficiary_id,
+                    or_(Beneficiary.full_name.ilike(pattern), Beneficiary.email.ilike(pattern)),
+                )
+                .exists(),
+            )
+        )
+
+    stmt = stmt.order_by(Transaction.created_at.desc()).limit(limit)
+    return list((await db.execute(stmt)).scalars().all())
+
+
+async def set_aml_flag(db: AsyncSession, txn: Transaction, flagged: bool) -> Transaction:
+    """FR-ADM-07: mark or clear a transaction for AML review.
+
+    Review-only: it never touches cash-in state, settlement state or balances.
+    """
+    txn.aml_flagged = flagged
+    await db.commit()
+    await db.refresh(txn)
+    return txn

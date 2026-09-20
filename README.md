@@ -90,7 +90,7 @@ make test
 | 4 | Simulated cash-in (FR-CI) · Message queue skeleton (FR-MQ) | ✅ Done |
 | 5 | XRPL standalone integration — account, TrustSet, UCTUSD transfer | ✅ Done |
 | 6 | Settlement worker end-to-end (FR-WAL) | ✅ Done |
-| 7 | Cash-out (FR-CO) · Remaining admin queues (FR-ADM) | ✅ Cash-out (FR-CO) done · FR-ADM partial |
+| 7 | Cash-out (FR-CO) · Remaining admin queues (FR-ADM) | ✅ Done |
 | 8 | Performance test scripts (brief §7.iv) | ⬜ |
 
 ---
@@ -133,7 +133,25 @@ make migration name="describe_change"   # Generate new migration
 Slice 7 note: cash-out (FR-CO-01..06) is complete — request with a priced preview, admin
 approval that reserves the balance, an on-chain burn to the issuer via the queue worker, and
 automatic reversal on a proven failure. The admin cash-out queue at `/admin/cashout` ships with it.
-The remaining FR-ADM work (transaction monitor with filters, fee config screen, AML flag) is Phase 8
-and is still outstanding.
+
+The admin portal (FR-ADM-01..07) is now complete too:
+
+| Screen | Route | FR |
+|---|---|---|
+| KYC review queue | `/admin/kyc` | FR-ADM-02 |
+| Cash-in confirmation queue | `/admin/cashin` | FR-ADM-03 |
+| Transaction monitor + drill-down | `/admin/transactions` | FR-ADM-04 |
+| Settlement monitor (retry / recover) | `/admin/settlements` | FR-ADM-05 |
+| Cash-out approval queue (approve / reject / reconcile) | `/admin/cashout` | FR-ADM-05 |
+| Fee &amp; limit configuration | `/admin/config` | FR-ADM-06, FR-FX-08, FR-LIM-05 |
+| AML review flag (set from the monitor drill-down, filterable) | `/admin/transactions/{id}/aml` | FR-ADM-07 |
+
+The monitor filters the `transactions` table by cash-in status, settlement status, UTC date range,
+user (sender, recipient or beneficiary, by name or email) and AML flag; the drill-down shows both
+statuses, the XRPL hash linked to the Testnet explorer, the validation result, attempt count and the
+pricing snapshot. Recipient cash-outs are a separate flow and stay on `/admin/cashout`, which the
+monitor links to. Fee edits apply to quotes generated after the save — never retroactively, because
+every transaction and cash-out request stores the figures it was priced with. Every route under
+`/admin` is gated by `dependencies.py:require_admin`, asserted by a test that walks the route table.
 
 Update the slice status table as you complete each one.

@@ -124,11 +124,19 @@ Phase 7  Cash-Out (burn)               ✅ DONE   FR-CO-01..06
          Reconcile resolves it from LastLedgerSequence + complete_ledgers coverage,
          never from elapsed time. Migration 0006. Worker: cashout_worker.py.
 
-Phase 8  Admin Portal                  ⬜(partial) FR-ADM-01..07
-         KYC queue, cash-in queue, settlement monitor and cash-out queue DONE
-         (cash-out queue shipped with Phase 7); add the full transaction monitor
-         with filters (/admin/transactions — still a dead link), fee config screen,
-         AML flag.
+Phase 8  Admin Portal                  ✅ DONE   FR-ADM-01..07
+         KYC queue, cash-in queue, settlement monitor and cash-out queue were
+         already done (cash-out shipped with Phase 7) and were left untouched.
+         Added: transaction monitor /admin/transactions (filters: cash-in status,
+         settlement status, UTC date range, user, AML flag) + drill-down
+         /admin/transactions/{id} showing both statuses, explorer-linked hash,
+         validation result, attempts and the pricing snapshot; the fee editor on
+         /admin/config (fixed_fee_zar, percentage_fee, fx_margin,
+         cashout_fee_percentage, cashout_fee_min_usd, and the mock
+         market_rate_zar_per_usd) alongside the existing limit tiers; the AML
+         flag (migration 0007, transactions.aml_flagged) toggled from the
+         drill-down and filterable in the monitor. Every /admin route is behind
+         require_admin — asserted by a test that walks app.routes.
 
 Phase 9  Performance Tests             ⬜        Brief §7.iv
          Locust scenarios once a full flow runs; synthetic data via Faker.
@@ -228,6 +236,10 @@ Changes for UCTUSD:
   There is deliberately **no `processing` status** — FR-CO-03 names four states, so the worker
   claims a row with `burn_started_at` rather than inventing a fifth.
 - **Treasury wallet is NOT a row** — it is config (see above).
+
+- **`transactions.aml_flagged`** (added by migration 0007, Phase 8): NOT NULL boolean,
+  `server_default false`, indexed. An admin review marker only — set from the transaction monitor,
+  filterable there, and it never changes cash-in state, settlement state or any balance.
 
 Keep `transactions.idempotency_key` (UUID UNIQUE) as the queue-dedup / anti-double-credit key.
 

@@ -57,6 +57,35 @@ async def get_active_fee_config(db: AsyncSession) -> Optional[FeeConfig]:
     return result.scalar_one_or_none()
 
 
+async def update_fee_config(
+    db: AsyncSession,
+    fee_config: FeeConfig,
+    *,
+    fixed_fee_zar: Decimal,
+    percentage_fee: Decimal,
+    fx_margin: Decimal,
+    cashout_fee_percentage: Decimal,
+    cashout_fee_min_usd: Decimal,
+    market_rate_zar_per_usd: Decimal,
+) -> FeeConfig:
+    """FR-ADM-06 / FR-FX-08: edit the active fee row in place.
+
+    Quotes snapshot every figure they used onto the transaction (and onto a
+    cash-out request), so a saved change applies to later quotes only and can
+    never rewrite what a past transaction was priced at.
+    """
+    fee_config.fixed_fee_zar = fixed_fee_zar
+    fee_config.percentage_fee = percentage_fee
+    fee_config.fx_margin = fx_margin
+    fee_config.cashout_fee_percentage = cashout_fee_percentage
+    fee_config.cashout_fee_min_usd = cashout_fee_min_usd
+    fee_config.market_rate_zar_per_usd = market_rate_zar_per_usd
+    db.add(fee_config)
+    await db.commit()
+    await db.refresh(fee_config)
+    return fee_config
+
+
 async def get_market_rate(db: AsyncSession, fee_config: Optional[FeeConfig] = None) -> Decimal:
     """Mid-market ZAR per 1 USD (FR-FX-01).
 

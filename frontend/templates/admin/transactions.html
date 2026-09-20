@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% from "_macros.html" import hash_link with context %}
+{% block title %}Transaction Monitor — Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h3 class="fw-bold mb-0"><i class="bi bi-list-ul me-2"></i>Transaction Monitor</h3>
+  <span class="badge bg-secondary fs-6">{{ transactions|length }} shown</span>
+</div>
+<p class="text-muted small mb-4">
+  Remittances (ZAR in from senders, UCTUSD out to recipients). Recipient cash-outs are a separate
+  flow — see the <a href="/admin/cashout">cash-out queue</a>. Settlement problems needing action are
+  gathered on the <a href="/admin/settlements">settlement monitor</a>.
+</p>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <form method="get" action="/admin/transactions" class="row g-2 align-items-end">
+      <div class="col-md-2">
+        <label class="form-label small mb-1">Cash-in</label>
+        <select name="cashin" class="form-select form-select-sm">
+          <option value="">All</option>
+          {% for s in cashin_statuses %}
+          <option value="{{ s }}" {% if selected.cashin == s %}selected{% endif %}>{{ s|replace("_", " ")|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-1">Settlement</label>
+        <select name="settlement" class="form-select form-select-sm">
+          <option value="">All</option>
+          {% for s in settlement_statuses %}
+          <option value="{{ s }}" {% if selected.settlement == s %}selected{% endif %}>{{ s|replace("_", " ")|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-1">From (UTC)</label>
+        <input type="date" name="date_from" class="form-control form-control-sm" value="{{ selected.date_from }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-1">To (UTC)</label>
+        <input type="date" name="date_to" class="form-control form-control-sm" value="{{ selected.date_to }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-1">AML</label>
+        <select name="aml" class="form-select form-select-sm">
+          <option value="">All</option>
+          <option value="1" {% if selected.aml == "1" %}selected{% endif %}>Flagged only</option>
+          <option value="0" {% if selected.aml == "0" %}selected{% endif %}>Not flagged</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-1">User</label>
+        <input type="text" name="q" class="form-control form-control-sm" placeholder="Name or email" value="{{ selected.q }}">
+      </div>
+      <div class="col-12 d-flex gap-2 pt-2">
+        <button class="btn btn-sm btn-primary"><i class="bi bi-funnel me-1"></i>Apply filters</button>
+        <a href="/admin/transactions" class="btn btn-sm btn-outline-secondary">Clear</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if truncated %}
+<div class="alert alert-warning small py-2">
+  Showing the newest {{ monitor_limit }} matches only. Narrow the filters to see older rows.
+</div>
+{% endif %}
+
+{% if transactions %}
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Created</th><th>Sender</th><th>Recipient</th><th class="text-end">Amount</th>
+          <th>Cash-in</th><th>Settlement</th><th>XRPL</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in transactions %}
+        <tr>
+          <td class="small text-muted text-nowrap">{{ t.created_at|localtime('%d %b %Y %H:%M') }}</td>
+          <td>
+            <span class="fw-semibold">{{ t.sender.full_name }}</span>
+            <div class="small text-muted">{{ t.sender.email }}</div>
+          </td>
+          <td>
+            {{ t.beneficiary.full_name }}
+            <div class="small text-muted">{{ "{:,.6f}".format(t.uctusd_amount) }} UCTUSD</div>
+          </td>
+          <td class="text-end fw-semibold text-nowrap">R{{ "{:,.2f}".format(t.zar_amount) }}</td>
+          <td>
+            <span class="badge bg-{{ {'received': 'success', 'failed': 'danger'}.get(t.cashin_status.value, 'warning text-dark') }}">
+              {{ t.cashin_status.value|capitalize }}
+            </span>
+          </td>
+          <td>
+            <span class="badge bg-{{ {'completed': 'success', 'failed': 'danger'}.get(t.settlement_status.value, 'secondary') }}">
+              {{ t.settlement_status.value|replace("_", " ")|capitalize }}
+            </span>
+            {% if t.aml_flagged %}<span class="badge bg-danger ms-1" title="Flagged for AML review"><i class="bi bi-flag-fill"></i> AML</span>{% endif %}
+          </td>
+          <td>{{ hash_link(t.xrpl_tx_hash) }}</td>
+          <td class="text-end">
+            <a href="/admin/transactions/{{ t.id }}" class="btn btn-sm btn-outline-primary text-nowrap">Details</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+  <strong>No transactions match these filters.</strong>
+</div>
+{% endif %}
+{% endblock %}

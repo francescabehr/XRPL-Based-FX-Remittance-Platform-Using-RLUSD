@@ -1,12 +1,16 @@
 import uuid
+from datetime import date
+from decimal import Decimal, InvalidOperation
+from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_flash, require_admin, set_flash
-from app.services import cashin_service, cashout_service
+from app.models.transaction import CashInStatus, SettlementStatus
+from app.services import cashin_service, cashout_service, fx_service
 from app.services.kyc_service import (
     approve_kyc,
     get_pending_submissions,
@@ -116,6 +120,7 @@ async def config_page(
             "request": request,
             "user": user,
             "tiers": tiers,
+            "fee_config": await fx_service.get_active_fee_config(db),
             "flash": get_flash(request),
         },
     )
@@ -147,6 +152,60 @@ async def update_tier_limits(
 
     await update_tier(db, tier, daily, monthly)
     set_flash(request, f"Limits for '{tier.tier_name}' updated.", "success")
+    return RedirectResponse(url="/admin/config", status_code=302)
+
+
+def _decimal_field(label: str, raw: str) -> Decimal:
+    """Parse one money/rate form field, refusing junk and negatives."""
+    try:
+        value = Decimal(raw.strip())
+    except (InvalidOperation, AttributeError):
+        raise ValueError(f"{label} must be a number.") from None
+    if not value.is_finite():
+        raise ValueError(f"{label} must be a number.")
+    if value < 0:
+        raise ValueError(f"{label} cannot be negative.")
+    return value
+
+
+@router.post("/config/fees")
+async def update_fees(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_admin),
+    fixed_fee_zar: str = Form(...),
+    percentage_fee: str = Form(...),
+    fx_margin: str = Form(...),
+    cashout_fee_percentage: str = Form(...),
+    cashout_fee_min_usd: str = Form(...),
+    market_rate_zar_per_usd: str = Form(...),
+):
+    """FR-ADM-06 / FR-FX-08: edit the active fee row. Never retroactive."""
+    fields = {
+        "fixed_fee_zar": ("Fixed fee", fixed_fee_zar),
+        "percentage_fee": ("Percentage fee", percentage_fee),
+        "fx_margin": ("FX margin", fx_margin),
+        "cashout_fee_percentage": ("Cash-out fee", cashout_fee_percentage),
+        "cashout_fee_min_usd": ("Minimum cash-out fee", cashout_fee_min_usd),
+        "market_rate_zar_per_usd": ("Mock market rate", market_rate_zar_per_usd),
+    }
+    try:
+        values = {name: _decimal_field(label, raw) for name, (label, raw) in fields.items()}
+    except ValueError as exc:
+        set_flash(request, f"Invalid value: {exc}", "danger")
+        return RedirectResponse(url="/admin/config", status_code=302)
+
+    if values["market_rate_zar_per_usd"] <= 0:
+        set_flash(request, "Invalid value: Mock market rate must be greater than zero.", "danger")
+        return RedirectResponse(url="/admin/config", status_code=302)
+
+    cfg = await fx_service.get_active_fee_config(db)
+    if not cfg:
+        set_flash(request, "No active fee configuration row exists to edit.", "danger")
+        return RedirectResponse(url="/admin/config", status_code=302)
+
+    await fx_service.update_fee_config(db, cfg, **values)
+    set_flash(request, "Fee configuration saved. It applies to quotes generated from now on.", "success")
     return RedirectResponse(url="/admin/config", status_code=302)
 
 
@@ -368,3 +427,127 @@ async def cashout_reconcile(
             "info",
         )
     return RedirectResponse(url="/admin/cashout", status_code=302)
+
+
+# ── Transaction monitor (FR-ADM-04, FR-ADM-07) ───────────────────────────────
+
+def _enum_filter(enum_cls, raw: Optional[str]):
+    """A status filter value, or None for 'all'. Unknown values fall back to all."""
+    if not raw:
+        return None
+    try:
+        return enum_cls(raw)
+    except ValueError:
+        return None
+
+
+def _date_filter(raw: Optional[str]) -> Optional[date]:
+    if not raw:
+        return None
+    try:
+        return date.fromisoformat(raw.strip())
+    except ValueError:
+        return None
+
+
+def _aml_filter(raw: Optional[str]) -> Optional[bool]:
+    return {"1": True, "flagged": True, "0": False, "clear": False}.get((raw or "").strip().lower())
+
+
+@router.get("/transactions", response_class=HTMLResponse)
+async def transaction_monitor(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_admin),
+    cashin: Optional[str] = Query(None),
+    settlement: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
+    aml: Optional[str] = Query(None),
+):
+    """FR-ADM-04: every remittance, filterable by status, date range, user and AML flag.
+
+    Scope is the `transactions` table (money in from senders). Cash-outs are a
+    separate flow and live on /admin/cashout, which this screen links to.
+    """
+    filters = {
+        "cashin_status": _enum_filter(CashInStatus, cashin),
+        "settlement_status": _enum_filter(SettlementStatus, settlement),
+        "date_from": _date_filter(date_from),
+        "date_to": _date_filter(date_to),
+        "user_query": (q or "").strip() or None,
+        "aml_flagged": _aml_filter(aml),
+    }
+    transactions = await cashin_service.list_transactions(db, **filters)
+
+    return templates.TemplateResponse(
+        "admin/transactions.html",
+        {
+            "request": request,
+            "user": user,
+            "flash": get_flash(request),
+            "transactions": transactions,
+            "truncated": len(transactions) >= cashin_service.MONITOR_LIMIT,
+            "monitor_limit": cashin_service.MONITOR_LIMIT,
+            # Echoed back so the form keeps what the admin typed, invalid parts included.
+            "selected": {
+                "cashin": cashin or "",
+                "settlement": settlement or "",
+                "date_from": date_from or "",
+                "date_to": date_to or "",
+                "q": q or "",
+                "aml": aml or "",
+            },
+            "cashin_statuses": [s.value for s in CashInStatus],
+            "settlement_statuses": [s.value for s in SettlementStatus],
+        },
+    )
+
+
+@router.get("/transactions/{txn_id}", response_class=HTMLResponse)
+async def transaction_detail(
+    txn_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_admin),
+):
+    """FR-ADM-04: drill-down — cash-in, settlement, XRPL hash and validation result."""
+    txn = await cashin_service.get_transaction(db, txn_id)
+    if not txn:
+        set_flash(request, "Transaction not found.", "danger")
+        return RedirectResponse(url="/admin/transactions", status_code=302)
+
+    return templates.TemplateResponse(
+        "admin/transaction_detail.html",
+        {
+            "request": request,
+            "user": user,
+            "flash": get_flash(request),
+            "txn": txn,
+        },
+    )
+
+
+@router.post("/transactions/{txn_id}/aml")
+async def transaction_set_aml(
+    txn_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_admin),
+    flagged: str = Form(...),
+):
+    """FR-ADM-07: raise or clear the AML review flag. Review-only — no money moves."""
+    txn = await cashin_service.get_transaction(db, txn_id)
+    if not txn:
+        set_flash(request, "Transaction not found.", "danger")
+        return RedirectResponse(url="/admin/transactions", status_code=302)
+
+    flag = flagged.strip().lower() in {"1", "true", "yes", "on"}
+    await cashin_service.set_aml_flag(db, txn, flag)
+    set_flash(
+        request,
+        "Flagged for AML review." if flag else "AML flag cleared.",
+        "warning" if flag else "success",
+    )
+    return RedirectResponse(url=f"/admin/transactions/{txn_id}", status_code=302)
