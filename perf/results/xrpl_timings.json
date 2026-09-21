@@ -1,0 +1,21 @@
+{
+  "faucet_account": {
+    "samples": 1,
+    "min_s": 11.6,
+    "mean_s": 11.6,
+    "max_s": 11.6
+  },
+  "trust_line": {
+    "samples": 1,
+    "min_s": 14.12,
+    "mean_s": 14.12,
+    "max_s": 14.12
+  },
+  "payment": {
+    "samples": 3,
+    "min_s": 13.01,
+    "mean_s": 14.13,
+    "max_s": 16.28
+  },
+  "first_transfer_total_s": 42.0
+}
