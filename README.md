@@ -80,18 +80,29 @@ make test
 
 ---
 
+## Documents
+
+| Document | What it covers |
+|---|---|
+| [SPECIFICATION.md](SPECIFICATION.md) | Business and technical specification (Brief §7.i): architecture, data model, settlement and cash-out flows, security, reliability, performance, compliance |
+| [requirements.md](requirements.md) | Functional requirements and UI design (FR-XXX IDs, acceptance criteria) |
+| [perf/REPORT.md](perf/REPORT.md) | Measured performance results and bottlenecks (Brief §7.iv) |
+| [CLAUDE.md](CLAUDE.md) · [BUILD_PLAN.md](BUILD_PLAN.md) | Locked-in stack decisions and the phased build plan |
+
+---
+
 ## Build Slices
 
 | Slice | Scope | Status |
 |---|---|---|
 | 1 | Scaffold · Auth (FR-AUTH) · KYC (FR-KYC) · Admin KYC approval | ✅ Done |
-| 2 | Beneficiaries (FR-BEN) · Remittance limits (FR-LIM) | Done |
+| 2 | Beneficiaries (FR-BEN) · Remittance limits (FR-LIM) | ✅ Done |
 | 3 | FX quote engine (FR-FX) | ✅ Done |
 | 4 | Simulated cash-in (FR-CI) · Message queue skeleton (FR-MQ) | ✅ Done |
 | 5 | XRPL standalone integration — account, TrustSet, UCTUSD transfer | ✅ Done |
 | 6 | Settlement worker end-to-end (FR-WAL) | ✅ Done |
 | 7 | Cash-out (FR-CO) · Remaining admin queues (FR-ADM) | ✅ Done |
-| 8 | Performance test scripts (brief §7.iv) | ⬜ |
+| 8 | Performance test scripts (brief §7.iv) | ✅ Done — results in [perf/REPORT.md](perf/REPORT.md) |
 
 ---
 
@@ -104,7 +115,16 @@ make migrate      # Apply pending Alembic migrations
 make seed-admin   # Create admin user from .env values
 make test         # Run pytest suite
 make migration name="describe_change"   # Generate new migration
+
+# Performance testing (Phase 9) — see perf/REPORT.md
+make perf-seed    # 200 synthetic users (python perf/seed_data.py --purge to remove)
+make perf-worker  # worker with a SIMULATED ledger — use this, not `make worker`, under load
+make perf-run     # Locust: 50 users, 3 minutes (users=… time=… to change)
+make perf-report  # regenerate the charts and tables
 ```
+
+> **Never run a load test against `make worker`.** It would attempt hundreds of real Testnet
+> payments and drain the treasury.
 
 ---
 
@@ -114,7 +134,7 @@ make migration name="describe_change"   # Generate new migration
 - XRPL private keys are Fernet-encrypted at rest; the encryption key lives in the environment, not the database (FR-WAL-03)
 - Private keys are never returned via the API, never logged, and are decrypted only in the signing path (FR-WAL-04)
 - Admin routes are enforced at the dependency layer — not just hidden from the UI
-- Auth uses server-side sessions (`SessionMiddleware` + signed cookie) — JWT is not used; this is a deliberate design choice
+- Auth uses signed-cookie sessions (`SessionMiddleware`; no server-side session store) — JWT is not used; this is a deliberate design choice
 - Cash-out debits the balance once, under a `SELECT … FOR UPDATE` lock, in the same transaction as
   the approval; reversals only ever add, so a balance cannot go negative (FR-CO-06)
 - A burn whose on-ledger outcome is unknown is never reversed automatically — the reserve is held
@@ -154,4 +174,8 @@ monitor links to. Fee edits apply to quotes generated after the save — never r
 every transaction and cash-out request stores the figures it was priced with. Every route under
 `/admin` is gated by `dependencies.py:require_admin`, asserted by a test that walks the route table.
 
-Update the slice status table as you complete each one.
+Slice 8 note: the performance work lives in `perf/` — a Faker seeder, a Locust profile covering
+sender, recipient and admin flows, a queue sampler, a real-Testnet timer and a chart generator.
+Measured at 50 concurrent users: 6,647 requests, 0 failures, 37 rps, 15 ms median. The bottlenecks
+found (blocking bcrypt in the async login handler, single-worker queue drain, the live-ledger call
+on `/wallet`) are written up with charts in [perf/REPORT.md](perf/REPORT.md).

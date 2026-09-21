@@ -39,7 +39,7 @@ wallet. It lives in configuration (`XRPL_PLATFORM_WALLET_ADDRESS` + encrypted se
 | Database | **PostgreSQL** | Row-level locking (`SELECT FOR UPDATE`) needed for concurrent wallet balance writes from web + worker |
 | ORM / migrations | **SQLAlchemy** (async) + **Alembic** | Standard pairing for FastAPI + Postgres |
 | Message queue | **Redis + RQ** | Simpler than Celery for a single-queue settlement flow; clear retry/failure semantics |
-| Session / auth | **Server-side sessions** (`SessionMiddleware`) | See correction note below — **not** JWT |
+| Session / auth | **Cookie sessions** (`SessionMiddleware`) | Signed browser cookie, no server-side store — **not** JWT; see correction note below |
 | Password hashing | **bcrypt** (via `passlib`) | FR-AUTH-02 |
 | XRPL private key encryption | **Fernet** (via `cryptography`) | Per-user seed encrypted; key stored separately from blob — FR-WAL-03 |
 | XRPL client | **xrpl-py** | Official Python SDK for XRPL Testnet |
@@ -64,9 +64,10 @@ wallet. It lives in configuration (`XRPL_PLATFORM_WALLET_ADDRESS` + encrypted se
 - One user account may hold both sender and recipient roles — the User model uses independent boolean flags is_admin, can_send, can_receive (both can_send and can_receive can be true), not a roles array.
 
 ### Corrections vs the original plan (now authoritative)
-- **Auth is session-based, not JWT.** The code uses `SessionMiddleware` (server-side cookie
-  sessions). This is an accepted limitation documented in "Assumptions & Limitations" of the spec —
-  do **not** rip in JWT. Any doc that still says "JWT" is stale.
+- **Auth is session-based, not JWT.** The code uses `SessionMiddleware`, which stores the session
+  in a **signed cookie in the browser** — there is no server-side session store, so a session cannot
+  be revoked before it expires (8 h). Calling these "server-side sessions" is wrong; requirements.md
+  §9.2 records it as a limitation. Do **not** rip in JWT. Any doc that still says "JWT" is stale.
 - **Admin enforcement must be centralized.** `dependencies.py:require_admin` is the single
   enforcement point (see Critical Rules). Admin enforcement is centralized in dependencies.py:require_admin; every admin route uses it and no ad-hoc helper remains. Done.
 - **Message queue role.** With per-user accounts, the queue/worker performs the **on-chain
@@ -85,7 +86,7 @@ Phase 0  Foundation                    ✅ DONE
          App skeleton, config (.env), DB session, Alembic init
 
 Phase 1  Auth & Users                  ✅ DONE   FR-AUTH-01..07
-         Registration, login/logout, bcrypt, server-side session
+         Registration, login/logout, bcrypt, signed-cookie session
 
 Phase 2  KYC                           ✅ DONE   FR-KYC-01..05
          Submit form, admin approval, status propagation
