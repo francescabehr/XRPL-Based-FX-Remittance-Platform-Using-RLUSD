@@ -53,7 +53,7 @@ human to fill in.)
   note; migration applies cleanly up and down.
 
 ### 4. Auth documentation correction
-- The code already uses `SessionMiddleware` (server-side sessions). Ensure no comment, docstring or
+- The code already uses `SessionMiddleware` (signed-cookie sessions; no server-side store). Ensure no comment, docstring or
   README line claims JWT. Add a one-line note that session auth is a deliberate choice.
 - **Acceptance:** `grep -ri jwt .` returns nothing in app code/docs (except an explicit
   "we do not use JWT" note if you add one).

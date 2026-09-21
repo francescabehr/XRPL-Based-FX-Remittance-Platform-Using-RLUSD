@@ -2,12 +2,12 @@ XRPL-Based FX Remittance Platform
 Functional Requirements & UI Design Document
 ECO5040W — Financial Software Engineering
 University of Cape Town
-Version 1.1
-Prepared: 20 August 2026 (v1.0) · Revised: 18 September 2026 (v1.1)
+Version 1.2
+Prepared: 20 August 2026 (v1.0) · Revised: 18 September 2026 (v1.1) · 21 September 2026 (v1.2)
 Feeds into: Business and Technical Specification (Project Brief, Section 7.i)
 
 Revision Note — Version 1.1 (18 September 2026)
-This addendum records decisions confirmed since v1.0. The body of this document below is unchanged and remains accurate as at 20 August 2026; wherever it refers to "RLUSD", read "UCTUSD". The living source of truth for implementation is CLAUDE.md and BUILD_PLAN.md.
+This addendum records decisions confirmed since v1.0. The body of this document below is unchanged and remains accurate as at 20 August 2026; wherever it refers to "UCTUSD", read "UCTUSD". The living source of truth for implementation is CLAUDE.md and BUILD_PLAN.md.
 
 Settlement asset changed: RLUSD → UCTUSD
 ●	The platform now settles in UCTUSD, a UCT-issued test IOU on the XRPL Testnet.
@@ -23,13 +23,13 @@ Open questions from Section 9 — now resolved
 ●	Cash-out balance debit (FR-CO-06): debited on approval, with automatic reversal on failure.
 ●	Recipient onboarding (FR-BEN-04): adding a beneficiary auto-links to an existing account by email or mobile; otherwise the recipient registers self-service.
 
-Open questions from Section 9 — still open, to be settled in Phase 4
+Open questions from Section 9 — open at v1.1, resolved in v1.2 (see the v1.2 note above and Section 9.1)
 ●	Quote validity window: how long a quote holds before the rate must be re-fetched.
 ●	Exchange-rate source: live API versus a mock or configurable rate table (starting with a configurable rate).
 
 Stack now locked (was left open in Sections 2 and 8)
 ●	Backend: FastAPI. Database: PostgreSQL (SQLAlchemy async with Alembic). Message queue: Redis with RQ. Templates: Jinja2 with Bootstrap 5.
-●	Authentication is server-side sessions (SessionMiddleware), not JWT — a deliberate choice, logged as an assumption and limitation. Read the "session/token" wording in FR-AUTH-03 accordingly.
+●	Authentication is cookie-based sessions (SessionMiddleware), not JWT — a deliberate choice, logged as an assumption and limitation. See the v1.2 note above: the session lives in a signed cookie, not in a server-side store. Read the "session/token" wording in FR-AUTH-03 accordingly.
 
 Message queue
 ●	The queue and worker requirement stands. Under the per-user-account model it carries the on-chain UCTUSD settlement; the lecturer has confirmed that an architecture that does not need the queue for on-chain transfers may use it for other background work instead.
@@ -46,7 +46,7 @@ Feeds into: Business and Technical Specification (Project Brief, Section 7.i)
 6. UI Design
 7. Non-Functional Requirements (Summary)
 8. Out of Scope
-9. Assumptions & Open Questions for the Team
+9. Assumptions, Resolved Questions & Known Limitations
 
  1. Introduction & Purpose
 This document defines the functional requirements and user-interface structure for the XRPL-based FX remittance platform described in the ECO5040W project brief (released 14 August 2026). It translates the brief's user journey and functional scope into testable requirements, each with an ID, an acceptance criterion and a priority, plus a screen-by-screen inventory of the web application's UI.
@@ -57,15 +57,15 @@ This document does not replace the full Business and Technical Specification req
 ●	Could — nice-to-have if time allows; safe to cut under time pressure.
 2. Scope & Confirmed Design Decisions
 The following decisions were confirmed for this document and are assumed throughout:
-●	Wallet architecture: each recipient gets a dedicated, platform-managed XRPL Testnet account (not a pooled platform wallet with an internal ledger). Each account requires a TrustSet to the RLUSD issuer before it can receive RLUSD.
+●	Wallet architecture: each recipient gets a dedicated, platform-managed XRPL Testnet account (not a pooled platform wallet with an internal ledger). Each account requires a TrustSet to the UCTUSD issuer before it can receive UCTUSD.
 ●	Simulated ZAR cash-in: card payment only (simulated — no real card network integration).
 ●	Cash-out currencies: USD and ZAR only.
-Other technology choices left open by the brief (Python framework, relational database engine, message queue technology, live vs mock exchange-rate source) do not change these functional requirements and are left to the team's technical specification — see Section 8 for the specific open items worth confirming as a team before build starts.
+Other technology choices left open by the brief (Python framework, relational database engine, message queue technology, live vs mock exchange-rate source) do not change these functional requirements and were settled during the build and are recorded in Section 9.1.
 3. User Roles
 3.1 Sender
-A South Africa-based user who registers, completes KYC, adds beneficiaries and initiates ZAR-to-RLUSD remittances.
+A South Africa-based user who registers, completes KYC, adds beneficiaries and initiates ZAR-to-UCTUSD remittances.
 3.2 Recipient
-A user who receives RLUSD into a custodial XRPL wallet and may hold it or request a simulated cash-out to USD or ZAR. A recipient is a platform user account in their own right (see Open Question in Section 8 on whether one account can hold both roles).
+A user who receives UCTUSD into a custodial XRPL wallet and may hold it or request a simulated cash-out to USD or ZAR. A recipient is a platform user account in their own right; one account may hold both roles (Section 9.1).
 3.3 Administrator
 Internal staff role responsible for KYC approval, cash-in/cash-out confirmation, transaction monitoring, and fee/limit configuration. Not a customer-facing role.
 4. End-to-End User Journey
@@ -77,8 +77,8 @@ This numbered flow mirrors Section 3 of the project brief and is the backbone th
 ●	5. Platform fetches/simulates the USD/ZAR rate and generates a full quote.
 ●	6. Sender reviews the quote and confirms a simulated card payment.
 ●	7. Confirmed cash-in places a settlement message on the queue.
-●	8. A background worker executes the RLUSD transfer on XRPL Testnet (with TrustSet already in place).
-●	9. Recipient logs in and views the received RLUSD in their wallet.
+●	8. A background worker executes the UCTUSD transfer on XRPL Testnet (with TrustSet already in place).
+●	9. Recipient logs in and views the received UCTUSD in their wallet.
 ●	10. Recipient requests a simulated cash-out to USD or ZAR.
 ●	11. Administrator approves/completes the cash-out; recipient sees the final status.
 5. Functional Requirements
@@ -90,7 +90,7 @@ FR-AUTH-03	User logs in and logs out.	Invalid credentials rejected without revea
 FR-AUTH-04	User views and edits basic profile information.	Changes persist; email/mobile format validated on save.	Should
 FR-AUTH-05	User views current KYC status (Not Submitted / Pending / Approved / Rejected).	Status reflects the latest admin decision without page refresh delay beyond a normal page load.	Must
 FR-AUTH-06	User views daily and monthly remittance limit usage.	Figures match the sum of the user's transactions for the current day/month against configured tier limits.	Must
-FR-AUTH-07	User views wallet balance and transaction history relevant to their role.	Sender sees sent transactions; recipient sees RLUSD balance and received/cashed-out transactions.	Must
+FR-AUTH-07	User views wallet balance and transaction history relevant to their role.	Sender sees sent transactions; recipient sees UCTUSD balance and received/cashed-out transactions.	Must
 5.2 Mock KYC
 ID	Requirement	Acceptance Criteria	Priority
 FR-KYC-01	Sender submits a KYC form capturing full name, date of birth, nationality, ID number, residential address, mobile number, email address and source of funds.	Form cannot be submitted with any field missing or invalid (e.g. underage DOB, malformed ID number).	Must
@@ -118,21 +118,21 @@ FR-FX-01	System retrieves or simulates the current USD/ZAR exchange rate at the 
 FR-FX-02	System calculates the transaction fee (fixed + percentage components).	Fee shown matches the configured fee formula for the entered amount.	Must
 FR-FX-03	System calculates the foreign-exchange margin applied to the market rate.	Effective rate shown to sender equals market rate adjusted by the configured margin.	Must
 FR-FX-04	System calculates the net ZAR amount being converted after fees.	Net amount = ZAR send amount minus transaction fee.	Must
-FR-FX-05	System calculates the RLUSD amount the recipient will receive.	RLUSD amount = net converted amount divided by the effective (margin-adjusted) rate.	Must
-FR-FX-06	System calculates an estimated cash-out fee and recipient payout preview.	Preview uses the configured cash-out fee against the RLUSD amount at today's rate.	Must
-FR-FX-07	Quote screen displays: ZAR amount, exchange rate, transaction fee, FX margin, RLUSD amount, cash-out fee and estimated payout.	All seven figures are visible on one screen before the sender confirms.	Must
+FR-FX-05	System calculates the UCTUSD amount the recipient will receive.	UCTUSD amount = net converted amount divided by the effective (margin-adjusted) rate.	Must
+FR-FX-06	System calculates an estimated cash-out fee and recipient payout preview.	Preview uses the configured cash-out fee against the UCTUSD amount at today's rate.	Must
+FR-FX-07	Quote screen displays: ZAR amount, exchange rate, transaction fee, FX margin, UCTUSD amount, cash-out fee and estimated payout.	All seven figures are visible on one screen before the sender confirms.	Must
 FR-FX-08	All fee, margin and rate parameters are configurable by an administrator.	Changing a parameter affects quotes generated after the change, not retroactively.	Should
 5.6 Simulated ZAR Cash-In (Card)
 ID	Requirement	Acceptance Criteria	Priority
 FR-CI-01	Sender confirms a simulated card payment for the ZAR send amount.	Sender is shown the exact amount due before submitting mock card details.	Must
 FR-CI-02	A mock payment service or administrator marks the cash-in as Received or Failed.	Status change is recorded with a timestamp.	Must
-FR-CI-03	The RLUSD settlement step does not start until cash-in status is Received.	No settlement message is queued while cash-in is Pending or Failed.	Must
+FR-CI-03	The UCTUSD settlement step does not start until cash-in status is Received.	No settlement message is queued while cash-in is Pending or Failed.	Must
 FR-CI-04	A failed cash-in halts the transaction and notifies the sender.	Transaction status becomes Failed and no XRPL transfer is attempted.	Must
 FR-CI-05	Cash-in status is visible in the sender's transaction history.	History row shows Pending/Received/Failed for the cash-in step.	Should
 5.7 Message Queue & Settlement
 ID	Requirement	Acceptance Criteria	Priority
 FR-MQ-01	A confirmed cash-in publishes a settlement message to the message queue.	Message is enqueued within a few seconds of cash-in confirmation.	Must
-FR-MQ-02	A background worker consumes settlement messages and triggers the RLUSD transfer on XRPL Testnet.	Worker picks up and processes queued messages without manual intervention.	Must
+FR-MQ-02	A background worker consumes settlement messages and triggers the UCTUSD transfer on XRPL Testnet.	Worker picks up and processes queued messages without manual intervention.	Must
 FR-MQ-03	Each settlement message carries a unique idempotency key tied to the source transaction.	Key is derivable from (and traceable back to) exactly one transaction record.	Must
 FR-MQ-04	Duplicate or redelivered messages must not credit the recipient more than once.	Replaying the same message a second time produces no additional balance change.	Must
 FR-MQ-05	Transaction outcome (success/failure) is recorded and the transaction status updated accordingly.	Status visible to sender and recipient matches the worker's outcome.	Must
@@ -140,20 +140,20 @@ FR-MQ-06	Failed transfers are retried per a defined policy or flagged for manual
 5.8 XRPL Wallet & Custody
 ID	Requirement	Acceptance Criteria	Priority
 FR-WAL-01	System provisions a dedicated XRPL Testnet account for each recipient (on registration or first receive).	Each recipient has exactly one platform-managed XRPL address.	Must
-FR-WAL-02	System establishes a TrustSet from the recipient's XRPL account to the RLUSD issuer before the first RLUSD credit.	TrustLine exists on-ledger before any RLUSD transfer is attempted to that account.	Must
+FR-WAL-02	System establishes a TrustSet from the recipient's XRPL account to the UCTUSD issuer before the first UCTUSD credit.	TrustLine exists on-ledger before any UCTUSD transfer is attempted to that account.	Must
 FR-WAL-03	Recipient private keys are encrypted at rest, with the encryption key stored in a separate store from the encrypted keys.	Compromise of the transaction database alone does not expose usable private keys.	Must
 FR-WAL-04	Private keys are never returned via the API, never appear in logs, and are decrypted only by the signing component.	Manual review of API responses and logs shows no raw key material.	Must
-FR-WAL-05	Recipient wallet screen shows RLUSD balance, incoming/outgoing transactions, status, date and XRPL transaction hash.	Every settled transaction row links to a resolvable XRPL Testnet transaction hash.	Must
+FR-WAL-05	Recipient wallet screen shows UCTUSD balance, incoming/outgoing transactions, status, date and XRPL transaction hash.	Every settled transaction row links to a resolvable XRPL Testnet transaction hash.	Must
 FR-WAL-06	System validates each transfer's success/failure against the XRPL Testnet response.	Balance is only updated after on-ledger validation confirms the transaction.	Must
 FR-WAL-07	A failed XRPL transaction is surfaced with a reason and does not alter recipient balance.	Failed transaction is visible in history with status = Failed and a reason code/message.	Must
 5.9 Simulated Cash-Out (USD / ZAR)
 ID	Requirement	Acceptance Criteria	Priority
-FR-CO-01	Recipient requests a cash-out specifying an RLUSD amount and target currency (USD or ZAR).	Request cannot exceed available RLUSD balance.	Must
-FR-CO-02	System calculates the fiat payout using the applicable exchange rate less the configured cash-out fee.	Displayed payout matches (RLUSD amount x rate) minus fee, for the selected currency.	Must
+FR-CO-01	Recipient requests a cash-out specifying an UCTUSD amount and target currency (USD or ZAR).	Request cannot exceed available UCTUSD balance.	Must
+FR-CO-02	System calculates the fiat payout using the applicable exchange rate less the configured cash-out fee.	Displayed payout matches (UCTUSD amount x rate) minus fee, for the selected currency.	Must
 FR-CO-03	Cash-out request follows the status flow Requested to Approved to Completed/Failed.	Status can only move forward through the defined sequence; no skipped or reversed states.	Must
 FR-CO-04	Recipient views real-time status of pending and past cash-out requests.	Status shown matches the latest admin action.	Must
 FR-CO-05	Administrator approves, completes or fails a cash-out request.	Action is timestamped and attributed to the admin.	Must
-FR-CO-06	RLUSD balance is debited once the cash-out is approved, and reversed automatically if it later fails.	Balance never goes negative; a failed cash-out restores the reserved RLUSD.	Should
+FR-CO-06	UCTUSD balance is debited once the cash-out is approved, and reversed automatically if it later fails.	Balance never goes negative; a failed cash-out restores the reserved UCTUSD.	Should
 5.10 Administrator & Compliance
 ID	Requirement	Acceptance Criteria	Priority
 FR-ADM-01	Administrator authenticates via a distinct admin role/login.	Admin-only screens are inaccessible to sender/recipient roles.	Must
@@ -164,7 +164,7 @@ FR-ADM-05	Administrator monitors failed XRPL transactions and message-queue erro
 FR-ADM-06	Administrator configures fees, FX margin and remittance limits.	See FR-FX-08 and FR-LIM-05.	Should
 FR-ADM-07	Administrator can flag a transaction for manual AML/monitoring review.	Flagged transactions are visibly tagged and filterable in the transaction monitor.	Could
 6. UI Design
-The web application is organised into three portals sharing a single login: Sender, Recipient and Admin. A user's post-login landing screen is determined by role; an account may be both a sender and a recipient (see Section 8).
+The web application is organised into three portals sharing a single login: Sender, Recipient and Admin. A user's post-login landing screen is determined by role; an account may be both a sender and a recipient (Section 9.1).
 6.1 Site Map
 ●	Public
 ○	Login
@@ -247,7 +247,7 @@ UI elements:
 ●	Exchange rate
 ●	Transaction fee
 ●	FX margin
-●	RLUSD amount to be received
+●	UCTUSD amount to be received
 ●	Cash-out fee estimate
 ●	Estimated recipient payout
 ●	Quote validity countdown (if implemented)
@@ -272,16 +272,16 @@ Primary actions:
 Transaction History & Detail
 Full record of sent remittances and their lifecycle.
 UI elements:
-●	List: date, recipient, ZAR amount, RLUSD amount, status, reference
+●	List: date, recipient, ZAR amount, UCTUSD amount, status, reference
 ●	Detail view: cash-in status, queue status, XRPL transaction hash once settled
 Primary actions:
 ●	Filter by status/date
 ●	Open a transaction for full detail
 6.3 Recipient Portal — Screens
 Wallet Dashboard
-Primary recipient view of their custodial RLUSD wallet.
+Primary recipient view of their custodial UCTUSD wallet.
 UI elements:
-●	RLUSD balance (prominent)
+●	UCTUSD balance (prominent)
 ●	XRPL account address
 ●	Incoming transfers: amount, sender, date, status, XRPL tx hash (linked)
 ●	“Cash Out” button
@@ -296,9 +296,9 @@ UI elements:
 Primary actions:
 ●	Return to Wallet Dashboard
 Cash-Out Request
-Convert RLUSD to fiat.
+Convert UCTUSD to fiat.
 UI elements:
-●	RLUSD amount input
+●	UCTUSD amount input
 ●	Currency toggle: USD / ZAR
 ●	Computed payout preview (rate applied, cash-out fee, net payout)
 Primary actions:
@@ -330,7 +330,7 @@ Primary actions:
 Cash-Out Approval Queue
 Approve, complete or fail recipient cash-out requests.
 UI elements:
-●	Table of pending cash-outs (recipient, RLUSD amount, target currency, payout amount)
+●	Table of pending cash-outs (recipient, UCTUSD amount, target currency, payout amount)
 ●	Approve / Complete / Fail buttons
 Primary actions:
 ●	Move a request through Requested → Approved → Completed/Failed
@@ -358,8 +358,8 @@ Full detail belongs in the Business and Technical Specification; these are the c
 ●	XRPL private keys encrypted at rest with the encryption key held separately from the key data; never exposed via API, UI or logs (FR-WAL-03, FR-WAL-04).
 ●	All traffic served over HTTPS; admin screens require an authenticated admin role, not just a logged-in session.
 7.2 Performance
-●	API response times, requests/second, queue throughput and XRPL transaction processing time must be measured and reported (see Project Brief Section 7.iv).
-●	UI screens should remain responsive (sub-second interaction feedback) under the team's defined concurrent-user test load.
+●	API response times, requests/second, queue throughput and XRPL transaction processing time must be measured and reported (see Project Brief Section 7.iv). Measured and reported in perf/REPORT.md (Phase 9).
+●	UI screens should remain responsive (sub-second interaction feedback) under the team's defined concurrent-user test load. Met at 50 concurrent users (15 ms median, 330 ms 95th percentile, 0 failures) for every screen except login and the wallet page; both causes and fixes are in perf/REPORT.md.
 7.3 Reliability
 ●	Message queue processing must be idempotent — no duplicate crediting on redelivery (FR-MQ-04).
 ●	Failed XRPL transactions must be handled gracefully and never silently drop a transaction's status.
@@ -373,11 +373,22 @@ Full detail belongs in the Business and Technical Specification; these are the c
 ●	Cash-in methods other than card (agent cash, bank transfer) unless the team later decides to add them.
 ●	Production-grade KYC/AML vendor integration, real identity verification, or a full legal/licensing opinion.
 ●	Multi-language UI, unless added as a stretch goal.
-9. Assumptions & Open Questions for the Team
-These do not block starting the build but should be confirmed early, ideally before the 21 August check-in, since they touch several requirements above:
-●	Can a single user account hold both the sender and recipient roles (e.g. to receive from one contact and send to another)? Assumed yes in Section 6, but the dashboard/navigation design depends on this.
-●	Is recipient onboarding self-service registration, or is an account auto-created/invited when a sender adds them as a beneficiary (FR-BEN-04)?
-●	How long is a quote valid before the rate must be re-fetched (referenced in FR-FX-07 / Send Money Step 2)?
-●	Is the RLUSD balance debited on cash-out request or only once approved/completed (FR-CO-06)? This document assumes debit-on-approval with reversal on failure.
-●	Backend framework (Flask / Django / FastAPI), database engine and message-queue technology — team's technical choice, does not change these functional requirements.
-●	Live exchange-rate API vs a mock/manual rate table — affects FR-FX-01 implementation, not the requirement itself.
+9. Assumptions, Resolved Questions & Known Limitations
+The questions raised in v1.0 have all been settled by the build. They are recorded here with the answer the implementation gives, followed by the limitations a reader should know about.
+
+9.1 Questions resolved
+●	Dual role: yes. One account may send and receive. The User model uses independent boolean flags (is_admin, can_send, can_receive); receiving for the first time sets can_receive.
+●	Recipient onboarding (FR-BEN-04): self-service registration, with automatic linking. Adding a beneficiary links them to an existing account by email or mobile. No invite or placeholder account is created — see the limitation in 9.2.
+●	Quote validity (FR-FX-07): no countdown. The quote is re-priced server-side when the sender submits payment and refused if the effective rate has changed, so the sender either pays the rate they saw or is asked to review a fresh quote. The figures used are snapshotted onto the transaction row, so later fee or rate changes never rewrite history (FR-FX-08).
+●	Cash-out debit (FR-CO-06): debited on approval, reversed automatically if the burn fails.
+●	Stack: FastAPI, PostgreSQL (async SQLAlchemy with Alembic), Redis with RQ, Jinja2 with Bootstrap 5.
+●	Exchange-rate source (FR-FX-01): configurable, selected by FX_RATE_SOURCE — the active fee_config row (default) or a fixed environment value. A live API can be added behind the same function without changing callers.
+
+9.2 Known limitations
+●	Sessions are signed browser cookies, not a server-side store (SessionMiddleware). A session cannot be revoked before it expires (8 hours). This was a deliberate simplification; see the v1.2 revision note.
+●	An unregistered beneficiary cannot be paid. FR-BEN-04's acceptance criterion anticipates an invite or placeholder record; the build instead refuses the send with a message asking the sender to invite the recipient, because a recipient's XRPL wallet belongs to a registered user account. A beneficiary added before the recipient registered is linked automatically at send time.
+●	Notifications are in-application only (FR-CI-04, FR-CO-04). Failed cash-ins and cash-out status changes appear in the user's transaction views; no email or SMS is sent.
+●	KYC is a manual form review with basic validation (adulthood, ID-number length). There is no identity-verification vendor, per Section 8.
+●	Settlement throughput is bounded by worker count: roughly 4 transfers per minute per worker against XRPL Testnet, where a payment takes about 14 seconds. See perf/REPORT.md.
+●	Recipient XRPL accounts are funded by the Testnet faucet. A mainnet deployment would have to fund each new account's XRP reserve from the treasury.
+●	The fee, margin and limit values shipped in the database are placeholders pending a team decision, not researched market rates.
