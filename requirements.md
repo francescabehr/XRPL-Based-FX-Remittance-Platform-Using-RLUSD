@@ -50,7 +50,7 @@ Feeds into: Business and Technical Specification (Project Brief, Section 7.i)
 
  1. Introduction & Purpose
 This document defines the functional requirements and user-interface structure for the XRPL-based FX remittance platform described in the ECO5040W project brief (released 14 August 2026). It translates the brief's user journey and functional scope into testable requirements, each with an ID, an acceptance criterion and a priority, plus a screen-by-screen inventory of the web application's UI.
-This document does not replace the full Business and Technical Specification required by Section 7.i of the brief. It intentionally excludes database schema design, a graphical architecture diagram, detailed security architecture and the regulatory discussion — those belong in the fuller specification and can be built directly on top of the requirements defined here.
+This document does not replace the full Business and Technical Specification required by Section 7.i of the brief. It intentionally excludes database schema design, a graphical architecture diagram, detailed security architecture and the regulatory discussion — those are written up in SPECIFICATION.md, which builds on the requirements defined here.
 1.1 Priority Key
 ●	Must — required for the core marked deliverable (registration, KYC, quoting, cash-in, settlement, wallet, cash-out, admin approvals).
 ●	Should — expected for a complete, well-rounded submission but not core to the demo.

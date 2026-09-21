@@ -80,6 +80,17 @@ make test
 
 ---
 
+## Documents
+
+| Document | What it covers |
+|---|---|
+| [SPECIFICATION.md](SPECIFICATION.md) | Business and technical specification (Brief §7.i): architecture, data model, settlement and cash-out flows, security, reliability, performance, compliance |
+| [requirements.md](requirements.md) | Functional requirements and UI design (FR-XXX IDs, acceptance criteria) |
+| [perf/REPORT.md](perf/REPORT.md) | Measured performance results and bottlenecks (Brief §7.iv) |
+| [CLAUDE.md](CLAUDE.md) · [BUILD_PLAN.md](BUILD_PLAN.md) | Locked-in stack decisions and the phased build plan |
+
+---
+
 ## Build Slices
 
 | Slice | Scope | Status |
