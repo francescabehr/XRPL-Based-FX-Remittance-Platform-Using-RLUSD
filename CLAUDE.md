@@ -138,8 +138,14 @@ Phase 8  Admin Portal                  ✅ DONE   FR-ADM-01..07
          drill-down and filterable in the monitor. Every /admin route is behind
          require_admin — asserted by a test that walks app.routes.
 
-Phase 9  Performance Tests             ⬜        Brief §7.iv
-         Locust scenarios once a full flow runs; synthetic data via Faker.
+Phase 9  Performance Tests             ✅ DONE   Brief §7.iv
+         perf/: Faker seeder (200 pairs), Locust profile (sender/recipient/admin),
+         queue sampler, real-Testnet timer, chart/table generator. Measured run:
+         6,647 requests, 0 failures, 37 rps, 15 ms median at 50 users. Bottlenecks
+         in perf/REPORT.md — blocking bcrypt in the async login handler (232 ms,
+         stalls the loop), single-worker queue drain (9/min simulated, ~4/min real),
+         live-ledger call on /wallet. Load tests use perf/perf_worker.py (SIMULATED
+         ledger); real XRPL timings measured separately (payment ~14 s).
 ```
 
 ---
@@ -185,6 +191,8 @@ xrpl-remittance/
 │       ├── crypto.py             # Fernet encrypt/decrypt for XRPL private keys
 │       └── hashing.py            # bcrypt hash/verify
 │
+├── perf/                         # (Phase 9) seed_data · locustfile · perf_worker ·
+│                                 #   sampler · measure_xrpl · analyze · REPORT.md
 ├── migrations/ · tests/ · frontend/{templates,static}
 ├── .env.example · requirements.txt · alembic.ini · Makefile
 ```

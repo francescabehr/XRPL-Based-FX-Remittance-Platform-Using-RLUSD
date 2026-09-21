@@ -27,3 +27,5 @@ cryptography==43.0.3
 
 # Slice 8 — perf testing
 locust==2.32.4
+faker==33.1.0        # synthetic users for the load test
+matplotlib==3.9.3    # charts for the performance report
