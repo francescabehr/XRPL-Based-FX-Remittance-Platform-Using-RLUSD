@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -15,19 +16,49 @@ from app.routers import admin, auth, beneficiaries, cashout, kyc, sender, transa
 logger = logging.getLogger(__name__)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Re-publish any cash-out burn whose message was lost between the approval
-    # commit and the enqueue (FR-CO-05). Idempotent: the worker's claim decides.
+# How often the cash-out sweep runs after startup. A row only becomes sweepable
+# once its claim is STUCK_AFTER (10 min) old, so this need not be tight.
+SWEEP_INTERVAL_SECONDS = 120
+
+
+async def _sweep_cashouts(when: str) -> None:
+    """Re-publish cash-out burns that have no live message (FR-CO-05).
+
+    Covers both the commit-before-publish window and a worker that claimed a row
+    and then died before signing — RQ abandons that job rather than requeueing it,
+    so nothing else would ever move the row, which sits approved and debited.
+    Idempotent: the worker's claim decides, so a duplicate message is a no-op.
+    """
     try:
         async with AsyncSessionLocal() as db:
             revived = await cashout_service.sweep_unpublished(db)
         if revived:
-            logger.warning("Startup sweep re-published %s cash-out burn(s)", len(revived))
-    except Exception as exc:  # noqa: BLE001 — never block startup on Redis/DB
-        logger.error("Startup cash-out sweep skipped: %s", type(exc).__name__)
-    yield
-    await engine.dispose()
+            logger.warning("%s sweep re-published %s cash-out burn(s)", when, len(revived))
+    except Exception as exc:  # noqa: BLE001 — never block startup or kill the loop
+        logger.error("%s cash-out sweep skipped: %s", when, type(exc).__name__)
+
+
+async def _sweep_loop() -> None:
+    while True:
+        await asyncio.sleep(SWEEP_INTERVAL_SECONDS)
+        await _sweep_cashouts("Periodic")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await _sweep_cashouts("Startup")
+    # A single boot-time sweep cannot catch a worker that dies later, so keep
+    # sweeping for as long as the app runs.
+    sweeper = asyncio.create_task(_sweep_loop())
+    try:
+        yield
+    finally:
+        sweeper.cancel()
+        try:
+            await sweeper
+        except asyncio.CancelledError:
+            pass
+        await engine.dispose()
 
 
 app = FastAPI(title="XRPL Remittance Platform", lifespan=lifespan)

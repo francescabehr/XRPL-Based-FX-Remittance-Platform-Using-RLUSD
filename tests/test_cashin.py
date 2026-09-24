@@ -8,7 +8,12 @@ from sqlalchemy import func, select
 from app.models.transaction import CashInStatus, SettlementStatus, Transaction
 from app.models.user import User
 from app.services import cashin_service, queue_service
-from app.services.cashin_service import MockCard, RemittanceError, create_remittance
+from app.services.cashin_service import (
+    AcceptedQuote,
+    MockCard,
+    RemittanceError,
+    create_remittance,
+)
 from app.services.limit_service import get_daily_usage
 from tests.conftest import _TestSession
 from tests.remit_helpers import (
@@ -18,9 +23,17 @@ from tests.remit_helpers import (
     approved_sender,
     beneficiary_for,
     logged_in,
+    quoted,
     registered_recipient,
     remittance,
 )
+
+
+def _any_price() -> AcceptedQuote:
+    """For refusals that must happen before pricing is even reached."""
+    return AcceptedQuote(
+        exchange_rate=Decimal("1"), transaction_fee=Decimal("0"), uctusd_amount=Decimal("1")
+    )
 
 pytestmark = pytest.mark.usefixtures("seed_tiers", "seed_fee_config")
 
@@ -48,12 +61,30 @@ async def test_only_last4_of_card_is_stored(db):
     assert not any("4242424242424242" in str(v).replace(" ", "") for v in columns.values())
 
 
+@pytest.mark.parametrize("zar", ["10", "25.38", "49.99"])
+async def test_send_below_the_minimum_is_refused_and_books_nothing(db, zar):
+    """AUDIT #2: these used to create a row priced at <= 0 UCTUSD, charge the
+    sender's ZAR, consume their allowance, and only fail at the worker."""
+    sender = await approved_sender(db)
+    ben = await beneficiary_for(db, sender, recipient=await registered_recipient(db))
+
+    with pytest.raises(RemittanceError):
+        await create_remittance(
+            db, sender, beneficiary_id=ben.id, zar_amount=Decimal(zar), card=GOOD_CARD,
+            accepted=_any_price(),
+        )
+
+    assert await _count(db, sender.id) == 0          # nothing booked
+    assert await get_daily_usage(db, sender.id) == Decimal("0")  # no allowance consumed
+
+
 async def test_unregistered_recipient_is_refused(db):
     sender = await approved_sender(db)
     ben = await beneficiary_for(db, sender, recipient=None)
 
     with pytest.raises(RemittanceError, match="does not have an account"):
-        await create_remittance(db, sender, beneficiary_id=ben.id, zar_amount=Decimal("100"), card=GOOD_CARD)
+        await create_remittance(db, sender, beneficiary_id=ben.id, zar_amount=Decimal("100"),
+                                card=GOOD_CARD, accepted=await quoted(db, ben, "100"))
     assert await _count(db, sender.id) == 0
 
 
@@ -66,7 +97,8 @@ async def test_recipient_who_registers_later_is_linked_at_send_time(db):
     late = await create_user(db, full_name="Late Comer", email="latecomer_ci@test.com",
                              mobile="+27795550001", password="Pass1234!")
 
-    txn = await create_remittance(db, sender, beneficiary_id=ben.id, zar_amount=Decimal("100"), card=GOOD_CARD)
+    txn = await create_remittance(db, sender, beneficiary_id=ben.id, zar_amount=Decimal("100"),
+                                  card=GOOD_CARD, accepted=await quoted(db, ben, "100"))
     assert txn.recipient_user_id == late.id
     await db.refresh(ben)
     assert ben.recipient_user_id == late.id
@@ -81,7 +113,8 @@ async def test_unapproved_sender_is_refused(db):
     await db.commit()
 
     with pytest.raises(RemittanceError, match="KYC"):
-        await create_remittance(db, sender, beneficiary_id=ben.id, zar_amount=Decimal("100"), card=GOOD_CARD)
+        await create_remittance(db, sender, beneficiary_id=ben.id, zar_amount=Decimal("100"),
+                                card=GOOD_CARD, accepted=_any_price())
 
 
 async def test_over_limit_is_refused_before_insert(db):
@@ -89,19 +122,44 @@ async def test_over_limit_is_refused_before_insert(db):
     ben = await beneficiary_for(db, sender, await registered_recipient(db))
 
     with pytest.raises(RemittanceError, match="Daily limit exceeded"):
-        await create_remittance(db, sender, beneficiary_id=ben.id, zar_amount=Decimal("10000.01"), card=GOOD_CARD)
+        await create_remittance(db, sender, beneficiary_id=ben.id, zar_amount=Decimal("10000.01"),
+                                card=GOOD_CARD, accepted=await quoted(db, ben, "10000.01"))
     assert await _count(db, sender.id) == 0
 
 
 async def test_changed_rate_is_refused(db):
     sender = await approved_sender(db)
     ben = await beneficiary_for(db, sender, await registered_recipient(db))
+    stale = await quoted(db, ben, "100")
 
-    with pytest.raises(RemittanceError, match="exchange rate changed"):
+    with pytest.raises(RemittanceError, match="price changed"):
         await create_remittance(
             db, sender, beneficiary_id=ben.id, zar_amount=Decimal("100"), card=GOOD_CARD,
-            expected_exchange_rate=Decimal("17.000000"),
+            accepted=AcceptedQuote(
+                exchange_rate=Decimal("17.000000"),
+                transaction_fee=stale.transaction_fee,
+                uctusd_amount=stale.uctusd_amount,
+            ),
         )
+    assert await _count(db, sender.id) == 0
+
+
+async def test_changed_fee_is_refused_even_when_the_rate_is_unchanged(db, seed_fee_config):
+    """AUDIT #5: the old check compared only the rate, so a fee-only config change
+    repriced the sender without them ever seeing the new price."""
+    sender = await approved_sender(db)
+    ben = await beneficiary_for(db, sender, await registered_recipient(db))
+    shown = await quoted(db, ben, "100")
+
+    seed_fee_config.fixed_fee_zar = Decimal("40.00")  # rate untouched, fee doubled
+    await db.commit()
+
+    with pytest.raises(RemittanceError, match="price changed"):
+        await create_remittance(
+            db, sender, beneficiary_id=ben.id, zar_amount=Decimal("100"),
+            card=GOOD_CARD, accepted=shown,
+        )
+    assert await _count(db, sender.id) == 0
 
 
 async def test_concurrent_sends_cannot_both_use_the_same_headroom(db):
@@ -113,7 +171,8 @@ async def test_concurrent_sends_cannot_both_use_the_same_headroom(db):
         async with _TestSession() as s:
             me = await s.get(User, sender.id)
             try:
-                await create_remittance(s, me, beneficiary_id=ben.id, zar_amount=Decimal("6000"), card=GOOD_CARD)
+                await create_remittance(s, me, beneficiary_id=ben.id, zar_amount=Decimal("6000"),
+                                        card=GOOD_CARD, accepted=await quoted(s, ben, "6000"))
                 return "ok"
             except RemittanceError as exc:
                 return str(exc)
@@ -138,7 +197,8 @@ async def test_invalid_card_details_are_refused(db, card, message):
     sender = await approved_sender(db)
     ben = await beneficiary_for(db, sender, await registered_recipient(db))
     with pytest.raises(RemittanceError, match=message):
-        await create_remittance(db, sender, beneficiary_id=ben.id, zar_amount=Decimal("100"), card=card)
+        await create_remittance(db, sender, beneficiary_id=ben.id, zar_amount=Decimal("100"),
+                                card=card, accepted=await quoted(db, ben, "100"))
 
 
 # --- cash-in outcomes (FR-CI-02..04, FR-MQ-01) ---
@@ -231,13 +291,24 @@ async def test_send_flow_pages_render(client, db):
         assert r.status_code == 200 and "R1,000.00" in r.text
 
 
+async def _post_form(db, ben, amount="1000", **overrides):
+    """The form the pay page posts, price lock included."""
+    price = await quoted(db, ben, amount)
+    form = {
+        "beneficiary_id": str(ben.id), "zar_amount": amount,
+        "exchange_rate": str(price.exchange_rate),
+        "transaction_fee": str(price.transaction_fee),
+        "uctusd_amount": str(price.uctusd_amount),
+        "card_number": "4242 4242 4242 4242", "card_expiry": "12/30", "card_cvv": "123", "card_name": "T",
+    }
+    form.update(overrides)
+    return form
+
+
 async def test_post_remittance_creates_transaction_and_redirects(client, db):
     sender = await approved_sender(db)
     ben = await beneficiary_for(db, sender, await registered_recipient(db))
-    form = {
-        "beneficiary_id": str(ben.id), "zar_amount": "1000", "exchange_rate": "18.870000",
-        "card_number": "4242 4242 4242 4242", "card_expiry": "12/30", "card_cvv": "123", "card_name": "T",
-    }
+    form = await _post_form(db, ben)
     with logged_in(sender):
         r = await client.post("/remittances", data=form, follow_redirects=False)
         assert r.status_code == 302 and r.headers["location"].startswith("/transactions/")
@@ -252,13 +323,49 @@ async def test_post_remittance_creates_transaction_and_redirects(client, db):
 async def test_post_remittance_bad_card_rerenders_pay_page(client, db):
     sender = await approved_sender(db)
     ben = await beneficiary_for(db, sender, await registered_recipient(db))
-    form = {
-        "beneficiary_id": str(ben.id), "zar_amount": "1000", "exchange_rate": "",
-        "card_number": "1234", "card_expiry": "12/30", "card_cvv": "123", "card_name": "T",
-    }
+    form = await _post_form(db, ben, card_number="1234")
     with logged_in(sender):
         r = await client.post("/remittances", data=form, follow_redirects=False)
     assert r.status_code == 200 and "Card number is not valid" in r.text
+    assert await _count(db, sender.id) == 0
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"exchange_rate": ""},                       # the old bypass: empty skipped the check
+        {"exchange_rate": "not-a-number"},
+        {"exchange_rate": "0"},
+        {"transaction_fee": ""},
+        {"uctusd_amount": "abc"},
+    ],
+)
+async def test_post_remittance_refuses_an_unreadable_price_lock(client, db, overrides):
+    """AUDIT #5: an absent or mangled price was treated as "skip the check", so the
+    sender was charged at whatever the rate happened to be."""
+    sender = await approved_sender(db)
+    ben = await beneficiary_for(db, sender, await registered_recipient(db))
+    form = await _post_form(db, ben, **overrides)
+
+    with logged_in(sender):
+        r = await client.post("/remittances", data=form, follow_redirects=False)
+
+    assert r.status_code == 302
+    assert r.headers["location"].startswith("/send")   # back to a fresh quote
+    assert await _count(db, sender.id) == 0            # nothing booked
+
+
+@pytest.mark.parametrize("missing", ["exchange_rate", "transaction_fee", "uctusd_amount"])
+async def test_post_remittance_refuses_a_missing_price_lock_field(client, db, missing):
+    sender = await approved_sender(db)
+    ben = await beneficiary_for(db, sender, await registered_recipient(db))
+    form = await _post_form(db, ben)
+    del form[missing]
+
+    with logged_in(sender):
+        r = await client.post("/remittances", data=form, follow_redirects=False)
+
+    assert r.status_code == 422        # the field is required, not optional
     assert await _count(db, sender.id) == 0
 
 

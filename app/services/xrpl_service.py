@@ -8,8 +8,9 @@ them in step. Rules this module enforces:
 - Seeds are decrypted only here (via security/crypto.py), only at signing time,
   and never logged, returned, or stored in plaintext (FR-WAL-03/04).
 - Transactions are signed before submission, so the hash is known even when the
-  ledger rejects them. Failures come back as an XRPLResult carrying the result
-  code (e.g. tecPATH_DRY), never as a raised exception (FR-WAL-07).
+  ledger rejects them. Failures come back as an XRPLResult carrying both the
+  result code (e.g. tecPATH_DRY) and a resolution saying whether the outcome is
+  actually known, never as a raised exception (FR-WAL-07).
 
 Result codes observed on Testnet (Phase 5 smoke run):
   tecPATH_DRY      payment to an account with no UCTUSD trust line
@@ -29,7 +30,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from xrpl.asyncio.clients import AsyncJsonRpcClient
 from xrpl.asyncio.ledger import get_latest_validated_ledger_sequence
-from xrpl.asyncio.transaction import autofill_and_sign, submit_and_wait
+from xrpl.asyncio.transaction import (
+    XRPLReliableSubmissionException,
+    autofill_and_sign,
+    submit_and_wait,
+)
 from xrpl.asyncio.wallet import generate_faucet_wallet
 from xrpl.constants import XRPLException
 from xrpl.models.amounts import IssuedCurrencyAmount
@@ -49,7 +54,28 @@ QUANT_UCTUSD = Decimal("0.000001")
 TRUST_LINE_LIMIT = "1000000000"
 SUCCESS = "tesSUCCESS"
 
-_RESULT_CODE = re.compile(r"\bte[a-z][A-Z_]+\b")
+# How much the ledger actually told us. Every decision that moves, restores or
+# re-sends money branches on XRPLResult.resolution — never on result_code.
+#
+# A code lifted out of an exception message can be the *preliminary* result of a
+# transaction whose real outcome nobody has seen: xrpl-py's reliable submission
+# raises "...Prelim result: tesSUCCESS" the moment LastLedgerSequence is passed,
+# and does so without a final Tx lookup, so the payment may well be in a
+# validated ledger. Treating that as a failure would reverse a burn that already
+# destroyed tokens. ter* codes (terQUEUED, terPRE_SEQ) arrive by the same route
+# and are just as unproven.
+SUCCEEDED = "succeeded"          # validated tesSUCCESS — the funds moved
+FAILED = "failed"                # provably did not move: validated tec*, or malformed tem*
+UNKNOWN = "unknown"              # signed and sent, outcome never observed — never reverse
+NOT_SUBMITTED = "not_submitted"  # nothing was signed or sent — safe to retry
+
+# "Transaction failed: tecPATH_DRY". xrpl-py raises this only after seeing
+# result["validated"] is true, so the code it carries is final.
+# Pinned to xrpl-py 4.0.0's _wait_for_final_transaction_outcome wording
+_VALIDATED_FAILURE = re.compile(r"^Transaction failed: ([a-z]{3}[A-Z][A-Z_]*)$")
+# "temBAD_FEE: Invalid fee...". The server rejected the blob outright; a tem*
+# transaction is malformed and can never be included in any ledger.
+_MALFORMED = re.compile(r"^(tem[A-Z_]+):")
 
 # Called with the tx hash after signing and before submission, so a caller can
 # persist the hash first — if the process dies mid-submit, the payment can still
@@ -82,14 +108,38 @@ class XRPLConfigError(RuntimeError):
     """Treasury seed/address or other XRPL settings are missing or inconsistent."""
 
 
+class InvalidAmountError(ValueError):
+    """The amount cannot be expressed as UCTUSD, so no transaction can carry it.
+
+    A permanent property of the value, not a transient condition: a worker that
+    sees this must fail the job outright, because retrying re-reads the same
+    amount and fails identically.
+    """
+
+
 @dataclass(frozen=True)
 class XRPLResult:
-    """Outcome of one submitted transaction. tx_hash is set whenever signing succeeded."""
+    """Outcome of one submitted transaction. tx_hash is set whenever signing succeeded.
+
+    result_code is for humans and logs. Callers decide what to do from
+    `resolution`, which is one of SUCCEEDED / FAILED / UNKNOWN / NOT_SUBMITTED.
+    Left unset, it is inferred conservatively: a failure that was signed counts
+    as UNKNOWN, because a transaction with a hash may be on the ledger.
+    """
 
     success: bool
     result_code: str
     tx_hash: Optional[str]
     message: str = ""
+    outcome: Optional[str] = None
+
+    @property
+    def resolution(self) -> str:
+        if self.outcome is not None:
+            return self.outcome
+        if self.success:
+            return SUCCEEDED
+        return NOT_SUBMITTED if self.tx_hash is None else UNKNOWN
 
 
 def get_client() -> AsyncJsonRpcClient:
@@ -98,9 +148,12 @@ def get_client() -> AsyncJsonRpcClient:
 
 def uctusd(value: Decimal) -> IssuedCurrencyAmount:
     """A UCTUSD amount using the ledger-verified currency code (6 dp, positive)."""
-    value = Decimal(value).quantize(QUANT_UCTUSD, rounding=ROUND_HALF_UP)
+    try:
+        value = Decimal(value).quantize(QUANT_UCTUSD, rounding=ROUND_HALF_UP)
+    except (TypeError, ArithmeticError) as exc:
+        raise InvalidAmountError(f"Not a usable UCTUSD amount: {value!r}") from exc
     if value <= 0:
-        raise ValueError("UCTUSD amount must be positive.")
+        raise InvalidAmountError("UCTUSD amount must be positive.")
     return IssuedCurrencyAmount(
         currency=settings.xrpl_currency_code,
         issuer=settings.xrpl_issuer_address,
@@ -126,9 +179,35 @@ def _signer_for(wallet: Wallet) -> XRPLWallet:
     return XRPLWallet.from_seed(crypto.decrypt_seed(wallet.encrypted_private_key))
 
 
-def _result_code(exc: Exception) -> str:
-    match = _RESULT_CODE.search(str(exc))
-    return match.group(0) if match else "submission_error"
+def _classify(exc: Exception) -> tuple[str, str]:
+    """Map a submission exception to (resolution, result_code).
+
+    Only two messages prove a transaction did not move funds: a validated
+    non-success, and a malformed (tem*) rejection. Everything else — a timeout,
+    a failed RPC, an unrecognised error — is UNKNOWN, because the transaction is
+    signed and may already be in a ledger this process never saw.
+    """
+    text = str(exc)
+    if not isinstance(exc, XRPLReliableSubmissionException):
+        # e.g. XRPLRequestFailureException: the RPC failed, and we cannot tell
+        # whether the server took the transaction before it did.
+        return UNKNOWN, "submission_error"
+
+    validated = _VALIDATED_FAILURE.match(text)
+    if validated:
+        return FAILED, validated.group(1)
+
+    malformed = _MALFORMED.match(text)
+    if malformed:
+        return FAILED, malformed.group(1)
+
+    if "LastLedgerSequence" in text:
+        # Gave up waiting. xrpl-py raises this without a final lookup, so the
+        # transaction may have been validated in the last ledger before the
+        # deadline. Unknowable here; an operator resolves it from the ledger.
+        return UNKNOWN, "submission_timeout"
+
+    return UNKNOWN, "submission_error"
 
 
 async def submit(
@@ -141,8 +220,9 @@ async def submit(
 ) -> XRPLResult:
     """Sign, submit, and wait for a validated outcome (FR-WAL-06).
 
-    A "sign_error" result means nothing reached the ledger, so it is safe to retry.
-    Any other failure has a hash and may need a ledger check before retrying.
+    The returned resolution says what may be done next: NOT_SUBMITTED is safe to
+    retry, FAILED provably moved nothing, and UNKNOWN must be neither retried nor
+    reversed until the ledger is consulted.
 
     on_signed gets just the hash; on_signed_tx additionally gets the ledger range
     needed to reconcile an unknown outcome. Both run after signing and before
@@ -152,7 +232,7 @@ async def submit(
         signed = await autofill_and_sign(tx, client, signer)
     except XRPLException as exc:
         logger.warning("XRPL sign failed for %s: %s", tx.account, type(exc).__name__)
-        return XRPLResult(False, "sign_error", None, str(exc))
+        return XRPLResult(False, "sign_error", None, str(exc), outcome=NOT_SUBMITTED)
 
     tx_hash = signed.get_hash()
     # Persist before submitting. If this raises, nothing is sent — better a
@@ -170,13 +250,16 @@ async def submit(
     try:
         resp = await submit_and_wait(signed, client)
     except XRPLException as exc:
-        code = _result_code(exc)
-        logger.warning("XRPL %s %s failed: %s", tx.transaction_type.value, tx_hash, code)
-        return XRPLResult(False, code, tx_hash, str(exc))
+        resolution, code = _classify(exc)
+        logger.warning(
+            "XRPL %s %s: %s (%s)", tx.transaction_type.value, tx_hash, code, resolution
+        )
+        return XRPLResult(False, code, tx_hash, str(exc), outcome=resolution)
 
     code = resp.result["meta"]["TransactionResult"]
     logger.info("XRPL %s %s: %s", tx.transaction_type.value, tx_hash, code)
-    return XRPLResult(code == SUCCESS, code, tx_hash)
+    success = code == SUCCESS
+    return XRPLResult(success, code, tx_hash, outcome=SUCCEEDED if success else FAILED)
 
 
 async def get_uctusd_balance(
@@ -277,14 +360,30 @@ async def send_from_treasury(
     amount: Decimal,
     client: Optional[AsyncJsonRpcClient] = None,
     on_signed: Optional[OnSigned] = None,
+    on_signed_tx: Optional[OnSignedTx] = None,
 ) -> XRPLResult:
-    """Treasury -> recipient UCTUSD settlement payment (used by the settlement worker)."""
+    """Treasury -> recipient UCTUSD settlement payment (used by the settlement worker).
+
+    on_signed_tx is the one to use: like burn_to_issuer, it hands back the ledger
+    range the hash can appear in, which is what lets an admin retry prove a
+    payment is dead instead of inferring it from elapsed time. The validated
+    ledger index is read before signing, so the range cannot start after the
+    payment was already included.
+    """
+    client = client or get_client()
     treasury = load_treasury()
+
+    submitted_ledger_index: Optional[int] = None
+    if on_signed_tx is not None:
+        submitted_ledger_index = await get_latest_validated_ledger_sequence(client)
+
     return await submit(
         Payment(account=treasury.classic_address, destination=destination, amount=uctusd(amount)),
         treasury,
-        client or get_client(),
+        client,
         on_signed,
+        on_signed_tx=on_signed_tx,
+        submitted_ledger_index=submitted_ledger_index,
     )
 
 

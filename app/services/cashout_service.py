@@ -25,7 +25,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Callable, Optional
 
-from sqlalchemy import func, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -35,7 +35,12 @@ from app.models.user import User
 from app.models.wallet import Wallet
 from app.services import fx_service, queue_service, xrpl_service
 from app.services.fx_service import QUANT_UCTUSD, cashout_fee_usd, cashout_payout
-from app.workers.cashout_worker import UNKNOWN_PREFIX, complete_burn, fail_and_restore
+from app.workers.cashout_worker import (
+    STUCK_AFTER,
+    UNKNOWN_PREFIX,
+    complete_burn,
+    fail_and_restore,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -369,26 +374,43 @@ async def sweep_unpublished(
     db: AsyncSession,
     enqueue: Optional[Enqueue] = None,
     grace: timedelta = PUBLISH_GRACE,
+    stuck_after: timedelta = STUCK_AFTER,
 ) -> list[uuid.UUID]:
-    """Re-publish burns lost in the commit-before-publish window.
+    """Re-publish approved burns that have no live message. Two ways that happens:
 
-    Approval commits the debit and then publishes. If the process dies in between,
-    the row is approved and reserved but no message exists, and nothing else would
-    ever pick it up. This finds those rows — approved, never signed, never claimed,
-    and older than the grace period — and re-publishes them.
+    1. Lost in the commit-before-publish window. Approval commits the debit and
+       then publishes; if the process dies in between, the row is approved and
+       reserved but no message exists.
+    2. Claimed by a worker that then died before signing. RQ moves an abandoned
+       job to the failed registry (verified against rq 2.0.0: jobs are enqueued
+       with no Retry, so retries_left is None and nothing is ever requeued), so
+       again no message exists. Reconcile cannot help — there is no hash — and
+       approve/reject need status=requested, so without this the row would sit
+       approved and debited forever.
+
+    `xrpl_burn_tx_hash IS NULL` is the hard guard on both: once anything has been
+    signed, this must never republish, because a second burn could destroy tokens
+    twice. A stale claim is evidence only about the worker, never about the ledger
+    — which is why it may only unstick rows that never reached signing.
 
     Safe to run repeatedly: the worker's claim is what enforces exactly-once, so a
     duplicate message is a no-op. Run at startup and periodically.
     """
     enqueue = enqueue or queue_service.enqueue_burn
     cutoff = _now() - grace
+    stale_before = _now() - stuck_after
     rows = (
         await db.execute(
             select(CashOutRequest).where(
                 CashOutRequest.status == CashOutStatus.approved,
                 CashOutRequest.xrpl_burn_tx_hash.is_(None),
-                CashOutRequest.burn_started_at.is_(None),
-                CashOutRequest.approved_at < cutoff,
+                or_(
+                    and_(
+                        CashOutRequest.burn_started_at.is_(None),
+                        CashOutRequest.approved_at < cutoff,
+                    ),
+                    CashOutRequest.burn_started_at < stale_before,
+                ),
             )
         )
     ).scalars().all()
@@ -401,7 +423,9 @@ async def sweep_unpublished(
             logger.error("Sweep could not re-publish cash-out %s: %s", req.id, exc)
             continue
         republished.append(req.id)
-        logger.warning("Sweep re-published unpublished burn for cash-out %s", req.id)
+        logger.warning(
+            "Sweep re-published burn for cash-out %s (claimed_at=%s)", req.id, req.burn_started_at
+        )
     return republished
 
 

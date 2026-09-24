@@ -10,16 +10,20 @@ Flow for one message:
      a duplicate message, or a row that anything has already signed for matches no
      row and stops here.
   2. Sign the burn, persist hash + ledger range BEFORE submitting.
-  3. Three post-signing outcomes, and only these:
-       validated tesSUCCESS -> completed, simulated fiat payout written, balance
-                               untouched (it was debited at approval).
-       validated tec*       -> failed, reserved UCTUSD restored exactly once.
-       unknown              -> stays approved with failure_reason=outcome_unknown,
-                               balance stays debited, never auto-resubmitted.
-                               Only an admin reconcile resolves it, from the ledger.
+  3. Three post-signing outcomes, and only these — taken from the result's
+     resolution, never from a result code parsed out of an exception message:
+       SUCCEEDED (validated tesSUCCESS) -> completed, simulated fiat payout
+                               written, balance untouched (debited at approval).
+       FAILED (validated tec*, or a malformed tem* the ledger never took)
+                            -> failed, reserved UCTUSD restored exactly once.
+       UNKNOWN (timeout, lost response) -> stays approved with
+                               failure_reason=outcome_unknown, balance stays
+                               debited, never auto-resubmitted. Only an admin
+                               reconcile resolves it, from the ledger.
 
 Retry policy: only failures that provably never reached the ledger (signing, or an
-error before signing) are retried, and the claim is released first. Nothing that
+error before signing) are retried, and the claim is released first. A permanently
+unusable amount fails at once, since a retry re-reads the same amount. Nothing that
 has been signed is ever resubmitted — that is what makes a double burn impossible.
 """
 from __future__ import annotations
@@ -271,6 +275,11 @@ async def process_burn(
             result = await xrpl_service.burn_to_issuer(
                 wallet, Decimal(req.uctusd_amount), on_signed_tx=remember_signed
             )
+        except xrpl_service.InvalidAmountError as exc:
+            # The amount itself is unusable, so no burn can ever carry it. Nothing
+            # was signed, so the reserve is restored — and retrying is pointless.
+            await fail_and_restore(db, req, f"invalid_amount: {exc}")
+            return "failed"
         except Exception as exc:  # noqa: BLE001 — every path must leave a known state
             if signed_hash:
                 # Signed and persisted, then we lost sight of it. Unknowable here.
@@ -279,21 +288,25 @@ async def process_burn(
             # Nothing was signed (or persistence failed, which prevents submission).
             return await _retry_or_fail(db, req, f"{type(exc).__name__}: {exc}", requeue)
 
-        if result.success:
+        # Branch on the resolution, never on the result code: a code scraped from a
+        # timeout message can be the burn's *preliminary* result, not its outcome.
+        if result.resolution == xrpl_service.SUCCEEDED:
             await complete_burn(db, req, result.tx_hash)
             return "completed"
 
-        if result.result_code == "sign_error":
+        if result.resolution == xrpl_service.NOT_SUBMITTED:
             # Never reached the ledger.
-            return await _retry_or_fail(db, req, f"sign_error: {result.message}", requeue)
+            return await _retry_or_fail(
+                db, req, f"{result.result_code}: {result.message}".strip(": "), requeue
+            )
 
-        if result.tx_hash and result.result_code == "submission_error":
+        if result.resolution == xrpl_service.UNKNOWN:
             # Submitted, but no validated result came back — indistinguishable from
             # a burn that succeeded. Hold, do not restore.
-            await hold_unknown(db, req, f"submission_error: {result.message}")
+            await hold_unknown(db, req, f"{result.result_code}: {result.message}".strip(": "))
             return "unknown"
 
-        # A validated tec* result: the ledger says the tokens did not move.
+        # xrpl_service.FAILED — the ledger says the tokens did not move.
         await fail_and_restore(
             db, req, f"{result.result_code}: {result.message}".strip(": "), result.tx_hash
         )

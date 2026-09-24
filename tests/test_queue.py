@@ -189,6 +189,22 @@ async def test_untrusted_wallet_and_sign_errors_are_transient(db, xrpl):
     assert xrpl.payments == []
 
 
+async def test_an_unusable_amount_fails_at_once_without_retrying(db, xrpl):
+    """AUDIT #2: a zero/negative UCTUSD amount raised ValueError out of uctusd(),
+    which was read as transient and burned three attempts before failing."""
+    txn, _ = await _queued(db)
+    xrpl.outcomes.append(xrpl_service.InvalidAmountError("UCTUSD amount must be positive."))
+    requeue = RecordingRequeue()
+
+    assert await _settle(txn, requeue) == "failed"
+
+    row = await _fresh(txn.id)
+    assert row.settlement_status == SettlementStatus.failed
+    assert row.xrpl_error_reason.startswith("invalid_amount")
+    assert requeue.calls == []            # no pointless retries
+    assert row.settlement_attempts == 1
+
+
 async def test_retries_stop_after_max_attempts(db, xrpl):
     txn, _ = await _queued(db)
     xrpl.outcomes.extend([ConnectionError("down")] * MAX_ATTEMPTS)
@@ -234,27 +250,124 @@ async def test_admin_retry_reconciles_a_payment_that_actually_landed(db, xrpl):
     assert xrpl.payments == []  # the "lost" payment was never re-submitted
 
 
+async def not_found(tx_hash):
+    return None
+
+
+def _ledger_at(index):
+    async def latest():
+        return index
+    return latest
+
+
+def _history(covered: bool):
+    async def has_range(start, end):
+        return covered
+    return has_range
+
+
 async def test_admin_retry_waits_while_a_signed_payment_could_still_land(db, xrpl):
+    """AUDIT #3: re-sending now needs ledger proof that the attempt is dead.
+
+    This test previously asserted the opposite — that waiting out
+    LEDGER_EXPIRY_MARGIN (5 minutes of wall-clock) was enough to re-send. It is
+    not: get_transaction_result returns None both for a payment that was never
+    included and for one this node cannot see, so a validated payment whose
+    response was lost would have been paid a second time. Aging the row no longer
+    unlocks the resend; passing the LastLedgerSequence, with history to prove it,
+    is what does.
+    """
     txn, _ = await _queued(db)
     xrpl.outcomes.append(("raise_after_sign", TimeoutError("lost response")))
     await _settle(txn)
 
-    async def not_found(tx_hash):
-        return None
-
+    # Still inside the range in which it could be validated.
     async with _TestSession() as s:
         row = await s.get(Transaction, txn.id)
-        with pytest.raises(cashin_service.RemittanceError, match="not final"):
-            await cashin_service.retry_settlement(s, row, enqueue=RecordingEnqueue(), ledger_result=not_found)
+        with pytest.raises(cashin_service.RemittanceError, match="could still be validated"):
+            await cashin_service.retry_settlement(
+                s, row, enqueue=RecordingEnqueue(), ledger_result=not_found,
+                latest_ledger=_ledger_at(xrpl.last_ledger_sequence), ledger_range=_history(True),
+            )
 
-    await _age(txn.id, minutes=10)  # past LastLedgerSequence: it can no longer land
+    # Time alone changes nothing — the whole point of the fix.
+    await _age(txn.id, minutes=60)
+    async with _TestSession() as s:
+        row = await s.get(Transaction, txn.id)
+        with pytest.raises(cashin_service.RemittanceError, match="could still be validated"):
+            await cashin_service.retry_settlement(
+                s, row, enqueue=RecordingEnqueue(), ledger_result=not_found,
+                latest_ledger=_ledger_at(xrpl.last_ledger_sequence), ledger_range=_history(True),
+            )
+
+    # Past LastLedgerSequence, with unbroken history: now it is provably dead.
     async with _TestSession() as s:
         row = await s.get(Transaction, txn.id)
         enqueue = RecordingEnqueue()
-        assert await cashin_service.retry_settlement(s, row, enqueue=enqueue, ledger_result=not_found) == "requeued"
+        assert await cashin_service.retry_settlement(
+            s, row, enqueue=enqueue, ledger_result=not_found,
+            latest_ledger=_ledger_at(xrpl.last_ledger_sequence + 1), ledger_range=_history(True),
+        ) == "requeued"
         assert len(enqueue.calls) == 1
 
     assert await _settle(txn) == "completed"
+
+
+async def test_admin_retry_refuses_while_the_server_has_a_history_gap(db, xrpl):
+    """AUDIT #3: past LastLedgerSequence, but the node cannot see the whole range,
+    so "not found" proves nothing and re-sending could pay twice."""
+    txn, _ = await _queued(db)
+    xrpl.outcomes.append(("raise_after_sign", TimeoutError("lost response")))
+    await _settle(txn)
+
+    async with _TestSession() as s:
+        row = await s.get(Transaction, txn.id)
+        enqueue = RecordingEnqueue()
+        with pytest.raises(cashin_service.RemittanceError, match="missing ledger history"):
+            await cashin_service.retry_settlement(
+                s, row, enqueue=enqueue, ledger_result=not_found,
+                latest_ledger=_ledger_at(xrpl.last_ledger_sequence + 100),
+                ledger_range=_history(False),
+            )
+        assert enqueue.calls == []
+
+    assert (await _fresh(txn.id)).xrpl_tx_hash is not None  # the attempt is not erased
+
+
+async def test_admin_retry_refuses_an_attempt_with_no_recorded_range(db, xrpl):
+    """A row signed before migration 0009 can never be proven dead, so it is
+    refused rather than re-sent on a guess."""
+    txn, _ = await _queued(db)
+    xrpl.outcomes.append(("raise_after_sign", TimeoutError("lost response")))
+    await _settle(txn)
+
+    async with _TestSession() as s:
+        await s.execute(
+            update(Transaction).where(Transaction.id == txn.id).values(
+                settlement_last_ledger_sequence=None, settlement_submitted_ledger_index=None
+            )
+        )
+        await s.commit()
+
+    async with _TestSession() as s:
+        row = await s.get(Transaction, txn.id)
+        with pytest.raises(cashin_service.RemittanceError, match="no recorded ledger range"):
+            await cashin_service.retry_settlement(
+                s, row, enqueue=RecordingEnqueue(), ledger_result=not_found,
+                latest_ledger=_ledger_at(10**9), ledger_range=_history(True),
+            )
+
+
+async def test_the_settlement_ledger_range_is_persisted_with_the_hash(db, xrpl):
+    """The range must be written before submission, or nothing above can work."""
+    txn, _ = await _queued(db)
+    xrpl.outcomes.append(("raise_after_sign", TimeoutError("lost response")))
+    await _settle(txn)
+
+    row = await _fresh(txn.id)
+    assert row.xrpl_tx_hash is not None
+    assert row.settlement_last_ledger_sequence == xrpl.last_ledger_sequence
+    assert row.settlement_submitted_ledger_index == xrpl.submitted_ledger_index
 
 
 async def test_admin_retry_of_ledger_failure_resends(db, xrpl):

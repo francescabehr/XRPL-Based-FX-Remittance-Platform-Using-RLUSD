@@ -179,6 +179,7 @@ async def update_fees(
     cashout_fee_percentage: str = Form(...),
     cashout_fee_min_usd: str = Form(...),
     market_rate_zar_per_usd: str = Form(...),
+    min_send_zar: str = Form(...),
 ):
     """FR-ADM-06 / FR-FX-08: edit the active fee row. Never retroactive."""
     fields = {
@@ -188,6 +189,7 @@ async def update_fees(
         "cashout_fee_percentage": ("Cash-out fee", cashout_fee_percentage),
         "cashout_fee_min_usd": ("Minimum cash-out fee", cashout_fee_min_usd),
         "market_rate_zar_per_usd": ("Mock market rate", market_rate_zar_per_usd),
+        "min_send_zar": ("Minimum send amount", min_send_zar),
     }
     try:
         values = {name: _decimal_field(label, raw) for name, (label, raw) in fields.items()}
@@ -197,6 +199,16 @@ async def update_fees(
 
     if values["market_rate_zar_per_usd"] <= 0:
         set_flash(request, "Invalid value: Mock market rate must be greater than zero.", "danger")
+        return RedirectResponse(url="/admin/config", status_code=302)
+
+    # A minimum at or below the fixed fee would let a send through that the fee
+    # consumes entirely — the floor exists precisely to make that unreachable.
+    if values["min_send_zar"] <= values["fixed_fee_zar"]:
+        set_flash(
+            request,
+            "Invalid value: Minimum send amount must be greater than the fixed fee.",
+            "danger",
+        )
         return RedirectResponse(url="/admin/config", status_code=302)
 
     cfg = await fx_service.get_active_fee_config(db)

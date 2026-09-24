@@ -11,7 +11,8 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
+from xrpl.asyncio.transaction import XRPLReliableSubmissionException
 
 from app.models.beneficiary import PayoutCurrency
 from app.models.cashout import CashOutRequest, CashOutStatus
@@ -30,6 +31,16 @@ SUCCESS = "tesSUCCESS"
 
 # --- fakes -------------------------------------------------------------------
 
+def real_submit_outcome(exc, tx_hash):
+    """Build the XRPLResult that xrpl_service.submit would build for `exc`.
+
+    Routing through the production classifier keeps the fake from drifting away
+    from how a real submission failure is actually read.
+    """
+    resolution, code = xrpl_service._classify(exc)
+    return xrpl_service.XRPLResult(False, code, tx_hash, str(exc), outcome=resolution)
+
+
 class RecordingBurnEnqueue:
     """Stands in for queue_service.enqueue_burn."""
 
@@ -47,8 +58,9 @@ class RecordingBurnEnqueue:
 class FakeBurn:
     """Replaces xrpl_service.burn_to_issuer — no Testnet.
 
-    outcomes entries: "tesSUCCESS" | "tec..." | "sign_error" | Exception
-                    | ("raise_after_sign", exc) | ("no_result", msg)
+    outcomes entries: "tesSUCCESS" | "tec..." (validated failure) | "sign_error"
+                    | Exception | ("raise_after_sign", exc) | ("no_result", msg)
+                    | ("timeout", prelim_code) — reliable-submission gave up
     """
 
     def __init__(self):
@@ -84,11 +96,26 @@ class FakeBurn:
             raise outcome[1]
         if isinstance(outcome, tuple) and outcome[0] == "no_result":
             return xrpl_service.XRPLResult(False, "submission_error", tx_hash, outcome[1])
+        if isinstance(outcome, tuple) and outcome[0] == "timeout":
+            # What xrpl-py really raises once LastLedgerSequence passes: it never
+            # re-checks the ledger, so the burn may in fact have been validated.
+            return real_submit_outcome(
+                XRPLReliableSubmissionException(
+                    f"The latest validated ledger sequence {self.last_ledger_sequence + 1} is "
+                    f"greater than LastLedgerSequence {self.last_ledger_sequence} in "
+                    f"the transaction. Prelim result: {outcome[1]}"
+                ),
+                tx_hash,
+            )
 
         self.burns.append((wallet.xrpl_address, Decimal(amount)))
         if outcome == SUCCESS:
-            return xrpl_service.XRPLResult(True, SUCCESS, tx_hash)
-        return xrpl_service.XRPLResult(False, outcome, tx_hash, f"Transaction failed: {outcome}")
+            return xrpl_service.XRPLResult(True, SUCCESS, tx_hash, outcome=xrpl_service.SUCCEEDED)
+        # A validated tec*: the ledger proved the tokens did not leave the wallet.
+        return xrpl_service.XRPLResult(
+            False, outcome, tx_hash, f"Transaction failed: {outcome}",
+            outcome=xrpl_service.FAILED,
+        )
 
 
 @pytest.fixture
@@ -601,6 +628,23 @@ async def test_a_held_burn_is_never_auto_resubmitted(db, burner):
     assert burner.burns == []
 
 
+@pytest.mark.parametrize("prelim", ["tesSUCCESS", "terQUEUED", "terPRE_SEQ", "tecPATH_DRY"])
+async def test_reliable_submission_timeout_holds_and_never_restores(db, burner, prelim):
+    """AUDIT #1: xrpl-py gives up once LastLedgerSequence passes, quoting the
+    *preliminary* result — including tesSUCCESS and ter* codes. That code says
+    nothing about whether the burn landed, so the reserve must stay debited."""
+    req, _, wallet = await approved(db, balance="100", amount="10")
+    burner.outcomes = [("timeout", prelim)]
+
+    assert await _burn(req) == "unknown"
+
+    held = await _fresh(req.id)
+    assert held.status == CashOutStatus.approved         # not failed
+    assert held.failure_reason.startswith("outcome_unknown")
+    assert held.awaiting_ledger_confirmation
+    assert await _balance(wallet.id) == Decimal("90")    # NOT restored
+
+
 async def test_missing_validated_result_is_treated_as_unknown(db, burner):
     req, _, wallet = await approved(db, balance="100", amount="10")
     burner.outcomes = [("no_result", "no validated result returned")]
@@ -845,6 +889,69 @@ async def test_sweep_ignores_fresh_claimed_and_terminal_rows(db, burner):
     swept = await cashout_service.sweep_unpublished(db, enqueue=enqueue)
     assert fresh.id not in swept   # inside the grace window
     assert done.id not in swept    # already completed
+
+
+async def _claim_then_die(db, req, claimed_minutes_ago):
+    """A worker claims the row, then dies before signing. RQ abandons the job."""
+    async with _TestSession() as s:
+        assert await cashout_worker.claim(s, req.idempotency_key) is not None
+        await s.execute(
+            update(CashOutRequest).where(CashOutRequest.id == req.id).values(
+                burn_started_at=datetime.now(timezone.utc) - timedelta(minutes=claimed_minutes_ago)
+            )
+        )
+        await s.commit()
+
+
+async def test_sweep_revives_a_row_claimed_by_a_worker_that_died(db, burner):
+    """AUDIT #4: with the claim set and no hash, nothing could move this row —
+    sweep skipped it, reconcile refused it (no hash), approve/reject need
+    status=requested. It sat approved and debited forever."""
+    req, _, wallet = await approved(db, balance="100", amount="10")
+    assert await _balance(wallet.id) == Decimal("90")  # already debited
+    await _claim_then_die(db, req, claimed_minutes_ago=30)
+
+    enqueue = RecordingBurnEnqueue()
+    revived = await cashout_service.sweep_unpublished(db, enqueue=enqueue)
+
+    # The sweep is global, so assert about this row rather than the whole table.
+    assert req.id in revived
+    assert (str(req.idempotency_key), str(req.id)) in enqueue.calls
+    # And the republished message actually moves it now.
+    assert await _burn(req) == "completed"
+
+
+async def test_sweep_leaves_a_live_worker_its_claim(db, burner):
+    """A fresh claim means a worker is still working; only a stale one is evidence
+    that nobody is."""
+    req, _, _ = await approved(db, balance="100", amount="10")
+    await _claim_then_die(db, req, claimed_minutes_ago=1)
+
+    swept = await cashout_service.sweep_unpublished(db, enqueue=RecordingBurnEnqueue())
+    assert req.id not in swept
+
+
+async def test_sweep_never_revives_a_row_that_was_signed(db, burner):
+    """The hard guard. A hash means a burn may exist on-ledger, and no amount of
+    elapsed claim time may ever put a second one in flight."""
+    req, _, wallet = await approved(db, balance="100", amount="10")
+    burner.outcomes = [("raise_after_sign", TimeoutError("ledger timeout"))]
+    assert await _burn(req) == "unknown"
+
+    async with _TestSession() as s:  # an ancient claim, but it has a hash
+        await s.execute(
+            update(CashOutRequest).where(CashOutRequest.id == req.id).values(
+                burn_started_at=datetime.now(timezone.utc) - timedelta(days=7)
+            )
+        )
+        await s.commit()
+
+    enqueue = RecordingBurnEnqueue()
+    swept = await cashout_service.sweep_unpublished(db, enqueue=enqueue)
+
+    assert req.id not in swept
+    assert str(req.idempotency_key) not in [key for key, _ in enqueue.calls]
+    assert await _balance(wallet.id) == Decimal("90")  # reserve still held
 
 
 async def test_sweep_is_safe_to_run_twice(db, burner):

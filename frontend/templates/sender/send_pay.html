@@ -19,7 +19,12 @@
         <form method="post" action="/remittances" autocomplete="off">
           <input type="hidden" name="beneficiary_id" value="{{ beneficiary.id }}">
           <input type="hidden" name="zar_amount" value="{{ quote.zar_amount }}">
+          {# The price lock (requirements.md §382): all three are re-priced and
+             compared server-side, so a fee-only change is caught as well as a
+             rate change. Omitting or mangling any of them is refused. #}
           <input type="hidden" name="exchange_rate" value="{{ quote.exchange_rate }}">
+          <input type="hidden" name="transaction_fee" value="{{ quote.transaction_fee }}">
+          <input type="hidden" name="uctusd_amount" value="{{ quote.uctusd_amount }}">
 
           <div class="mb-3">
             <label class="form-label fw-semibold" for="card_name">Name on card</label>

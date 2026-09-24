@@ -30,6 +30,17 @@ class FXConfigError(RuntimeError):
     """Raised when no active fee_config row exists — the platform cannot quote."""
 
 
+class AmountTooSmall(ValueError):
+    """The send amount is below the minimum, or the fee consumes all of it.
+
+    Two floors, both enforced here so no caller can price a send that cannot
+    settle. The structural one is absolute: net ZAR at or below zero converts to a
+    zero or negative UCTUSD amount, which the ledger cannot carry — the settlement
+    worker would only discover that after the sender had already been charged.
+    The policy one (fee_config.min_send_zar) sits above it and is configurable.
+    """
+
+
 @dataclass(frozen=True)
 class Quote:
     """The seven display figures (FR-FX-07) plus the inputs behind them."""
@@ -67,6 +78,7 @@ async def update_fee_config(
     cashout_fee_percentage: Decimal,
     cashout_fee_min_usd: Decimal,
     market_rate_zar_per_usd: Decimal,
+    min_send_zar: Decimal,
 ) -> FeeConfig:
     """FR-ADM-06 / FR-FX-08: edit the active fee row in place.
 
@@ -80,6 +92,7 @@ async def update_fee_config(
     fee_config.cashout_fee_percentage = cashout_fee_percentage
     fee_config.cashout_fee_min_usd = cashout_fee_min_usd
     fee_config.market_rate_zar_per_usd = market_rate_zar_per_usd
+    fee_config.min_send_zar = min_send_zar
     db.add(fee_config)
     await db.commit()
     await db.refresh(fee_config)
@@ -159,6 +172,9 @@ def calculate_quote(
 
     Worked example: zar_send=1000, fixed=25, pct=0.015, margin=0.02, market=18.50
     -> fee=40.00, net=960.00, effective=18.870000, uctusd=50.874404.
+
+    Raises AmountTooSmall if the fee leaves nothing to convert — every caller
+    prices through here, so no path can produce a zero or negative UCTUSD amount.
     """
     zar_send = _q(Decimal(zar_send), QUANT_ZAR)
     market_rate = _q(Decimal(market_rate), QUANT_RATE)
@@ -169,8 +185,21 @@ def calculate_quote(
     effective_rate = _q(market_rate * (Decimal("1") + Decimal(fx_margin)), QUANT_RATE)
     # FR-FX-04
     net_zar = _q(zar_send - transaction_fee, QUANT_ZAR)
+    if net_zar <= 0:
+        # The fee is the whole send (or more). Refuse here so the quote screen
+        # says so, rather than booking the ZAR and failing at settlement.
+        raise AmountTooSmall(
+            f"A fee of R{transaction_fee} leaves nothing to convert from R{zar_send}. "
+            "Send a larger amount."
+        )
     # FR-FX-05
     uctusd_amount = _q(net_zar / effective_rate, QUANT_UCTUSD)
+    if uctusd_amount <= 0:
+        # Above zero in ZAR, but it rounds away at UCTUSD's 6 dp.
+        raise AmountTooSmall(
+            f"R{zar_send} converts to less than the smallest amount that can be "
+            "sent. Send a larger amount."
+        )
     # FR-FX-06 — same helpers the Phase 7 cash-out uses, so the estimate shown here
     # and the payout actually paid out are computed by one piece of code.
     cashout_fee_estimate = cashout_fee_usd(
@@ -201,6 +230,10 @@ async def quote_for(
     fee_config = await get_active_fee_config(db)
     if fee_config is None:
         raise FXConfigError("No active fee_config row — the platform cannot issue quotes.")
+
+    minimum = _q(Decimal(fee_config.min_send_zar), QUANT_ZAR)
+    if _q(Decimal(zar_send), QUANT_ZAR) < minimum:
+        raise AmountTooSmall(f"The smallest amount you can send is R{minimum}.")
 
     market_rate = await get_market_rate(db, fee_config)
     return calculate_quote(

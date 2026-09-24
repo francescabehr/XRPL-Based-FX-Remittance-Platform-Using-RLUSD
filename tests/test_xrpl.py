@@ -183,7 +183,78 @@ async def test_ledger_failure_returns_code_and_hash(ledger, code):
 
     assert not result.success
     assert result.result_code == code
+    assert result.resolution == xrpl_service.FAILED  # validated: proven not to have moved
     assert result.tx_hash is not None  # signed before submit, so the failed tx is traceable
+
+
+# --- how a submission outcome is classified (AUDIT #1) ---
+#
+# The rule: only a validated non-success and a malformed tem* rejection prove a
+# transaction moved nothing. Everything else is UNKNOWN, because the transaction
+# is signed and may already be in a ledger this process never saw.
+
+def _timeout(prelim):
+    """The real message xrpl-py raises when LastLedgerSequence is passed.
+
+    Note it raises this *without* a final Tx lookup, so the transaction may have
+    been validated in the very last ledger before the deadline.
+    """
+    return XRPLReliableSubmissionException(
+        f"The latest validated ledger sequence 1000 is greater than "
+        f"LastLedgerSequence 990 in the transaction. Prelim result: {prelim}"
+    )
+
+
+@pytest.mark.parametrize("prelim", ["tesSUCCESS", "terQUEUED", "terPRE_SEQ", "tecPATH_DRY"])
+def test_submission_timeout_is_unknown_whatever_the_prelim_result(prelim):
+    resolution, code = xrpl_service._classify(_timeout(prelim))
+    assert resolution == xrpl_service.UNKNOWN
+    assert code == "submission_timeout"
+    assert code != prelim  # the prelim code must never become the outcome
+
+
+@pytest.mark.parametrize("code", ["tecPATH_DRY", "tecPATH_PARTIAL", "tecUNFUNDED_PAYMENT"])
+def test_validated_non_success_is_a_proven_failure(code):
+    assert xrpl_service._classify(
+        XRPLReliableSubmissionException(f"Transaction failed: {code}")
+    ) == (xrpl_service.FAILED, code)
+
+
+def test_malformed_rejection_is_a_proven_failure():
+    assert xrpl_service._classify(
+        XRPLReliableSubmissionException("temBAD_FEE: Invalid fee, negative or not XRP.")
+    ) == (xrpl_service.FAILED, "temBAD_FEE")
+
+
+def test_request_failure_is_unknown():
+    from xrpl.clients import XRPLRequestFailureException
+
+    resolution, code = xrpl_service._classify(
+        XRPLRequestFailureException({"error": "internal", "error_message": "Internal error."})
+    )
+    assert (resolution, code) == (xrpl_service.UNKNOWN, "submission_error")
+
+
+async def test_timeout_result_is_unknown_not_a_failure(ledger, monkeypatch):
+    """The end-to-end shape: a timed-out payment comes back UNKNOWN, with a hash."""
+    async def timed_out(signed, client):
+        raise _timeout("tesSUCCESS")
+
+    monkeypatch.setattr(xrpl_service, "submit_and_wait", timed_out)
+    result = await xrpl_service.send_from_treasury(
+        XRPLWallet.create().classic_address, Decimal("1"), client=object()
+    )
+
+    assert result.resolution == xrpl_service.UNKNOWN
+    assert not result.success
+    assert result.tx_hash is not None
+
+
+def test_unspecified_failure_with_a_hash_defaults_to_unknown():
+    """The conservative default: anything signed but unresolved is not a failure."""
+    assert xrpl_service.XRPLResult(False, "whatever", "HASH").resolution == xrpl_service.UNKNOWN
+    assert xrpl_service.XRPLResult(False, "sign_error", None).resolution == xrpl_service.NOT_SUBMITTED
+    assert xrpl_service.XRPLResult(True, "tesSUCCESS", "HASH").resolution == xrpl_service.SUCCEEDED
 
 
 async def test_sign_failure_is_reported_not_raised(monkeypatch):
@@ -197,6 +268,7 @@ async def test_sign_failure_is_reported_not_raised(monkeypatch):
         XRPLWallet.create().classic_address, Decimal("1"), client=object()
     )
     assert (result.success, result.result_code, result.tx_hash) == (False, "sign_error", None)
+    assert result.resolution == xrpl_service.NOT_SUBMITTED  # safe to retry
 
 
 # --- provisioning (FR-WAL-01..04) ---

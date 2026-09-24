@@ -24,7 +24,7 @@ from app.models.transaction import CashInStatus, SettlementStatus, Transaction
 from app.models.user import KYCStatus, User
 from app.services import queue_service, xrpl_service
 from app.services.beneficiary_service import get_beneficiary, refresh_recipient_link
-from app.services.fx_service import quote_for
+from app.services.fx_service import AmountTooSmall, quote_for
 from app.services.limit_service import check_limit
 from app.workers.settlement_worker import complete_settlement
 
@@ -34,13 +34,34 @@ Enqueue = Callable[[str, str], object]
 
 # Mock processor: this test card is always declined, so FR-CI-04 can be demoed.
 DECLINED_TEST_CARD = "4000000000000002"
-# An xrpl-py payment expires ~20 ledgers (~1-2 min) after signing. Past this age, a
-# hash the ledger has never validated can no longer land, so a retry is safe.
-LEDGER_EXPIRY_MARGIN = timedelta(minutes=5)
 
 
 class RemittanceError(ValueError):
     """A send or cash-in action was refused; the message is safe to show the user."""
+
+
+@dataclass(frozen=True)
+class AcceptedQuote:
+    """The pricing the sender was shown and is agreeing to pay.
+
+    Compared against a fresh server-side quote, never persisted from the client.
+    All three figures are checked, not just the rate: a fee-only config change
+    leaves the effective rate identical while changing what the sender pays, so a
+    rate-only comparison would let it through (the cash-out side already compares
+    its full set — see cashout_service._pricing_matches).
+    """
+
+    exchange_rate: Decimal
+    transaction_fee: Decimal
+    uctusd_amount: Decimal
+
+
+def _pricing_matches(quote, accepted: AcceptedQuote) -> bool:
+    return (
+        quote.exchange_rate == accepted.exchange_rate
+        and quote.transaction_fee == accepted.transaction_fee
+        and quote.uctusd_amount == accepted.uctusd_amount
+    )
 
 
 @dataclass(frozen=True)
@@ -97,12 +118,18 @@ async def create_remittance(
     beneficiary_id: uuid.UUID,
     zar_amount: Decimal,
     card: MockCard,
-    expected_exchange_rate: Optional[Decimal] = None,
+    accepted: AcceptedQuote,
 ) -> Transaction:
     """Insert a remittance from a confirmed quote and a simulated card payment.
 
     The sender's row is locked first, so the limit check and the insert run in one
     DB transaction that concurrent sends by the same user must queue behind.
+
+    `accepted` is the pricing the sender was shown, and it is mandatory
+    (requirements.md §382): the quote is re-priced server-side here and refused
+    unless it still matches, so the sender pays the price they saw or is sent back
+    to a fresh quote. It is a refusal, never something a caller can opt out of by
+    omitting a field — the figures themselves are never persisted from the client.
     """
     if not sender.can_send or sender.kyc_status != KYCStatus.approved:
         raise RemittanceError("Your account must be KYC-approved before sending money.")
@@ -122,9 +149,16 @@ async def create_remittance(
             "with the email or mobile number you saved, then try again."
         )
 
-    quote = await quote_for(db, zar_amount, beneficiary.payout_currency)
-    if expected_exchange_rate is not None and quote.exchange_rate != expected_exchange_rate:
-        raise RemittanceError("The exchange rate changed since your quote. Please review the new quote.")
+    # Re-priced server-side: the floor is enforced here too, so a hand-made POST
+    # cannot book a send the quote screen would have refused.
+    try:
+        quote = await quote_for(db, zar_amount, beneficiary.payout_currency)
+    except AmountTooSmall as exc:
+        raise RemittanceError(str(exc)) from exc
+    if not _pricing_matches(quote, accepted):
+        raise RemittanceError(
+            "The price changed since your quote. Please review the new quote before paying."
+        )
 
     limit = await check_limit(db, sender, quote.zar_amount)
     if not limit["allowed"]:
@@ -241,18 +275,58 @@ def _is_stuck(txn: Transaction) -> bool:
     )
 
 
+async def _refuse_unless_provably_dead(
+    txn: Transaction,
+    latest_ledger=xrpl_service.get_latest_validated_ledger,
+    ledger_range=xrpl_service.has_complete_ledger_range,
+) -> None:
+    """Raise unless the ledger proves the signed payment can never be included.
+
+    The sole gate on re-sending. A row whose range was never recorded (signed
+    before migration 0009) can never be proven dead, so it is refused too — an
+    admin resolves it by looking the hash up on the ledger.
+    """
+    last_ledger = txn.settlement_last_ledger_sequence
+    submitted_at = txn.settlement_submitted_ledger_index
+    if last_ledger is None or submitted_at is None:
+        raise RemittanceError(
+            "This attempt has no recorded ledger range, so it cannot be shown to have "
+            f"failed. Check {txn.xrpl_tx_hash} on the ledger before retrying."
+        )
+    if await latest_ledger() <= last_ledger:
+        raise RemittanceError(
+            "The last attempt could still be validated. Wait until ledger "
+            f"{last_ledger} has passed, then retry."
+        )
+    if not await ledger_range(submitted_at, last_ledger):
+        raise RemittanceError(
+            "The server is missing ledger history for this attempt, so a missing "
+            "payment proves nothing. Retry once its history is complete."
+        )
+
+
 async def retry_settlement(
     db: AsyncSession,
     txn: Transaction,
     enqueue: Enqueue = queue_service.enqueue_settlement,
     ledger_result=xrpl_service.get_transaction_result,
+    latest_ledger=xrpl_service.get_latest_validated_ledger,
+    ledger_range=xrpl_service.has_complete_ledger_range,
 ) -> str:
     """FR-MQ-06: admin retry of a failed or stuck settlement. Returns "requeued" or "reconciled".
 
     Covers a `failed` row, and a `processing` row whose worker died (older than
     STUCK_AFTER). If an attempt was signed, the ledger is checked first: a payment
-    that actually succeeded is recorded (never re-sent), and one that may still
-    land is refused until it has expired.
+    that actually succeeded is recorded and never re-sent.
+
+    Re-sending demands ledger proof that the previous attempt is dead, exactly as
+    cash-out reconcile does — both of:
+      - the validated ledger is past the payment's LastLedgerSequence, and
+      - the server holds unbroken history across [submitted, LastLedgerSequence],
+        so "not found" means "never included", not "this node cannot see it".
+    Elapsed wall-clock time is never evidence: get_transaction_result returns None
+    both for a payment that was never included and for one the node simply cannot
+    see, and re-sending on the second would pay the recipient twice.
     """
     retryable = txn.settlement_status == SettlementStatus.failed or _is_stuck(txn)
     if not retryable or txn.cashin_status != CashInStatus.received:
@@ -264,10 +338,10 @@ async def retry_settlement(
         if code == xrpl_service.SUCCESS:
             await complete_settlement(db, txn, txn.xrpl_tx_hash, from_statuses=(from_status,))
             return "reconciled"
-        if code is None and _now() - txn.updated_at < LEDGER_EXPIRY_MARGIN:
-            raise RemittanceError(
-                "The last attempt is not final on the ledger yet. Wait a few minutes and retry."
-            )
+        if code is None:
+            # Absent from the ledger. That only permits a re-send once the payment
+            # can no longer be included and the server can actually prove it.
+            await _refuse_unless_provably_dead(txn, latest_ledger, ledger_range)
 
     # Guarded on status + updated_at: if anything touched the row since it was
     # read, nothing changes and the admin is asked to refresh.
@@ -283,6 +357,10 @@ async def retry_settlement(
             settlement_attempts=0,
             xrpl_error_reason=None,
             xrpl_tx_hash=None,
+            # The dead attempt's range belongs to the dead attempt; the next
+            # signing writes its own.
+            settlement_last_ledger_sequence=None,
+            settlement_submitted_ledger_index=None,
             updated_at=_now(),
         )
         .returning(Transaction.id)

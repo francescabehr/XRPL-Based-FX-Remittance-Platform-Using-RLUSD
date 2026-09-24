@@ -100,6 +100,15 @@
         <div class="form-text">Floor applied when the percentage is smaller.</div>
       </div>
       <div class="col-md-4">
+        <label class="form-label small mb-1">Minimum send amount</label>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text">R</span>
+          <input type="number" name="min_send_zar" class="form-control"
+                 value="{{ fee_config.min_send_zar }}" min="0" step="0.01" required>
+        </div>
+        <div class="form-text">Smallest remittance accepted. Must exceed the fixed fee.</div>
+      </div>
+      <div class="col-md-4">
         <label class="form-label small mb-1">Market rate <span class="badge bg-warning text-dark ms-1">Mock / demo</span></label>
         <div class="input-group input-group-sm">
           <span class="input-group-text">R</span>

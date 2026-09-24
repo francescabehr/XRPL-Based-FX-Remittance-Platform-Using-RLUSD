@@ -265,6 +265,7 @@ async def test_fee_edit_changes_later_quotes_only(client: AsyncClient, db: Async
                 "cashout_fee_percentage": "0.02",
                 "cashout_fee_min_usd": "2",
                 "market_rate_zar_per_usd": "19.00",
+                "min_send_zar": "100.00",
             },
             follow_redirects=False,
         )
@@ -294,6 +295,10 @@ async def test_fee_edit_changes_later_quotes_only(client: AsyncClient, db: Async
         ("fx_margin", ""),
         ("cashout_fee_min_usd", "-0.5"),
         ("market_rate_zar_per_usd", "0"),
+        # AUDIT #2: a minimum at or below the fixed fee would let through a send
+        # the fee consumes entirely.
+        ("min_send_zar", "25.00"),
+        ("min_send_zar", "10.00"),
     ],
 )
 async def test_fee_edit_rejects_invalid_input(
@@ -307,6 +312,7 @@ async def test_fee_edit_rejects_invalid_input(
         "cashout_fee_percentage": "0.01",
         "cashout_fee_min_usd": "1",
         "market_rate_zar_per_usd": "18.50",
+        "min_send_zar": "50.00",
         bad_field: bad_value,
     }
 

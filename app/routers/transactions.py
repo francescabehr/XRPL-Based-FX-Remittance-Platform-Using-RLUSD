@@ -22,7 +22,7 @@ from app.services.beneficiary_service import (
     get_beneficiary,
     list_beneficiaries,
 )
-from app.services.fx_service import FXConfigError, quote_for
+from app.services.fx_service import AmountTooSmall, FXConfigError, quote_for
 from app.services.limit_service import check_limit
 from app.templating import make_templates
 
@@ -60,6 +60,9 @@ async def get_quote(
 
     try:
         quote = await quote_for(db, zar_amount, beneficiary.payout_currency)
+    except AmountTooSmall as exc:
+        # The amount is the problem, not the platform — 400, not 503.
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except (FXConfigError, InvalidOperation) as exc:
         raise HTTPException(status_code=503, detail=f"Quote unavailable: {exc}") from exc
 
@@ -100,12 +103,17 @@ def _sender_redirect(request: Request, user: Optional[User]) -> Optional[Redirec
     return None
 
 
-def _parse_amount(raw: str) -> Optional[Decimal]:
+def _parse_decimal(raw: str) -> Optional[Decimal]:
+    """A Decimal from form input, or None if it is not a number at all."""
     try:
-        amount = Decimal(raw.replace(",", "").strip())
+        return Decimal(raw.replace(",", "").strip())
     except (InvalidOperation, AttributeError):
         return None
-    return amount if amount > 0 else None
+
+
+def _parse_amount(raw: str) -> Optional[Decimal]:
+    amount = _parse_decimal(raw)
+    return amount if amount is not None and amount > 0 else None
 
 
 async def _quote_context(db: AsyncSession, user: User, beneficiary_id: str, zar_amount: str) -> dict:
@@ -125,6 +133,8 @@ async def _quote_context(db: AsyncSession, user: User, beneficiary_id: str, zar_
 
     try:
         quote = await quote_for(db, amount, ben.payout_currency)
+    except AmountTooSmall as exc:
+        return {"error": str(exc)}
     except (FXConfigError, InvalidOperation) as exc:
         return {"error": f"Quotes are unavailable right now: {exc}"}
 
@@ -138,6 +148,24 @@ async def _quote_context(db: AsyncSession, user: User, beneficiary_id: str, zar_
             "email or mobile number you saved, then try again."
         )
     return ctx
+
+
+def _accepted_quote(
+    exchange_rate: str, transaction_fee: str, uctusd_amount: str
+) -> Optional[cashin_service.AcceptedQuote]:
+    """The price the sender is agreeing to, or None if any part is unreadable.
+
+    None means refuse. The fee may legitimately be zero (an admin can configure a
+    zero fixed and percentage fee); the rate and the UCTUSD amount cannot be.
+    """
+    rate = _parse_amount(exchange_rate)
+    fee = _parse_decimal(transaction_fee)
+    uctusd = _parse_amount(uctusd_amount)
+    if rate is None or fee is None or fee < 0 or uctusd is None:
+        return None
+    return cashin_service.AcceptedQuote(
+        exchange_rate=rate, transaction_fee=fee, uctusd_amount=uctusd
+    )
 
 
 def _back_to_send(beneficiary_id: str, zar_amount: str) -> RedirectResponse:
@@ -228,7 +256,11 @@ async def create_remittance(
     user=Depends(get_current_user),
     beneficiary_id: str = Form(...),
     zar_amount: str = Form(...),
-    exchange_rate: str = Form(""),
+    # The price lock (requirements.md §382). Required: a POST that omits or
+    # mangles these must be refused, never silently priced at the current rate.
+    exchange_rate: str = Form(...),
+    transaction_fee: str = Form(...),
+    uctusd_amount: str = Form(...),
     card_number: str = Form(""),
     card_expiry: str = Form(""),
     card_cvv: str = Form(""),
@@ -246,6 +278,17 @@ async def create_remittance(
         set_flash(request, "Your send details were incomplete. Please start again.", "danger")
         return RedirectResponse(url="/send", status_code=302)
 
+    # An unreadable price lock is a refusal, not a skipped check: without all three
+    # figures there is nothing to compare the fresh quote against.
+    accepted = _accepted_quote(exchange_rate, transaction_fee, uctusd_amount)
+    if accepted is None:
+        set_flash(
+            request,
+            "We could not confirm the price you were quoted. Please review a fresh quote.",
+            "danger",
+        )
+        return _back_to_send(beneficiary_id, zar_amount)
+
     try:
         txn = await cashin_service.create_remittance(
             db,
@@ -253,7 +296,7 @@ async def create_remittance(
             beneficiary_id=ben_uuid,
             zar_amount=amount,
             card=cashin_service.MockCard(card_number, card_expiry, card_cvv, card_name),
-            expected_exchange_rate=_parse_amount(exchange_rate),
+            accepted=accepted,
         )
     except cashin_service.RemittanceError as exc:
         ctx = await _quote_context(db, user, beneficiary_id, zar_amount)

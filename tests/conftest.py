@@ -99,6 +99,7 @@ async def seed_fee_config(db: AsyncSession):
     cfg.cashout_fee_percentage = Decimal("0.01")
     cfg.cashout_fee_min_usd = Decimal("1")
     cfg.market_rate_zar_per_usd = Decimal("18.50")
+    cfg.min_send_zar = Decimal("50.00")
     cfg.is_active = True
 
     await db.commit()

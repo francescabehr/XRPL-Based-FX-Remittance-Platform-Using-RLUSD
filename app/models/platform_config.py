@@ -42,6 +42,11 @@ class FeeConfig(Base):
     cashout_fee_percentage: Mapped[Decimal] = mapped_column(Numeric(10, 6), nullable=False)
     # Floor on the cash-out fee, in USD.
     cashout_fee_min_usd: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False)
+    # Smallest remittance the platform will quote or accept, in ZAR. Below this the
+    # fee consumes the send and the quote yields a zero/negative UCTUSD amount.
+    min_send_zar: Mapped[Decimal] = mapped_column(
+        Numeric(20, 2), nullable=False, server_default="50.00"
+    )
     # Mock market rate (ZAR per 1 USD) used while RATE_SOURCE is "config".
     market_rate_zar_per_usd: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

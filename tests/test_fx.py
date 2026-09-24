@@ -10,6 +10,7 @@ from app.services.auth_service import create_user
 from app.services.beneficiary_service import create_beneficiary
 from app.services.fx_service import (
     QUANT_UCTUSD,
+    AmountTooSmall,
     calculate_quote,
     get_active_fee_config,
     get_market_rate,
@@ -77,6 +78,49 @@ def test_cashout_fee_percentage_wins_above_the_floor():
     assert q.cashout_fee_estimate > Decimal("1")
     expected = (q.uctusd_amount * Decimal("0.01")).quantize(QUANT_UCTUSD, ROUND_HALF_UP)
     assert q.cashout_fee_estimate == expected
+
+
+# --- the floor under the send amount (AUDIT #2) ---
+#
+# Without it: R10 quoted -0.802862 UCTUSD and R25.38 quoted 0.000000. Both were
+# accepted, charged, and only failed at the worker — after the ZAR was booked and
+# the daily allowance consumed, with no refund path.
+
+@pytest.mark.parametrize("zar", ["0.01", "10", "25", "25.38"])
+def test_quote_refuses_amounts_the_fee_consumes(zar):
+    with pytest.raises(AmountTooSmall):
+        calculate_quote(**{**EXAMPLE, "zar_send": Decimal(zar)}, payout_currency=PayoutCurrency.USD)
+
+
+def test_quote_is_positive_immediately_above_the_break_even():
+    """R25.39 is the first amount that leaves anything to convert."""
+    q = calculate_quote(**{**EXAMPLE, "zar_send": Decimal("25.39")},
+                        payout_currency=PayoutCurrency.USD)
+    assert q.net_zar_converted > 0
+    assert q.uctusd_amount > 0
+
+
+def test_no_quote_can_produce_a_non_positive_uctusd_amount():
+    """The property that matters: sweep the whole range around the break-even."""
+    for cents in range(0, 6000):
+        zar = Decimal(cents) / Decimal("100")
+        try:
+            q = calculate_quote(**{**EXAMPLE, "zar_send": zar},
+                                payout_currency=PayoutCurrency.USD)
+        except AmountTooSmall:
+            continue
+        assert q.uctusd_amount > 0, f"R{zar} quoted {q.uctusd_amount}"
+        assert q.net_zar_converted > 0, f"R{zar} quoted net {q.net_zar_converted}"
+
+
+async def test_quote_for_enforces_the_configured_minimum(db: AsyncSession, seed_fee_config):
+    """The policy floor sits above the structural one and is admin-configurable."""
+    with pytest.raises(AmountTooSmall) as exc:
+        await quote_for(db, Decimal("49.99"), PayoutCurrency.USD)
+    assert "R50.00" in str(exc.value)
+
+    q = await quote_for(db, Decimal("50.00"), PayoutCurrency.USD)
+    assert q.uctusd_amount > 0
 
 
 def test_zar_payout_uses_the_market_rate_not_the_effective_rate():

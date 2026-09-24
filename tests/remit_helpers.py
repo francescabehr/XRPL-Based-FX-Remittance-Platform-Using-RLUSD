@@ -11,7 +11,9 @@ from app.models.user import KYCStatus
 from app.models.wallet import Wallet
 from app.services.auth_service import create_user
 from app.services.beneficiary_service import create_beneficiary
-from app.services.cashin_service import MockCard, create_remittance
+from app.services.cashin_service import AcceptedQuote, MockCard, create_remittance
+from app.services.fx_service import quote_for
+from app.services import xrpl_service
 from app.services.xrpl_service import XRPLResult
 
 GOOD_CARD = MockCard("4242 4242 4242 4242", "12/30", "123", "Test Sender")
@@ -52,12 +54,29 @@ async def beneficiary_for(db, sender, recipient=None, *, email=None, currency="U
     )
 
 
+async def quoted(db, ben, amount) -> AcceptedQuote:
+    """The price lock a sender's browser posts back: the quote they were shown.
+
+    Every create_remittance call must carry one — the server re-prices and refuses
+    if it no longer matches (requirements.md §382).
+    """
+    q = await quote_for(db, Decimal(amount), ben.payout_currency)
+    return AcceptedQuote(
+        exchange_rate=q.exchange_rate,
+        transaction_fee=q.transaction_fee,
+        uctusd_amount=q.uctusd_amount,
+    )
+
+
 async def remittance(db, amount="1000", card=GOOD_CARD):
     """An approved sender -> registered recipient remittance with a pending cash-in."""
     sender = await approved_sender(db)
     recipient = await registered_recipient(db)
     ben = await beneficiary_for(db, sender, recipient)
-    txn = await create_remittance(db, sender, beneficiary_id=ben.id, zar_amount=Decimal(amount), card=card)
+    txn = await create_remittance(
+        db, sender, beneficiary_id=ben.id, zar_amount=Decimal(amount), card=card,
+        accepted=await quoted(db, ben, amount),
+    )
     return txn, sender, recipient
 
 
@@ -92,9 +111,14 @@ class FakeXRPL:
     def __init__(self):
         self.provisioned = 0
         self.payments: list[tuple[str, Decimal]] = []
-        self.outcomes: list = []  # "tesSUCCESS" | "tec..." | "sign_error" | Exception | ("raise_after_sign", exc)
+        # "tesSUCCESS" | "tec..." (validated failure) | "sign_error" | Exception
+        # | ("raise_after_sign", exc)
+        self.outcomes: list = []
         self.trust_ok = True
         self.delay = 0.0
+        # The ledger range a signed payment could land in (mirrors FakeBurn).
+        self.last_ledger_sequence = 500
+        self.submitted_ledger_index = 480
 
     async def provision_wallet(self, db, user, client=None):
         self.provisioned += 1
@@ -110,7 +134,9 @@ class FakeXRPL:
         await db.commit()
         return wallet
 
-    async def send_from_treasury(self, destination, amount, client=None, on_signed=None):
+    async def send_from_treasury(
+        self, destination, amount, client=None, on_signed=None, on_signed_tx=None
+    ):
         import asyncio
 
         outcome = self.outcomes.pop(0) if self.outcomes else "tesSUCCESS"
@@ -122,14 +148,26 @@ class FakeXRPL:
         tx_hash = f"HASH{len(self.payments):04d}{uuid.uuid4().hex[:8]}".upper()
         if on_signed:
             await on_signed(tx_hash)
+        if on_signed_tx:
+            await on_signed_tx(
+                xrpl_service.SignedTx(
+                    tx_hash=tx_hash,
+                    last_ledger_sequence=self.last_ledger_sequence,
+                    submitted_ledger_index=self.submitted_ledger_index,
+                )
+            )
         if self.delay:
             await asyncio.sleep(self.delay)
         if isinstance(outcome, tuple):
             raise outcome[1]  # fails after signing
         self.payments.append((destination, Decimal(amount)))
         if outcome == "tesSUCCESS":
-            return XRPLResult(True, outcome, tx_hash)
-        return XRPLResult(False, outcome, tx_hash, f"Transaction failed: {outcome}")
+            return XRPLResult(True, outcome, tx_hash, outcome=xrpl_service.SUCCEEDED)
+        # A validated tec*: the ledger proved the payment moved nothing.
+        return XRPLResult(
+            False, outcome, tx_hash, f"Transaction failed: {outcome}",
+            outcome=xrpl_service.FAILED,
+        )
 
 
 @contextmanager

@@ -13,6 +13,7 @@ Flow for one message:
 Retry policy (FR-MQ-06):
   - Failure before signing (network, faucet, TrustSet not yet set): nothing reached
     the ledger, so re-queue with a delay, up to MAX_ATTEMPTS, then mark failed.
+  - A permanently unusable amount: failed immediately — retrying cannot change it.
   - Failure after signing: never retried automatically — the payment may exist.
     It is marked failed and shown to admins, whose retry checks the ledger first.
 """
@@ -174,10 +175,18 @@ async def process_settlement(
 
         signed_hash: Optional[str] = None
 
-        async def remember_hash(tx_hash: str) -> None:
+        async def remember_signed(signed: xrpl_service.SignedTx) -> None:
+            """Persist hash + ledger range before the payment is submitted.
+
+            The range is what an admin retry needs to prove a missing payment can
+            never be included. If this raises, nothing is submitted, so the row
+            (still without a hash) stays safe to retry.
+            """
             nonlocal signed_hash
-            signed_hash = tx_hash
-            txn.xrpl_tx_hash = tx_hash
+            signed_hash = signed.tx_hash
+            txn.xrpl_tx_hash = signed.tx_hash
+            txn.settlement_last_ledger_sequence = signed.last_ledger_sequence
+            txn.settlement_submitted_ledger_index = signed.submitted_ledger_index
             db.add(txn)
             await db.commit()
 
@@ -186,8 +195,14 @@ async def process_settlement(
             if not wallet.trust_set_complete:
                 raise TransientSettlementError("trust line to the issuer is not set yet")
             result = await xrpl_service.send_from_treasury(
-                wallet.xrpl_address, Decimal(txn.uctusd_amount), on_signed=remember_hash
+                wallet.xrpl_address, Decimal(txn.uctusd_amount), on_signed_tx=remember_signed
             )
+        except xrpl_service.InvalidAmountError as exc:
+            # The amount itself is unusable (a fee-consumed send booked before the
+            # quote engine had a floor). Nothing was signed, and a retry re-reads
+            # the same amount, so fail now instead of burning three attempts.
+            await fail_settlement(db, txn, f"invalid_amount: {exc}")
+            return "failed"
         except Exception as exc:  # noqa: BLE001 — every path must leave the row in a known state
             if signed_hash:
                 await fail_settlement(
@@ -198,13 +213,23 @@ async def process_settlement(
                 return "failed"
             return await _retry_or_fail(db, txn, f"{type(exc).__name__}: {exc}", requeue)
 
-        if result.success:
+        # Branch on the resolution, never on the result code: a code scraped from a
+        # timeout message can be the payment's *preliminary* result, not its outcome.
+        if result.resolution == xrpl_service.SUCCEEDED:
             await complete_settlement(db, txn, result.tx_hash)
             return "completed"
-        if result.result_code == "sign_error":
-            return await _retry_or_fail(db, txn, f"sign_error: {result.message}", requeue)
+        if result.resolution == xrpl_service.NOT_SUBMITTED:
+            return await _retry_or_fail(
+                db, txn, f"{result.result_code}: {result.message}".strip(": "), requeue
+            )
 
-        await fail_settlement(db, txn, f"{result.result_code}: {result.message}".strip(": "), result.tx_hash)
+        reason = f"{result.result_code}: {result.message}".strip(": ")
+        if result.resolution == xrpl_service.UNKNOWN:
+            # Signed and sent, outcome never seen. Marked with the same prefix as
+            # the post-signing exception path so an admin retry knows it must
+            # check the ledger before re-sending anything.
+            reason = f"outcome_unknown: {reason}; check the hash on the ledger"
+        await fail_settlement(db, txn, reason, result.tx_hash)
         return "failed"
 
 

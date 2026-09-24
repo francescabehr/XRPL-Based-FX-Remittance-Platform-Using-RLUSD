@@ -93,6 +93,13 @@ class Transaction(Base):
     # Treasury -> recipient hash. Written as soon as the payment is signed, before
     # submission, so an interrupted settlement can be checked on the ledger.
     xrpl_tx_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    # The only ledger range in which that hash can ever appear, written with it.
+    # A missing transaction is proven dead only when the validated ledger is past
+    # last_ledger AND the server holds unbroken history across the range; without
+    # both, "not found" may only mean "this node cannot see it" — so a retry that
+    # re-sent on elapsed time could pay a recipient twice.
+    settlement_last_ledger_sequence: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    settlement_submitted_ledger_index: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     settlement_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     xrpl_error_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     settled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
