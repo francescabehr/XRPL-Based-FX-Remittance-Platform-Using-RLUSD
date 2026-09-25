@@ -1,15 +1,16 @@
 {% extends "base.html" %}
 {% block title %}Cash Out — XRPL Remit{% endblock %}
 
+{% block page_title %}Cash out{% endblock %}
+
 {% block content %}
-<h3 class="fw-bold mb-4"><i class="bi bi-cash-coin me-2"></i>Cash Out</h3>
 
 {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
 
 {% if not wallet %}
 <div class="card shadow-sm">
   <div class="card-body text-center py-5 text-muted">
-    <i class="bi bi-wallet2 fs-1 d-block mb-2"></i>
+    <i class="bi bi-wallet2 fs-1 d-block mb-2" aria-hidden="true"></i>
     <strong>No wallet yet.</strong> You can cash out once you have received UCTUSD.
   </div>
 </div>
@@ -38,7 +39,7 @@
             <div class="form-text">Cash-out is available in USD and ZAR only.</div>
           </div>
           <button type="submit" class="btn btn-primary">
-            Preview payout <i class="bi bi-arrow-right ms-1"></i>
+            Preview payout <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i>
           </button>
           <a href="/cashout/history" class="btn btn-link">View my cash-outs</a>
         </form>
@@ -60,7 +61,7 @@
       </div>
     </div>
     <div class="alert alert-secondary small mt-3 mb-0">
-      <i class="bi bi-info-circle me-1"></i>
+      <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
       Cashing out burns your UCTUSD on the XRPL Testnet and records a
       <strong>simulated</strong> fiat payout. No real money is transferred.
     </div>

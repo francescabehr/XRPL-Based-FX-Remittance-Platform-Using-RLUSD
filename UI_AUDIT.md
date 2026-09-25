@@ -218,3 +218,19 @@ Empty states are applied everywhere.
 6. **Send flow:** `/send` stays one route. The stepper is Details (recipient + amount) → Review → Pay → Status (`/transactions/{id}`). The live quote calls the existing `GET /quote`.
 7. **Amounts:** `R1,000.00`, `$1,000.00`, `50.874404 UCTUSD`, with the symbol/code and number in one text node.
 8. **Phase 3** fixes the §4 navigation and accessibility issues. Irreversible admin actions (cash-in received/failed, cash-out approve, settlement retry) get confirmation.
+
+## 11. Phase 3 status (§4 items)
+
+| §4 item | Status |
+|---|---|
+| 1. No active-page state | **Fixed**: pink active item with `aria-current="page"`. |
+| 2. Nav ignores roles | **Fixed**: send links need `can_send`, wallet links need `can_receive`, admin has its own groups. |
+| 3. `/cashout/history` not in nav | **Fixed**: "My cash-outs" in the Wallet group. |
+| 4. Recipients land on the sender dashboard | **Deferred to Phase 4 §7.2**: the role-aware dashboard is part of that screen's redesign (the nav is already role-aware). |
+| 5. Admin nav order | **Fixed**: Overview → Queues (KYC, Cash-in, Settlements, Cash-out) → Monitor → Config; the warning icon is gone. |
+| 6–8. Status wording, colours and hash visibility differ by screen | **Deferred to Phases 4/5**: fixed as each page adopts `status_badge` / `tx_hash`. |
+| 9. "Send Money" disabled link still keyboard-reachable | **Fixed**: a real disabled button, described by the KYC note. |
+| 10. Inconsistent confirmation | **Fixed**: shared `data-confirm` dialog on every irreversible admin action; native `confirm()` removed. |
+| 11. Transaction-detail back link for admins | **Fixed**: goes to `/admin/transactions`. |
+| 12. Branding | **Fixed**: one wordmark ("XRPL Remit") in the sidebar and signed-out header. |
+| 13. Accessibility gaps | **Fixed**: skip link, landmarks, labels tied to inputs (auth, KYC, beneficiary, config, monitor filters, reason fields), `aria-label` on icon-only buttons, all decorative icons `aria-hidden`, a single `<h1>` per page. |

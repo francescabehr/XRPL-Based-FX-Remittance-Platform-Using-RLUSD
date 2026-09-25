@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import stat_tile %}
+{% block title %}Overview — Admin{% endblock %}
+{% block page_title %}Overview{% endblock %}
+
+{% macro count(n) -%}
+<span data-count-up data-decimals="0">{{ n }}</span>
+{%- endmacro %}
+
+{% block content %}
+<p class="text-muted mb-4">What needs attention across the platform right now. Each tile opens its queue.</p>
+
+<div class="row g-3">
+  <div class="col-sm-6 col-xl-4">
+    {{ stat_tile("Pending KYC", count(pending_kyc),
+                 "Submissions awaiting review" if pending_kyc else "All caught up",
+                 tone="warning" if pending_kyc else none, href="/admin/kyc") }}
+  </div>
+  <div class="col-sm-6 col-xl-4">
+    {{ stat_tile("Cash-ins awaiting confirmation", count(pending_cashins),
+                 "Card payments to confirm" if pending_cashins else "All caught up",
+                 tone="warning" if pending_cashins else none, href="/admin/cashin") }}
+  </div>
+  <div class="col-sm-6 col-xl-4">
+    {{ stat_tile("Pending cash-outs", count(cashouts.requested),
+                 (cashouts.awaiting_ledger ~ " awaiting ledger confirmation") if cashouts.awaiting_ledger
+                   else ("Requests awaiting approval" if cashouts.requested else "All caught up"),
+                 tone="warning" if (cashouts.requested or cashouts.awaiting_ledger) else none, href="/admin/cashout") }}
+  </div>
+  <div class="col-sm-6 col-xl-4">
+    {{ stat_tile("Failed settlements", count(failed_settlements),
+                 "Retry from the settlement monitor" if failed_settlements else "No failed settlements",
+                 tone="danger" if failed_settlements else none, href="/admin/settlements") }}
+  </div>
+  <div class="col-sm-6 col-xl-4">
+    {{ stat_tile("Settled on XRPL today", count(settled_today),
+                 "Validated on-ledger since midnight",
+                 tone="success" if settled_today else none, href="/admin/transactions?settlement=completed") }}
+  </div>
+</div>
+{% endblock %}

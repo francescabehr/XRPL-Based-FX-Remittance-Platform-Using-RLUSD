@@ -14,7 +14,7 @@ templates = make_templates()
 @router.get("/login", response_class=HTMLResponse)
 async def login_form(request: Request, user=Depends(get_current_user)):
     if user:
-        return RedirectResponse(url="/dashboard" if not user.is_admin else "/admin/kyc", status_code=302)
+        return RedirectResponse(url="/dashboard" if not user.is_admin else "/admin", status_code=302)
     return templates.TemplateResponse("auth/login.html", {"request": request, "flash": get_flash(request)})
 
 
@@ -33,7 +33,7 @@ async def login(
             status_code=401,
         )
     request.session["user_id"] = str(user.id)
-    return RedirectResponse(url="/admin/kyc" if user.is_admin else "/dashboard", status_code=302)
+    return RedirectResponse(url="/admin" if user.is_admin else "/dashboard", status_code=302)
 
 
 @router.get("/register", response_class=HTMLResponse)

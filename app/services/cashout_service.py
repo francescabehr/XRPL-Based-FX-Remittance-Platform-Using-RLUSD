@@ -480,6 +480,22 @@ async def list_for_recipient(db: AsyncSession, recipient_id: uuid.UUID) -> list[
     return list((await db.execute(stmt)).scalars().all())
 
 
+async def count_open(db: AsyncSession) -> dict[str, int]:
+    """Admin overview tile (read-only): requests awaiting a decision, and approved
+    burns whose outcome is unknown — the SQL form of awaiting_ledger_confirmation."""
+    requested = await db.execute(
+        select(func.count()).select_from(CashOutRequest).where(CashOutRequest.status == CashOutStatus.requested)
+    )
+    awaiting = await db.execute(
+        select(func.count()).select_from(CashOutRequest).where(
+            CashOutRequest.status == CashOutStatus.approved,
+            CashOutRequest.xrpl_burn_tx_hash.is_not(None),
+            CashOutRequest.failure_reason.like("outcome_unknown%"),
+        )
+    )
+    return {"requested": requested.scalar_one(), "awaiting_ledger": awaiting.scalar_one()}
+
+
 async def list_open(db: AsyncSession) -> list[CashOutRequest]:
     """Admin queue: everything still awaiting an admin decision or a ledger outcome."""
     stmt = _with_parties(

@@ -1,11 +1,10 @@
 {% extends "base.html" %}
 {% block title %}KYC Review — {{ submission.full_name }}{% endblock %}
 
+{% block page_title %}KYC review — {{ submission.full_name }}{% endblock %}
+{% block page_back %}/admin/kyc{% endblock %}
+
 {% block content %}
-<div class="d-flex align-items-center gap-2 mb-4">
-  <a href="/admin/kyc" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
-  <h3 class="fw-bold mb-0">KYC Review — {{ submission.full_name }}</h3>
-</div>
 
 <div class="row g-4">
   <!-- Submission details -->
@@ -52,9 +51,9 @@
       <div class="card-body">
         <p class="text-muted small">Approving will let this user initiate remittances immediately.</p>
         <form method="post" action="/admin/kyc/{{ submission.id }}/approve"
-              onsubmit="return confirm('Approve KYC for {{ submission.full_name }}?')">
+              data-confirm="{{ submission.full_name }} will be able to send money immediately." data-confirm-title="Approve KYC?" data-confirm-label="Approve" data-confirm-tone="primary">
           <button type="submit" class="btn btn-success w-100">
-            <i class="bi bi-check-lg me-1"></i>Approve
+            <i class="bi bi-check-lg me-1" aria-hidden="true"></i>Approve
           </button>
         </form>
       </div>
@@ -64,14 +63,14 @@
       <div class="card-header fw-semibold text-danger">Reject</div>
       <div class="card-body">
         <form method="post" action="/admin/kyc/{{ submission.id }}/reject"
-              onsubmit="return confirm('Reject KYC for {{ submission.full_name }}?')">
+              data-confirm="{{ submission.full_name }} will be told the reason and asked to resubmit." data-confirm-title="Reject KYC?" data-confirm-label="Reject">
           <div class="mb-3">
-            <label class="form-label fw-semibold">Reason <span class="text-danger">*</span></label>
-            <textarea name="reason" class="form-control" rows="3" required
+            <label class="form-label fw-semibold" for="kyc-reject-reason">Reason <span class="text-danger">*</span></label>
+            <textarea name="reason" class="form-control" rows="3" required id="kyc-reject-reason"
                       placeholder="Explain clearly so the user knows what to fix…"></textarea>
           </div>
           <button type="submit" class="btn btn-danger w-100">
-            <i class="bi bi-x-lg me-1"></i>Reject
+            <i class="bi bi-x-lg me-1" aria-hidden="true"></i>Reject
           </button>
         </form>
       </div>

@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Review Cash-Out — XRPL Remit{% endblock %}
 
+{% block page_title %}Review your cash-out{% endblock %}
+{% block page_back %}/cashout{% endblock %}
+
 {% block content %}
-<h3 class="fw-bold mb-4"><i class="bi bi-cash-coin me-2"></i>Review your cash-out</h3>
 
 <div class="row g-4">
   <div class="col-lg-7">
@@ -51,7 +53,7 @@
           <input type="hidden" name="cashout_fee_usd" value="{{ pricing.cashout_fee_usd }}">
           <input type="hidden" name="net_payout" value="{{ pricing.net_payout }}">
           <button type="submit" class="btn btn-success">
-            <i class="bi bi-check2-circle me-1"></i>Confirm cash-out
+            <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Confirm cash-out
           </button>
           <a href="/cashout" class="btn btn-link">Change amount</a>
         </form>
@@ -61,7 +63,7 @@
 
   <div class="col-lg-5">
     <div class="alert alert-warning small mb-3">
-      <i class="bi bi-exclamation-triangle me-1"></i>
+      <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
       Your UCTUSD is reserved when an administrator approves this request, then burned
       on the XRPL Testnet. If the burn fails, the reserved amount is returned to you.
     </div>

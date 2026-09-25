@@ -26,7 +26,7 @@ async def wallet_page(
     if not user:
         return RedirectResponse(url="/login", status_code=302)
     if user.is_admin:
-        return RedirectResponse(url="/admin/kyc", status_code=302)
+        return RedirectResponse(url="/admin", status_code=302)
 
     wallet = await xrpl_service.get_wallet_for_user(db, user.id)
 

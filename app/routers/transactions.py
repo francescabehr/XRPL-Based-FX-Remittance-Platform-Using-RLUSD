@@ -98,7 +98,7 @@ def _sender_redirect(request: Request, user: Optional[User]) -> Optional[Redirec
     if not user:
         return RedirectResponse(url="/login", status_code=302)
     if user.is_admin:
-        return RedirectResponse(url="/admin/kyc", status_code=302)
+        return RedirectResponse(url="/admin", status_code=302)
     if not user.can_send or user.kyc_status != KYCStatus.approved:
         set_flash(request, "Your KYC must be approved before you can send money.", "warning")
         return RedirectResponse(url="/dashboard", status_code=302)

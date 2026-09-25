@@ -42,7 +42,7 @@
       {% for id, name in [("colour", "Colour"), ("type", "Typography"), ("buttons", "Buttons"), ("forms", "Forms"),
                           ("cards", "Cards"), ("status", "Status badges"), ("amounts", "Amounts"), ("tiles", "Stat tiles"),
                           ("stepper", "Stepper"), ("breakdown", "Breakdown"), ("tables", "Tables"), ("empty", "Empty state"),
-                          ("flash", "Flash"), ("hash", "XRPL hash"), ("drawer", "Drawer"), ("motion", "Motion")] %}
+                          ("flash", "Flash"), ("hash", "XRPL hash"), ("drawer", "Drawer"), ("confirm", "Confirmation"), ("motion", "Motion")] %}
       <a href="#{{ id }}">{{ name }}</a>
       {% endfor %}
     </div>
@@ -374,6 +374,20 @@
       <a href="#drawer" class="btn btn-outline-secondary" data-drawer-open="sg-drawer">Open transfer details</a>
     </section>
 
+    {# ── Confirmation ───────────────────────────────────────────────────── #}
+    <section class="sg-section" id="confirm" aria-labelledby="confirm-h">
+      <h2 id="confirm-h">Confirmation</h2>
+      <p class="text-muted">Irreversible actions carry <code>data-confirm</code> on their form. <code>ui.js</code> asks in the shared <code>#ds-confirm</code> dialog, then resubmits with the original button. Without JS the form submits directly.</p>
+      <div class="sg-row">
+        <form method="get" action="/dev/styleguide#confirm" data-confirm="This demo only reloads the styleguide." data-confirm-title="Approve cash-out?" data-confirm-label="Approve" data-confirm-tone="primary">
+          <button class="btn btn-success">Approve (primary tone)</button>
+        </form>
+        <form method="get" action="/dev/styleguide#confirm" data-confirm="This demo only reloads the styleguide." data-confirm-title="Reject KYC?" data-confirm-label="Reject">
+          <button class="btn btn-outline-danger">Reject (danger tone)</button>
+        </form>
+      </div>
+    </section>
+
     {# ── Motion ─────────────────────────────────────────────────────────── #}
     <section class="sg-section" id="motion" aria-labelledby="motion-h">
       <h2 id="motion-h">Motion</h2>
@@ -530,7 +544,7 @@ document.addEventListener("DOMContentLoaded", function () {
         li.classList.toggle("is-done", n < step);
         li.classList.toggle("is-current", n === step);
         if (n === step) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current");
-        li.querySelector(".ds-stepper__marker").innerHTML = n < step ? '<i class="bi bi-check-lg"></i>' : String(n);
+        li.querySelector(".ds-stepper__marker").innerHTML = n < step ? '<i class="bi bi-check-lg" aria-hidden="true"></i>' : String(n);
       });
     });
   });

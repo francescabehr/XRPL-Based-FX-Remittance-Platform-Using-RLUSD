@@ -6,9 +6,9 @@
   <div class="col-sm-10 col-md-7 col-lg-6">
     <div class="card shadow-sm mt-4">
       <div class="card-body p-4">
-        <h4 class="card-title mb-4 fw-bold">
-          <i class="bi bi-person-plus me-2 text-primary"></i>Create Account
-        </h4>
+        <h1 class="h4 card-title mb-4 fw-bold">
+          <i class="bi bi-person-plus me-2 text-primary" aria-hidden="true"></i>Create Account
+        </h1>
 
         {% if errors %}
         <div class="alert alert-danger py-2">
@@ -20,27 +20,27 @@
 
         <form method="post" action="/register" novalidate>
           <div class="mb-3">
-            <label class="form-label fw-semibold">Full name</label>
-            <input type="text" name="full_name" class="form-control"
+            <label class="form-label fw-semibold" for="full_name">Full name</label>
+            <input type="text" name="full_name" class="form-control" id="full_name" autocomplete="name"
                    value="{{ prefill.full_name if prefill else '' }}" required autofocus>
           </div>
           <div class="mb-3">
-            <label class="form-label fw-semibold">Email address</label>
-            <input type="email" name="email" class="form-control"
+            <label class="form-label fw-semibold" for="email">Email address</label>
+            <input type="email" name="email" class="form-control" id="email" autocomplete="email"
                    value="{{ prefill.email if prefill else '' }}" required>
           </div>
           <div class="mb-3">
-            <label class="form-label fw-semibold">Mobile number</label>
-            <input type="tel" name="mobile" class="form-control" placeholder="+27..."
+            <label class="form-label fw-semibold" for="mobile">Mobile number</label>
+            <input type="tel" name="mobile" class="form-control" placeholder="+27..." id="mobile" autocomplete="tel"
                    value="{{ prefill.mobile if prefill else '' }}" required>
           </div>
           <div class="mb-3">
-            <label class="form-label fw-semibold">Password <span class="text-muted fw-normal">(min 8 characters)</span></label>
-            <input type="password" name="password" class="form-control" required minlength="8">
+            <label class="form-label fw-semibold" for="password">Password <span class="text-muted fw-normal">(min 8 characters)</span></label>
+            <input type="password" name="password" class="form-control" required minlength="8" id="password" autocomplete="new-password">
           </div>
           <div class="mb-4">
-            <label class="form-label fw-semibold">Confirm password</label>
-            <input type="password" name="confirm_password" class="form-control" required>
+            <label class="form-label fw-semibold" for="confirm_password">Confirm password</label>
+            <input type="password" name="confirm_password" class="form-control" required id="confirm_password" autocomplete="new-password">
           </div>
           <button type="submit" class="btn btn-primary w-100">Create Account</button>
         </form>

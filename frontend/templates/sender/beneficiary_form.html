@@ -1,11 +1,10 @@
 {% extends "base.html" %}
 {% block title %}{{ "Edit" if editing else "Add" }} Beneficiary — XRPL Remit{% endblock %}
 
+{% block page_title %}{{ "Edit" if editing else "Add" }} beneficiary{% endblock %}
+{% block page_back %}/beneficiaries{% endblock %}
+
 {% block content %}
-<div class="d-flex align-items-center gap-2 mb-4">
-  <a href="/beneficiaries" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
-  <h3 class="fw-bold mb-0">{{ "Edit" if editing else "Add" }} Beneficiary</h3>
-</div>
 
 {% if error %}
 <div class="alert alert-danger">{{ error }}</div>
@@ -18,14 +17,14 @@
 
       <div class="row g-3">
         <div class="col-md-6">
-          <label class="form-label fw-semibold">Full name <span class="text-danger">*</span></label>
-          <input type="text" name="full_name" class="form-control" required
+          <label class="form-label fw-semibold" for="ben-full_name">Full name <span class="text-danger">*</span></label>
+          <input type="text" name="full_name" class="form-control" required id="ben-full_name"
                  value="{{ ben.full_name if editing else (prefill.full_name if prefill else '') }}">
         </div>
 
         <div class="col-md-6">
-          <label class="form-label fw-semibold">Relationship <span class="text-danger">*</span></label>
-          <select name="relationship" class="form-select" required>
+          <label class="form-label fw-semibold" for="ben-relationship">Relationship <span class="text-danger">*</span></label>
+          <select name="relationship" class="form-select" required id="ben-relationship">
             <option value="">— Select —</option>
             {% for r in relationships %}
             <option value="{{ r }}"
@@ -36,22 +35,22 @@
         </div>
 
         <div class="col-md-6">
-          <label class="form-label fw-semibold">Email</label>
-          <input type="email" name="email" class="form-control"
+          <label class="form-label fw-semibold" for="ben-email">Email</label>
+          <input type="email" name="email" class="form-control" id="ben-email"
                  value="{{ ben.email if editing else (prefill.email if prefill else '') }}"
                  placeholder="optional if mobile provided">
         </div>
 
         <div class="col-md-6">
-          <label class="form-label fw-semibold">Mobile</label>
-          <input type="tel" name="mobile" class="form-control"
+          <label class="form-label fw-semibold" for="ben-mobile">Mobile</label>
+          <input type="tel" name="mobile" class="form-control" id="ben-mobile"
                  value="{{ ben.mobile if editing else (prefill.mobile if prefill else '') }}"
                  placeholder="optional if email provided">
         </div>
 
         <div class="col-md-6">
-          <label class="form-label fw-semibold">Country <span class="text-danger">*</span></label>
-          <select name="country" class="form-select" required>
+          <label class="form-label fw-semibold" for="ben-country">Country <span class="text-danger">*</span></label>
+          <select name="country" class="form-select" required id="ben-country">
             <option value="">— Select —</option>
             {% for c in countries %}
             <option value="{{ c }}"
@@ -62,8 +61,8 @@
         </div>
 
         <div class="col-md-6">
-          <label class="form-label fw-semibold">Payout currency <span class="text-danger">*</span></label>
-          <div class="d-flex gap-3 mt-1">
+          <span class="form-label fw-semibold d-block" id="ben-payout-label">Payout currency <span class="text-danger">*</span></span>
+          <div class="d-flex gap-3 mt-1" role="radiogroup" aria-labelledby="ben-payout-label">
             {% for cur in ["USD", "ZAR"] %}
             <div class="form-check">
               <input class="form-check-input" type="radio" name="payout_currency"
@@ -80,7 +79,7 @@
       </div>
 
       <p class="text-muted small mt-3 mb-0">
-        <i class="bi bi-info-circle me-1"></i>
+        <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
         If the email or mobile matches an existing platform account, the beneficiary will be
         automatically linked to that account (FR-BEN-04).
       </p>

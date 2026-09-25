@@ -1,6 +1,6 @@
 {# XRPL hash as a link to the Testnet explorer (FR-WAL-05). #}
 {% macro hash_link(tx_hash) -%}
-{% if tx_hash %}<a href="{{ explorer_tx_url }}{{ tx_hash }}" target="_blank" rel="noopener" class="font-monospace small">{{ tx_hash[:10] }}…<i class="bi bi-box-arrow-up-right ms-1"></i></a>{% else %}<span class="text-muted small">—</span>{% endif %}
+{% if tx_hash %}<a href="{{ explorer_tx_url }}{{ tx_hash }}" target="_blank" rel="noopener" class="font-monospace small">{{ tx_hash[:10] }}…<i class="bi bi-box-arrow-up-right ms-1" aria-hidden="true"></i></a>{% else %}<span class="text-muted small">—</span>{% endif %}
 {%- endmacro %}
 
 {# Send Money progress indicator. #}

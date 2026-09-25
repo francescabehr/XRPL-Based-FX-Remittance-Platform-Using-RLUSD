@@ -2,13 +2,14 @@
 {% from "_macros.html" import hash_link with context %}
 {% block title %}Transaction {{ txn.id|string|truncate(8, True, "") }} — Admin{% endblock %}
 
+{% block page_title %}{{ txn.sender.full_name }} → {{ txn.beneficiary.full_name }}{% endblock %}
+{% block page_back %}/admin/transactions{% endblock %}
+{% block page_actions %}
+  <span class="badge bg-{{ txn.status_badge }} fs-6">{{ txn.status_label }}</span>
+  {% if txn.aml_flagged %}<span class="badge bg-danger fs-6"><i class="bi bi-flag-fill me-1" aria-hidden="true"></i>AML review</span>{% endif %}
+{% endblock %}
+
 {% block content %}
-<div class="d-flex align-items-center gap-2 mb-4">
-  <a href="/admin/transactions" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
-  <h3 class="fw-bold mb-0">{{ txn.sender.full_name }} → {{ txn.beneficiary.full_name }}</h3>
-  <span class="badge bg-{{ txn.status_badge }} fs-6 ms-2">{{ txn.status_label }}</span>
-  {% if txn.aml_flagged %}<span class="badge bg-danger fs-6"><i class="bi bi-flag-fill me-1"></i>AML review</span>{% endif %}
-</div>
 
 {% if txn.failure_reason %}
 <div class="alert alert-danger">
@@ -115,19 +116,19 @@
 
     <!-- AML review (FR-ADM-07) -->
     <div class="card shadow-sm border-{{ 'danger' if txn.aml_flagged else 'light' }}">
-      <div class="card-header fw-semibold"><i class="bi bi-flag me-2"></i>AML review</div>
+      <div class="card-header fw-semibold"><i class="bi bi-flag me-2" aria-hidden="true"></i>AML review</div>
       <div class="card-body">
         {% if txn.aml_flagged %}
           <p class="small text-muted mb-3">This transaction is flagged for AML review. Flagging is a review marker only — it does not stop or reverse any payment.</p>
           <form method="post" action="/admin/transactions/{{ txn.id }}/aml">
             <input type="hidden" name="flagged" value="0">
-            <button class="btn btn-sm btn-outline-success"><i class="bi bi-flag me-1"></i>Clear AML flag</button>
+            <button class="btn btn-sm btn-outline-success"><i class="bi bi-flag me-1" aria-hidden="true"></i>Clear AML flag</button>
           </form>
         {% else %}
           <p class="small text-muted mb-3">Not flagged. Raise a flag to mark this transaction for AML review; it stays visible under the monitor's AML filter.</p>
           <form method="post" action="/admin/transactions/{{ txn.id }}/aml">
             <input type="hidden" name="flagged" value="1">
-            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-flag-fill me-1"></i>Flag for AML review</button>
+            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-flag-fill me-1" aria-hidden="true"></i>Flag for AML review</button>
           </form>
         {% endif %}
       </div>

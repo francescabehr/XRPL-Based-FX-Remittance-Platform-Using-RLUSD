@@ -42,7 +42,7 @@
   {%- set href = none if step is string else step[1] -%}
   {%- set i = loop.index %}
   <li class="ds-stepper__step{% if i < current %} is-done{% elif i == current %} is-current{% endif %}"{% if i == current %} aria-current="step"{% endif %}>
-    <span class="ds-stepper__marker" aria-hidden="true">{% if i < current %}<i class="bi bi-check-lg"></i>{% else %}{{ i }}{% endif %}</span>
+    <span class="ds-stepper__marker" aria-hidden="true">{% if i < current %}<i class="bi bi-check-lg" aria-hidden="true"></i>{% else %}{{ i }}{% endif %}</span>
     <span class="ds-stepper__label">
       {%- if href and i < current %}<a href="{{ href }}">{{ text }}</a>{% else %}{{ text }}{% endif -%}
       {%- if i < current %}<span class="visually-hidden"> (completed)</span>{% endif -%}
@@ -55,7 +55,7 @@
 {#- Every list needs one. `action` = {"label": ..., "href": ..., "icon": optional}. -#}
 {% macro empty_state(title, message=none, action=none, icon="inbox") -%}
 <div class="ds-empty-state">
-  <span class="ds-empty-state__icon" aria-hidden="true"><i class="bi bi-{{ icon }}"></i></span>
+  <span class="ds-empty-state__icon" aria-hidden="true"><i class="bi bi-{{ icon }}" aria-hidden="true"></i></span>
   <p class="ds-empty-state__title">{{ title }}</p>
   {%- if message %}<p class="ds-empty-state__message">{{ message }}</p>{% endif %}
   {%- if action %}

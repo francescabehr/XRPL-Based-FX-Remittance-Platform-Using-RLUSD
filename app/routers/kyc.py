@@ -30,7 +30,7 @@ async def kyc_form(
     if not user:
         return RedirectResponse(url="/login", status_code=302)
     if user.is_admin:
-        return RedirectResponse(url="/admin/kyc", status_code=302)
+        return RedirectResponse(url="/admin", status_code=302)
 
     kyc = await get_active_kyc(db, user.id)
 

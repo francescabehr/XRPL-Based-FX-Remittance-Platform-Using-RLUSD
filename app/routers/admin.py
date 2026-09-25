@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
@@ -14,15 +14,40 @@ from app.services import cashin_service, cashout_service, fx_service
 from app.services.kyc_service import (
     KYCReviewError,
     approve_kyc,
+    count_pending_submissions,
     get_pending_submissions,
     get_submission_by_id,
     reject_kyc,
 )
-from app.services.limit_service import get_all_tiers, get_tier_by_id, update_tier
+from app.services.limit_service import day_start_utc, display_tz, get_all_tiers, get_tier_by_id, update_tier
 from app.templating import make_templates
 
 router = APIRouter(prefix="/admin")
 templates = make_templates()
+
+
+# ── Overview (admin landing page) ─────────────────────────────────────────────
+
+@router.get("", response_class=HTMLResponse)
+async def overview(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_admin),
+):
+    today_start = day_start_utc(datetime.now(display_tz()).date())
+    return templates.TemplateResponse(
+        "admin/overview.html",
+        {
+            "request": request,
+            "user": user,
+            "flash": get_flash(request),
+            "pending_kyc": await count_pending_submissions(db),
+            "pending_cashins": await cashin_service.count_pending_cashins(db),
+            "cashouts": await cashout_service.count_open(db),
+            "failed_settlements": await cashin_service.count_failed_settlements(db),
+            "settled_today": await cashin_service.count_settled_since(db, today_start),
+        },
+    )
 
 
 @router.get("/kyc", response_class=HTMLResponse)

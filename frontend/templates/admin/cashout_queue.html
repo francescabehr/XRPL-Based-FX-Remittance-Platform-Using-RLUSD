@@ -2,8 +2,9 @@
 {% from "_macros.html" import hash_link with context %}
 {% block title %}Cash-Out Queue — Admin{% endblock %}
 
+{% block page_title %}Cash-out queue{% endblock %}
+
 {% block content %}
-<h3 class="fw-bold mb-1"><i class="bi bi-cash-stack me-2"></i>Cash-out queue</h3>
 <p class="text-muted small mb-4">
   Approving reserves the recipient's UCTUSD and queues an on-chain burn to the issuer.
   Fiat payouts are simulated.
@@ -40,15 +41,16 @@
           <td>{{ hash_link(r.xrpl_burn_tx_hash) }}</td>
           <td class="text-end text-nowrap">
             {% if r.status.value == "requested" %}
-            <form method="post" action="/admin/cashout/{{ r.id }}/approve" class="d-inline">
-              <button class="btn btn-success btn-sm"><i class="bi bi-check-lg me-1"></i>Approve</button>
+            <form method="post" action="/admin/cashout/{{ r.id }}/approve" class="d-inline"
+                  data-confirm="{{ "{:,.6f}".format(r.uctusd_amount) }} UCTUSD is reserved from {{ r.recipient.full_name }}'s wallet and burned on the XRPL. This can't be undone." data-confirm-title="Approve cash-out?" data-confirm-label="Approve" data-confirm-tone="primary">
+              <button class="btn btn-success btn-sm"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>Approve</button>
             </form>
             <button class="btn btn-outline-danger btn-sm" data-bs-toggle="collapse" data-bs-target="#reject{{ loop.index }}">
               Reject
             </button>
             {% elif r.awaiting_ledger_confirmation %}
             <form method="post" action="/admin/cashout/{{ r.id }}/reconcile" class="d-inline">
-              <button class="btn btn-warning btn-sm"><i class="bi bi-search me-1"></i>Reconcile</button>
+              <button class="btn btn-warning btn-sm"><i class="bi bi-search me-1" aria-hidden="true"></i>Reconcile</button>
             </form>
             {% else %}
             <span class="small text-muted">Burn in progress…</span>
@@ -58,10 +60,11 @@
         {% if r.status.value == "requested" %}
         <tr class="collapse" id="reject{{ loop.index }}">
           <td colspan="7" class="bg-light">
-            <form method="post" action="/admin/cashout/{{ r.id }}/reject" class="row g-2 align-items-center">
+            <form method="post" action="/admin/cashout/{{ r.id }}/reject" class="row g-2 align-items-center"
+                  data-confirm="{{ r.recipient.full_name }}'s request is closed and nothing is burned." data-confirm-title="Reject cash-out?" data-confirm-label="Reject">
               <div class="col-md-9">
                 <input type="text" name="reason" class="form-control form-control-sm"
-                       placeholder="Reason for rejecting this cash-out">
+                       placeholder="Reason for rejecting this cash-out" aria-label="Reason for rejecting this cash-out">
               </div>
               <div class="col-md-3">
                 <button class="btn btn-danger btn-sm w-100">Confirm rejection</button>
@@ -76,7 +79,7 @@
   </div>
   {% else %}
   <div class="card-body text-muted text-center py-5">
-    <i class="bi bi-check2-circle fs-1 d-block mb-2"></i>
+    <i class="bi bi-check2-circle fs-1 d-block mb-2" aria-hidden="true"></i>
     No cash-out requests awaiting action.
   </div>
   {% endif %}

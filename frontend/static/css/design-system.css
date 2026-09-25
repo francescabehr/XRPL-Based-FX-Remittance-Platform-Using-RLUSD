@@ -930,3 +930,302 @@ html.ds-reduce-motion *::after {
 }
 html.ds-reduce-motion .ds-skeleton::after,
 html.ds-reduce-motion .ds-pulse-dot::after { animation: none !important; }
+
+
+/* 7. App shell (Phase 3) ---------------------------------------------------- */
+
+:root {
+  --sidebar-width: 264px;
+  --sidebar-text: #F4F8F8;               /* 9.1:1 on teal */
+  --sidebar-muted: rgba(255, 255, 255, 0.72); /* 5.9:1 on teal */
+  --sidebar-hover: rgba(255, 255, 255, 0.08);
+  --sidebar-line: rgba(255, 255, 255, 0.12);
+}
+
+body { background: var(--bg); }
+
+.ds-skip-link {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 2000;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+.ds-skip-link:focus { transform: none; color: #fff; }
+
+.ds-shell {
+  display: flex;
+  min-height: 100vh;
+}
+.ds-shell__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Wordmark */
+.ds-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--sidebar-text);
+  text-decoration: none;
+}
+.ds-wordmark:hover { color: var(--sidebar-text); }
+.ds-wordmark__mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--highlight);
+  color: var(--highlight-ink);
+  font-size: 1rem;
+}
+.ds-wordmark--dark,
+.ds-wordmark--dark:hover { color: var(--accent); }
+
+/* Sidebar — deep teal; pink active item with ink text. */
+.ds-sidebar {
+  --bs-offcanvas-width: min(300px, 85vw);
+  --bs-offcanvas-bg: var(--accent);
+  --bs-offcanvas-color: var(--sidebar-text);
+  display: flex;
+  flex-direction: column;
+  background: var(--accent);
+  color: var(--sidebar-text);
+}
+@media (min-width: 992px) {
+  .ds-sidebar.offcanvas-lg {
+    position: sticky;
+    top: 0;
+    flex: 0 0 var(--sidebar-width);
+    width: var(--sidebar-width);
+    height: 100vh;
+    background-color: var(--accent) !important;
+    display: flex !important;
+    flex-direction: column;
+  }
+}
+.ds-sidebar__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-6) var(--space-5) var(--space-4);
+}
+.ds-sidebar__nav {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0 var(--space-3) var(--space-4);
+}
+.ds-sidebar__group {
+  margin: var(--space-5) var(--space-3) var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sidebar-muted);
+}
+.ds-sidebar__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ds-sidebar__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0.625rem var(--space-3);
+  border-radius: var(--radius-pill);
+  color: var(--sidebar-text);
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    background-color var(--dur-fast) var(--ease-in-out),
+    color var(--dur-fast) var(--ease-in-out);
+}
+.ds-sidebar__link .bi { font-size: 1.1rem; width: 1.25rem; text-align: center; }
+.ds-sidebar__link:hover { background: var(--sidebar-hover); color: var(--sidebar-text); }
+.ds-sidebar__link.is-active,
+.ds-sidebar__link.is-active:hover {
+  background: var(--highlight);
+  color: var(--highlight-ink);
+  font-weight: 600;
+}
+/* A teal focus ring would vanish on teal: use pink here (3.7:1 on teal). */
+.ds-sidebar a:focus-visible,
+.ds-sidebar button:focus-visible {
+  outline: 2px solid var(--highlight);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+.ds-sidebar__link.is-active:focus-visible { outline-color: var(--sidebar-text); }
+
+.ds-sidebar__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--sidebar-line);
+}
+.ds-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--lavender-soft);
+  color: var(--lavender-ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.ds-sidebar__who {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.ds-sidebar__name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ds-sidebar__email {
+  font-size: var(--text-xs);
+  color: var(--sidebar-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ds-sidebar__logout {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill);
+  color: var(--sidebar-text);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-decoration: none;
+}
+.ds-sidebar__logout .bi { font-size: 1.1rem; width: 1.25rem; text-align: center; }
+.ds-sidebar__logout:hover { background: var(--sidebar-hover); color: var(--sidebar-text); }
+
+/* Top bar — light, sticky, page title + actions + KYC badge. */
+.ds-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 1020;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 64px;
+  padding: calc(var(--space-3) + env(safe-area-inset-top, 0px)) var(--space-8) var(--space-3);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: saturate(1.2) blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.ds-topbar__menu {
+  --bs-btn-padding-x: 0.5rem;
+  --bs-btn-padding-y: 0.25rem;
+  --bs-btn-color: var(--accent);
+  --bs-btn-hover-bg: var(--accent-soft);
+  --bs-btn-hover-color: var(--accent);
+  font-size: 1.5rem;
+  line-height: 1;
+}
+.ds-topbar__back { --bs-btn-padding-x: 0.5rem; }
+.ds-topbar__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+.ds-topbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.ds-topbar__kyc {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-decoration: none;
+}
+.ds-topbar__kyc-label { font-size: var(--text-sm); color: var(--text-muted); }
+@media (max-width: 575.98px) {
+  .ds-topbar__kyc-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+
+.ds-content {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 1200px;
+  padding: var(--space-8);
+}
+.ds-content:focus,
+.ds-public-main:focus { outline: none; }
+
+@media (max-width: 991.98px) {
+  .ds-topbar { padding-left: var(--space-4); padding-right: var(--space-4); }
+  .ds-content { padding: var(--space-5) var(--space-4); }
+}
+@media (max-width: 575.98px) {
+  .ds-topbar__title { font-size: var(--text-lg); }
+}
+
+/* Signed-out pages */
+.ds-public-header {
+  display: flex;
+  justify-content: center;
+  padding: calc(var(--space-8) + env(safe-area-inset-top, 0px)) var(--space-4) var(--space-2);
+}
+.ds-public-main {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-4) var(--space-12);
+}
+
+/* Confirmation dialog for irreversible actions (ui.js, form[data-confirm]). */
+.ds-confirm {
+  width: min(440px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 24px 48px rgba(22, 22, 29, 0.18);
+}
+.ds-confirm[open] { animation: ds-slide-up var(--dur-slow) var(--ease-out) both; }
+.ds-confirm::backdrop { background: rgba(22, 22, 29, 0.4); }
+.ds-confirm__body { padding: var(--space-6); }
+.ds-confirm__title { margin: 0 0 var(--space-2); font-size: var(--text-lg); }
+.ds-confirm__message { margin: 0 0 var(--space-6); color: var(--text-muted); }
+.ds-confirm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

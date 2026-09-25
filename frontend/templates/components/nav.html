@@ -1,0 +1,92 @@
+{#- App sidebar (UI_REDESIGN.md §5). Role-aware: admin links for admins; send
+    links for can_send; wallet links for can_receive (set once a wallet exists).
+    Static on ≥lg, Bootstrap off-canvas below.
+
+    Usage (base.html): {{ sidebar(user, request.url.path) }}
+-#}
+
+{#- Is `item` the page at `path`? exact → equality; otherwise any `match`
+    prefix, minus anything in `exclude`. -#}
+{% macro _is_active(item, path) -%}
+{%- set ns = namespace(hit=(path == item.href)) -%}
+{%- if not item.exact -%}
+  {%- for prefix in item.match or [item.href] -%}
+    {%- if path == prefix or path.startswith(prefix ~ "/") or (prefix.endswith("/") and path.startswith(prefix)) -%}
+      {%- set ns.hit = true -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {%- for excluded in item.exclude or [] -%}
+    {%- if path == excluded -%}{%- set ns.hit = false -%}{%- endif -%}
+  {%- endfor -%}
+{%- endif -%}
+{{- "1" if ns.hit else "" -}}
+{%- endmacro %}
+
+{% macro _link(item, path) -%}
+{%- set active = _is_active(item, path) -%}
+<li>
+  <a class="ds-sidebar__link{% if active %} is-active{% endif %}" href="{{ item.href }}"{% if active %} aria-current="page"{% endif %}>
+    <i class="bi bi-{{ item.icon }}" aria-hidden="true"></i><span>{{ item.label }}</span>
+  </a>
+</li>
+{%- endmacro %}
+
+{% macro sidebar(user, path) -%}
+{%- if user.is_admin -%}
+  {%- set groups = [
+    (none, [{"label": "Overview", "href": "/admin", "icon": "grid-1x2", "exact": true}]),
+    ("Queues", [
+      {"label": "KYC", "href": "/admin/kyc", "icon": "person-check"},
+      {"label": "Cash-in", "href": "/admin/cashin", "icon": "credit-card"},
+      {"label": "Settlements", "href": "/admin/settlements", "icon": "arrow-left-right"},
+      {"label": "Cash-out", "href": "/admin/cashout", "icon": "cash-stack"},
+    ]),
+    ("Monitor", [{"label": "Transactions", "href": "/admin/transactions", "icon": "list-ul"}]),
+    ("Config", [{"label": "Fees & limits", "href": "/admin/config", "icon": "sliders"}]),
+  ] -%}
+{%- else -%}
+  {%- set groups = [(none, [{"label": "Home", "href": "/dashboard", "icon": "house", "exact": true}])] -%}
+  {%- if user.can_send -%}
+    {%- set groups = groups + [("Send", [
+      {"label": "Send money", "href": "/send", "icon": "send"},
+      {"label": "Beneficiaries", "href": "/beneficiaries", "icon": "people"},
+      {"label": "History", "href": "/transactions", "icon": "clock-history"},
+    ])] -%}
+  {%- endif -%}
+  {%- if user.can_receive -%}
+    {%- set groups = groups + [("Wallet", [
+      {"label": "Wallet", "href": "/wallet", "icon": "wallet2"},
+      {"label": "Cash out", "href": "/cashout", "icon": "cash-coin", "match": ["/cashout/preview"]},
+      {"label": "My cash-outs", "href": "/cashout/history", "icon": "receipt", "match": ["/cashout/"], "exclude": ["/cashout/preview"]},
+    ])] -%}
+  {%- endif -%}
+  {%- set groups = groups + [("Account", [{"label": "Verification", "href": "/kyc", "icon": "shield-check"}])] -%}
+{%- endif -%}
+{%- set initials = (user.full_name.split()|map("first")|list)[:2]|join|upper -%}
+<aside class="offcanvas-lg offcanvas-start ds-sidebar" id="ds-sidebar" tabindex="-1" aria-label="Main navigation">
+  <div class="ds-sidebar__head">
+    <a class="ds-wordmark" href="{{ '/admin' if user.is_admin else '/dashboard' }}">
+      <span class="ds-wordmark__mark" aria-hidden="true"><i class="bi bi-arrow-left-right" aria-hidden="true"></i></span>XRPL Remit
+    </a>
+    <button type="button" class="btn-close btn-close-white d-lg-none" data-bs-dismiss="offcanvas" data-bs-target="#ds-sidebar" aria-label="Close menu"></button>
+  </div>
+  <nav class="ds-sidebar__nav" aria-label="Main">
+    {%- for label, items in groups %}
+    {%- if label %}<p class="ds-sidebar__group" id="nav-{{ label|lower }}">{{ label }}</p>{% endif %}
+    <ul class="ds-sidebar__list"{% if label %} aria-labelledby="nav-{{ label|lower }}"{% endif %}>
+      {%- for item in items %}
+      {{ _link(item, path) }}
+      {%- endfor %}
+    </ul>
+    {%- endfor %}
+  </nav>
+  <div class="ds-sidebar__foot">
+    <span class="ds-avatar" aria-hidden="true">{{ initials }}</span>
+    <span class="ds-sidebar__who">
+      <span class="ds-sidebar__name">{{ user.full_name }}</span>
+      <span class="ds-sidebar__email">{{ "Administrator" if user.is_admin else user.email }}</span>
+    </span>
+    <a class="ds-sidebar__logout" href="/logout"><i class="bi bi-box-arrow-right" aria-hidden="true"></i><span>Log out</span></a>
+  </div>
+</aside>
+{%- endmacro %}

@@ -41,7 +41,7 @@ async def beneficiary_list(
     if not user:
         return RedirectResponse(url="/login", status_code=302)
     if user.is_admin:
-        return RedirectResponse(url="/admin/kyc", status_code=302)
+        return RedirectResponse(url="/admin", status_code=302)
 
     bens = await list_beneficiaries(db, user.id)
     return templates.TemplateResponse(

@@ -2,12 +2,11 @@
 {% from "_macros.html" import hash_link with context %}
 {% block title %}Transaction — XRPL Remit{% endblock %}
 
+{% block page_title %}Transfer to {{ txn.beneficiary.full_name }}{% endblock %}
+{% block page_back %}{{ '/transactions' if is_sender else ('/admin/transactions' if user.is_admin else '/wallet') }}{% endblock %}
+{% block page_actions %}<span class="badge bg-{{ txn.status_badge }} fs-6">{{ txn.status_label }}</span>{% endblock %}
+
 {% block content %}
-<div class="d-flex align-items-center gap-2 mb-4">
-  <a href="{{ '/transactions' if is_sender else ('/wallet' if not user.is_admin else '/admin/settlements') }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
-  <h3 class="fw-bold mb-0">Transfer to {{ txn.beneficiary.full_name }}</h3>
-  <span class="badge bg-{{ txn.status_badge }} fs-6 ms-2">{{ txn.status_label }}</span>
-</div>
 
 {% if txn.failure_reason %}
 <div class="alert alert-danger"><strong>Failed:</strong> {{ txn.failure_reason }}{% if txn.cashin_status.value == "failed" %} No money was sent.{% else %} The recipient's balance was not changed.{% endif %}</div>
@@ -19,15 +18,15 @@
       <div class="card-header fw-semibold">Progress</div>
       <ul class="list-group list-group-flush">
         <li class="list-group-item d-flex justify-content-between">
-          <span><i class="bi bi-credit-card me-2"></i>Card payment{% if txn.card_last4 %} (•••• {{ txn.card_last4 }}){% endif %}</span>
+          <span><i class="bi bi-credit-card me-2" aria-hidden="true"></i>Card payment{% if txn.card_last4 %} (•••• {{ txn.card_last4 }}){% endif %}</span>
           <span>{{ txn.cashin_status.value|capitalize }}{% if txn.cashin_updated_at %} <span class="text-muted small">· {{ txn.cashin_updated_at|localtime('%d %b %H:%M') }}</span>{% endif %}</span>
         </li>
         <li class="list-group-item d-flex justify-content-between">
-          <span><i class="bi bi-hdd-network me-2"></i>XRPL settlement</span>
+          <span><i class="bi bi-hdd-network me-2" aria-hidden="true"></i>XRPL settlement</span>
           <span>{{ txn.settlement_status.value|replace("_", " ")|capitalize }}{% if txn.settled_at %} <span class="text-muted small">· {{ txn.settled_at|localtime('%d %b %H:%M') }}</span>{% endif %}</span>
         </li>
         <li class="list-group-item d-flex justify-content-between">
-          <span><i class="bi bi-link-45deg me-2"></i>XRPL transaction</span>
+          <span><i class="bi bi-link-45deg me-2" aria-hidden="true"></i>XRPL transaction</span>
           <span>{{ hash_link(txn.xrpl_tx_hash) }}</span>
         </li>
       </ul>

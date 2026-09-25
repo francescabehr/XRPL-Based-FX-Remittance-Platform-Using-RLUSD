@@ -317,6 +317,48 @@
     return { stop: stop };
   }
 
+  // ── Confirmation for irreversible actions ──────────────────────────────────
+
+  /* form[data-confirm="message"] asks before submitting, in the shared
+   * #ds-confirm <dialog> (base.html). Optional: data-confirm-title,
+   * data-confirm-label (button text), data-confirm-tone="danger|primary".
+   * Without JS the form simply submits. */
+  function confirmSubmit(form, submitter) {
+    var dialog = doc.getElementById("ds-confirm");
+    if (!dialog || typeof dialog.showModal !== "function") return true;
+
+    var ds = form.dataset;
+    dialog.querySelector("#ds-confirm-title").textContent = ds.confirmTitle || "Are you sure?";
+    dialog.querySelector("#ds-confirm-message").textContent = ds.confirm;
+    var ok = dialog.querySelector("[data-confirm-ok]");
+    ok.textContent = ds.confirmLabel || "Confirm";
+    ok.className = "btn " + (ds.confirmTone === "primary" ? "btn-primary" : "btn-danger");
+
+    dialog.returnValue = "";
+    dialog.addEventListener("close", function onClose() {
+      dialog.removeEventListener("close", onClose);
+      if (dialog.returnValue === "confirm") {
+        form._confirmed = true;
+        if (form.requestSubmit) form.requestSubmit(submitter || undefined);
+        else form.submit();
+      } else if (submitter && submitter.focus) {
+        submitter.focus();
+      }
+    });
+    dialog.showModal();
+    return false;
+  }
+
+  doc.addEventListener("submit", function (event) {
+    var form = event.target;
+    if (!form.matches || !form.matches("form[data-confirm]")) return;
+    if (form._confirmed) {
+      form._confirmed = false; // one confirmation per submit
+      return;
+    }
+    if (!confirmSubmit(form, event.submitter)) event.preventDefault();
+  });
+
   // ── Auto-wiring ────────────────────────────────────────────────────────────
 
   function wire(scope) {

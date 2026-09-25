@@ -2,11 +2,10 @@
 {% from "_macros.html" import hash_link with context %}
 {% block title %}Settlement Monitor — Admin{% endblock %}
 
+{% block page_title %}Settlement monitor{% endblock %}
+{% block page_actions %}<span class="badge bg-{{ 'danger' if transactions else 'success' }}-subtle text-{{ 'danger' if transactions else 'success' }}-emphasis fs-6">{{ transactions|length }} need attention</span>{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-2">
-  <h3 class="fw-bold mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Settlement Monitor</h3>
-  <span class="badge bg-{{ 'danger' if transactions else 'success' }} fs-6">{{ transactions|length }} need attention</span>
-</div>
 <p class="text-muted small mb-4">
   Failed XRPL settlements, and any queued or in-progress for over 10 minutes (e.g. the worker stopped).
   Retrying or recovering a signed payment checks the ledger first, so a payment that actually went through is never sent twice.
@@ -32,8 +31,9 @@
           <td>{{ hash_link(t.xrpl_tx_hash) }}</td>
           <td class="text-end">
             {% set label = {"failed": "Retry", "queued": "Re-queue", "processing": "Recover"}[t.settlement_status.value] %}
-            <form method="post" action="/admin/settlements/{{ t.id }}/retry">
-              <button class="btn btn-sm btn-outline-primary text-nowrap"><i class="bi bi-arrow-repeat me-1"></i>{{ label }}</button>
+            <form method="post" action="/admin/settlements/{{ t.id }}/retry"
+                  data-confirm="The ledger is checked first, so a payment that already went through is never sent twice." data-confirm-title="{{ label }} this settlement?" data-confirm-label="{{ label }}" data-confirm-tone="primary">
+              <button class="btn btn-sm btn-outline-primary text-nowrap"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>{{ label }}</button>
             </form>
           </td>
         </tr>
@@ -44,7 +44,7 @@
 </div>
 {% else %}
 <div class="text-center py-5 text-muted">
-  <i class="bi bi-check-circle fs-1 d-block mb-2 text-success"></i>
+  <i class="bi bi-check-circle fs-1 d-block mb-2 text-success" aria-hidden="true"></i>
   <strong>No settlement problems.</strong>
 </div>
 {% endif %}

@@ -2,8 +2,9 @@
 {% from "_macros.html" import send_steps with context %}
 {% block title %}Review Quote — XRPL Remit{% endblock %}
 
+{% block page_title %}Send money{% endblock %}
+
 {% block content %}
-<h3 class="fw-bold mb-3"><i class="bi bi-send me-2"></i>Send Money</h3>
 {{ send_steps(2) }}
 
 <div class="card shadow-sm" style="max-width: 560px">
@@ -20,11 +21,11 @@
     {% endif %}
     <div class="d-flex gap-2">
       <a href="/send?beneficiary_id={{ beneficiary.id }}&zar_amount={{ quote.zar_amount }}" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left me-1"></i>Change
+        <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Change
       </a>
       {% if not error %}
       <a href="/send/pay?beneficiary_id={{ beneficiary.id }}&zar_amount={{ quote.zar_amount }}" class="btn btn-primary flex-grow-1">
-        Continue to payment <i class="bi bi-arrow-right ms-1"></i>
+        Continue to payment <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i>
       </a>
       {% endif %}
     </div>

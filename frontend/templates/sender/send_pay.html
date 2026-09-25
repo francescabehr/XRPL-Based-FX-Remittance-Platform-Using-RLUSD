@@ -2,14 +2,15 @@
 {% from "_macros.html" import send_steps with context %}
 {% block title %}Pay — XRPL Remit{% endblock %}
 
+{% block page_title %}Send money{% endblock %}
+
 {% block content %}
-<h3 class="fw-bold mb-3"><i class="bi bi-send me-2"></i>Send Money</h3>
 {{ send_steps(3) }}
 
 <div class="row g-4">
   <div class="col-lg-6">
     <div class="card shadow-sm">
-      <div class="card-header fw-semibold"><i class="bi bi-credit-card me-1"></i>Card payment (simulated)</div>
+      <div class="card-header fw-semibold"><i class="bi bi-credit-card me-1" aria-hidden="true"></i>Card payment (simulated)</div>
       <div class="card-body p-4">
         <p class="mb-1 text-muted">Amount due</p>
         <p class="display-6 fw-bold mb-3">R{{ "{:,.2f}".format(quote.zar_amount) }}</p>
@@ -46,7 +47,7 @@
             </div>
           </div>
           <button type="submit" class="btn btn-success w-100">
-            <i class="bi bi-lock me-1"></i>Pay R{{ "{:,.2f}".format(quote.zar_amount) }}
+            <i class="bi bi-lock me-1" aria-hidden="true"></i>Pay R{{ "{:,.2f}".format(quote.zar_amount) }}
           </button>
         </form>
       </div>

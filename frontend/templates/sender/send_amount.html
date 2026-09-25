@@ -2,16 +2,17 @@
 {% from "_macros.html" import send_steps with context %}
 {% block title %}Send Money — XRPL Remit{% endblock %}
 
+{% block page_title %}Send money{% endblock %}
+
 {% block content %}
-<h3 class="fw-bold mb-3"><i class="bi bi-send me-2"></i>Send Money</h3>
 {{ send_steps(1) }}
 
 {% if not beneficiaries %}
 <div class="card shadow-sm">
   <div class="card-body text-center py-5">
-    <i class="bi bi-people fs-1 d-block mb-2 text-muted"></i>
+    <i class="bi bi-people fs-1 d-block mb-2 text-muted" aria-hidden="true"></i>
     <p class="mb-3">Add a beneficiary before sending money.</p>
-    <a href="/beneficiaries/new" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Add beneficiary</a>
+    <a href="/beneficiaries/new" class="btn btn-primary"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add beneficiary</a>
   </div>
 </div>
 {% else %}
@@ -40,7 +41,7 @@
           R{{ "{:,.2f}".format(limit.monthly_remaining) }} this month
         </div>
       </div>
-      <button type="submit" class="btn btn-primary w-100">Get quote <i class="bi bi-arrow-right ms-1"></i></button>
+      <button type="submit" class="btn btn-primary w-100">Get quote <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i></button>
     </form>
   </div>
 </div>

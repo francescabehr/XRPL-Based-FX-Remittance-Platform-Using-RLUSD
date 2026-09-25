@@ -133,18 +133,24 @@ Motion must explain what is happening or confirm that something worked. It is ne
 
 Add a **Motion** section to `/dev/styleguide` that demos every utility. It needs a toggle that simulates reduced motion.
 
-## 5. Phase 3: App shell
+## 5. Phase 3: App shell (✅ built)
 
-Rebuild `base.html`:
-- **Sidebar:**
-  - the logo or wordmark (a simple text wordmark is fine);
-  - role-aware navigation, meaning sender, recipient and admin links shown only to those roles;
-  - the active state highlighted with `--accent-soft`;
-  - user name and initials avatar at the bottom, with logout.
-- **Top bar:** page title, plus the KYC status badge for non-admin users.
-- **Flash messages:** styled with the `.ds-flash` variants.
-- **Navigation fixes (from UI_AUDIT.md §4):** role-aware links (send/beneficiaries/history only for `can_send`; wallet, cash out and **My cash-outs** (`/cashout/history`) for `can_receive`), an active state, admin links in workflow order starting at the new **Overview** (`/admin`), and the accessibility gaps (labels tied to inputs, `aria-label` on icon buttons, `aria-hidden` icons, disabled actions that are really disabled).
-- **Flash name clash:** `base.html` reads a `flash` context variable. Import the flash macro under an alias (e.g. `flash as flash_message`), because a top-level name `flash` in a child template shadows that variable.
+`base.html` renders two layouts: the **signed-in shell** and a **signed-out** page (light header with the teal wordmark, content centred). There is no dark top navbar.
+
+- **Sidebar** (`components/nav.html`, `sidebar(user, path)`):
+  - deep-teal background (`--accent`), near-white text (#F4F8F8, 9.1:1), muted group labels (white at 72%, 5.9:1);
+  - wordmark at the top ("XRPL Remit", pink mark with ink glyph);
+  - role-aware grouped navigation with icons. The **active item is a pink pill (`--highlight`) with `--highlight-ink` text** and `aria-current="page"`. Inside the sidebar the focus ring is pink (a teal ring would vanish on teal);
+  - non-admin: Home · **Send** (Send money, Beneficiaries, History — `can_send`) · **Wallet** (Wallet, Cash out, My cash-outs — `can_receive`, set once a wallet exists) · **Account** (Verification);
+  - admin: Overview · **Queues** (KYC, Cash-in, Settlements, Cash-out) · **Monitor** (Transactions) · **Config** (Fees & limits);
+  - footer: initials avatar (lavender-soft/lavender-ink), name, email (or "Administrator"), Log out.
+- **Mobile:** Bootstrap `offcanvas-lg`: a static sidebar at ≥992px, an off-canvas drawer below that, opened by the top bar's menu button (focus handling, Esc and backdrop come from Bootstrap).
+- **Top bar:** sticky, light. Page title as the page's `<h1>`, optional back link, page actions, and for non-admins a "Verification" label with the KYC `status_badge` (linking to `/kyc`).
+- **Template blocks:** `page_title` (defaults to the `<title>` minus its suffix), `page_actions` (buttons/badges on the right) and `page_back` (an href). Page bodies no longer carry their own `<h3>` header row.
+- **Flash messages:** `flash_message(...)` (`.ds-flash`). **Flash name clash:** import the macro under an alias, because a top-level name `flash` in a template shadows the `flash` context variable.
+- **Confirmation:** forms for irreversible actions carry `data-confirm` (+ optional `data-confirm-title`, `-label`, `-tone`). `ui.js` asks in the shared `#ds-confirm` `<dialog>` and resubmits with the original button. Without JS the form submits directly (accepted for this prototype). Used on cash-in received/failed, cash-out approve/reject, settlement retry, KYC approve/reject and beneficiary delete.
+- **Admin landing:** admins land on `/admin` (Overview) after login and when they open a user page.
+- **Accessibility:** skip link to `#main`, landmarks (`nav`, `main`), labels tied to inputs, `aria-label` on icon-only buttons, decorative icons `aria-hidden`, disabled actions rendered as disabled buttons.
 
 ## 6. Status vocabulary
 
@@ -254,7 +260,7 @@ Redesign these screens in order. After each one, run the tests and check it at d
 
 ### 7.6 Admin area (pattern: Stripe dashboard)
 
-- **Overview:** A new page at `/admin` (behind `require_admin`) and the admin landing page after login. Stat tiles for pending KYC, cash-ins awaiting confirmation, pending cash-outs, failed settlements and settlements validated today.
+- **Overview:** A new page at `/admin` (behind `require_admin`) and the admin landing page after login. Stat tiles for pending KYC, cash-ins awaiting confirmation, pending cash-outs, failed settlements and settlements validated today. *(Tiles shipped in Phase 3; Phase 4 adds the "Failed payments"-style list.)*
 - **Queues:** KYC, cash-in and cash-out queues are clean tables. Each row has a status badge and inline Approve / Reject actions.
 - **Actions:** Destructive or irreversible actions ask for confirmation. This includes cash-in received/failed, cash-out approve and settlement retry (in-page confirmation, not only native `confirm()`).
 - **Failed settlements:** Listed prominently, like Stripe's "Failed payments".

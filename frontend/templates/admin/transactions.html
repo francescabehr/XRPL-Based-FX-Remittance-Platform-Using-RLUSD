@@ -2,11 +2,10 @@
 {% from "_macros.html" import hash_link with context %}
 {% block title %}Transaction Monitor — Admin{% endblock %}
 
+{% block page_title %}Transaction monitor{% endblock %}
+{% block page_actions %}<span class="badge bg-secondary-subtle text-secondary-emphasis fs-6">{{ transactions|length }} shown</span>{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-2">
-  <h3 class="fw-bold mb-0"><i class="bi bi-list-ul me-2"></i>Transaction Monitor</h3>
-  <span class="badge bg-secondary fs-6">{{ transactions|length }} shown</span>
-</div>
 <p class="text-muted small mb-4">
   Remittances (ZAR in from senders, UCTUSD out to recipients). Recipient cash-outs are a separate
   flow — see the <a href="/admin/cashout">cash-out queue</a>. Settlement problems needing action are
@@ -17,8 +16,8 @@
   <div class="card-body">
     <form method="get" action="/admin/transactions" class="row g-2 align-items-end">
       <div class="col-md-2">
-        <label class="form-label small mb-1">Cash-in</label>
-        <select name="cashin" class="form-select form-select-sm">
+        <label class="form-label small mb-1" for="f-cashin">Cash-in</label>
+        <select name="cashin" class="form-select form-select-sm" id="f-cashin">
           <option value="">All</option>
           {% for s in cashin_statuses %}
           <option value="{{ s }}" {% if selected.cashin == s %}selected{% endif %}>{{ s|replace("_", " ")|capitalize }}</option>
@@ -26,8 +25,8 @@
         </select>
       </div>
       <div class="col-md-2">
-        <label class="form-label small mb-1">Settlement</label>
-        <select name="settlement" class="form-select form-select-sm">
+        <label class="form-label small mb-1" for="f-settlement">Settlement</label>
+        <select name="settlement" class="form-select form-select-sm" id="f-settlement">
           <option value="">All</option>
           {% for s in settlement_statuses %}
           <option value="{{ s }}" {% if selected.settlement == s %}selected{% endif %}>{{ s|replace("_", " ")|capitalize }}</option>
@@ -35,27 +34,27 @@
         </select>
       </div>
       <div class="col-md-2">
-        <label class="form-label small mb-1">From (UTC)</label>
-        <input type="date" name="date_from" class="form-control form-control-sm" value="{{ selected.date_from }}">
+        <label class="form-label small mb-1" for="f-date_from">From (UTC)</label>
+        <input type="date" name="date_from" class="form-control form-control-sm" value="{{ selected.date_from }}" id="f-date_from">
       </div>
       <div class="col-md-2">
-        <label class="form-label small mb-1">To (UTC)</label>
-        <input type="date" name="date_to" class="form-control form-control-sm" value="{{ selected.date_to }}">
+        <label class="form-label small mb-1" for="f-date_to">To (UTC)</label>
+        <input type="date" name="date_to" class="form-control form-control-sm" value="{{ selected.date_to }}" id="f-date_to">
       </div>
       <div class="col-md-2">
-        <label class="form-label small mb-1">AML</label>
-        <select name="aml" class="form-select form-select-sm">
+        <label class="form-label small mb-1" for="f-aml">AML</label>
+        <select name="aml" class="form-select form-select-sm" id="f-aml">
           <option value="">All</option>
           <option value="1" {% if selected.aml == "1" %}selected{% endif %}>Flagged only</option>
           <option value="0" {% if selected.aml == "0" %}selected{% endif %}>Not flagged</option>
         </select>
       </div>
       <div class="col-md-2">
-        <label class="form-label small mb-1">User</label>
-        <input type="text" name="q" class="form-control form-control-sm" placeholder="Name or email" value="{{ selected.q }}">
+        <label class="form-label small mb-1" for="f-q">User</label>
+        <input type="text" name="q" class="form-control form-control-sm" placeholder="Name or email" value="{{ selected.q }}" id="f-q">
       </div>
       <div class="col-12 d-flex gap-2 pt-2">
-        <button class="btn btn-sm btn-primary"><i class="bi bi-funnel me-1"></i>Apply filters</button>
+        <button class="btn btn-sm btn-primary"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Apply filters</button>
         <a href="/admin/transactions" class="btn btn-sm btn-outline-secondary">Clear</a>
       </div>
     </form>
@@ -100,7 +99,7 @@
             <span class="badge bg-{{ {'completed': 'success', 'failed': 'danger'}.get(t.settlement_status.value, 'secondary') }}">
               {{ t.settlement_status.value|replace("_", " ")|capitalize }}
             </span>
-            {% if t.aml_flagged %}<span class="badge bg-danger ms-1" title="Flagged for AML review"><i class="bi bi-flag-fill"></i> AML</span>{% endif %}
+            {% if t.aml_flagged %}<span class="badge bg-danger ms-1" title="Flagged for AML review"><i class="bi bi-flag-fill" aria-hidden="true"></i> AML</span>{% endif %}
           </td>
           <td>{{ hash_link(t.xrpl_tx_hash) }}</td>
           <td class="text-end">
@@ -114,7 +113,7 @@
 </div>
 {% else %}
 <div class="text-center py-5 text-muted">
-  <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+  <i class="bi bi-inbox fs-1 d-block mb-2" aria-hidden="true"></i>
   <strong>No transactions match these filters.</strong>
 </div>
 {% endif %}

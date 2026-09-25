@@ -43,7 +43,7 @@
     `hero` = the one figure that matters ("Recipient gets"). -#}
 {% macro breakdown_row(label, value, icon=none, hint=none, hero=false, muted=false, id=none) -%}
 <li class="ds-breakdown__row{% if hero %} ds-breakdown__row--hero{% endif %}{% if muted %} ds-breakdown__row--muted{% endif %}"{% if id %} id="{{ id }}"{% endif %}>
-  {%- if icon %}<span class="ds-breakdown__icon" aria-hidden="true"><i class="bi bi-{{ icon }}"></i></span>{% endif %}
+  {%- if icon %}<span class="ds-breakdown__icon" aria-hidden="true"><i class="bi bi-{{ icon }}" aria-hidden="true"></i></span>{% endif %}
   <span class="ds-breakdown__label">{{ label }}{% if hint %}<small>{{ hint }}</small>{% endif %}</span>
   <span class="ds-breakdown__value">{{ value }}</span>
 </li>
