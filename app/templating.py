@@ -1,7 +1,9 @@
 """Shared Jinja2 setup for every router's templates.
 
-Timestamps are stored and computed in UTC (limits reset at UTC midnight); the
-`localtime` filter converts them for display only.
+Timestamps are stored in UTC; the `localtime` filter converts them for display.
+Window boundaries (limit days/months, admin date filters) are computed in
+DISPLAY_TIMEZONE and converted to UTC, so the day a user reads here is the same
+day their allowance is counted against — see limit_service.day_start_utc.
 """
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo

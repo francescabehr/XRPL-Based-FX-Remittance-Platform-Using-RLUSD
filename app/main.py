@@ -9,7 +9,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import settings
 from app.database import AsyncSessionLocal, engine
-from app.services import cashout_service
+from app.services import cashin_service, cashout_service
 from app.routers import admin, auth, beneficiaries, cashout, kyc, sender, transactions, wallet
 
 
@@ -38,15 +38,33 @@ async def _sweep_cashouts(when: str) -> None:
         logger.error("%s cash-out sweep skipped: %s", when, type(exc).__name__)
 
 
+async def _expire_cashins(when: str) -> None:
+    """Release limit allowance held by cash-ins nobody ever confirmed (FR-LIM-01/02).
+
+    A pending cash-in counts against the sender's daily and monthly allowance —
+    it has to, or concurrent sends could each claim the same headroom — so one
+    that is never confirmed would hold that allowance forever.
+    """
+    try:
+        async with AsyncSessionLocal() as db:
+            expired = await cashin_service.expire_stale_cashins(db)
+        if expired:
+            logger.warning("%s sweep expired %s unconfirmed cash-in(s)", when, expired)
+    except Exception as exc:  # noqa: BLE001 — never block startup or kill the loop
+        logger.error("%s cash-in expiry skipped: %s", when, type(exc).__name__)
+
+
 async def _sweep_loop() -> None:
     while True:
         await asyncio.sleep(SWEEP_INTERVAL_SECONDS)
         await _sweep_cashouts("Periodic")
+        await _expire_cashins("Periodic")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await _sweep_cashouts("Startup")
+    await _expire_cashins("Startup")
     # A single boot-time sweep cannot catch a worker that dies later, so keep
     # sweeping for as long as the app runs.
     sweeper = asyncio.create_task(_sweep_loop())

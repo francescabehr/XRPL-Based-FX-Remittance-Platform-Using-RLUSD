@@ -61,6 +61,25 @@
           <tr><th class="fw-normal text-muted">Idempotency key</th><td class="text-end font-monospace small">{{ txn.idempotency_key }}</td></tr>
         </tbody>
       </table>
+      {% if txn.settlement_previous_attempts %}
+        {# Attempts retired by an admin retry. Each may still exist on-ledger,
+           which is exactly why the hash and its ledger range are kept. #}
+        <div class="card-footer small">
+          <div class="fw-semibold mb-2 text-muted">Earlier attempts ({{ txn.settlement_previous_attempts|length }})</div>
+          {% for attempt in txn.settlement_previous_attempts %}
+            <div class="{% if not loop.last %}mb-2 pb-2 border-bottom{% endif %}">
+              <div>{{ hash_link(attempt.tx_hash) }}</div>
+              <div class="text-muted">
+                Ledgers {{ attempt.submitted_ledger_index or "?" }}–{{ attempt.last_ledger_sequence or "?" }}
+                · retired {{ attempt.retired_at or "—" }}
+              </div>
+              {% if attempt.failure_reason %}
+                <div class="text-danger text-break">{{ attempt.failure_reason }}</div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
     </div>
   </div>
 

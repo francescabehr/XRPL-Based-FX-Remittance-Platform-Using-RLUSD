@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime, timezone
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -88,23 +88,70 @@ async def submit_kyc(
     return submission
 
 
-async def approve_kyc(
-    db: AsyncSession, submission: KYCSubmission, admin: User
-) -> KYCSubmission:
-    submission.status = KYCSubmissionStatus.approved
-    submission.reviewed_by = admin.id
-    submission.reviewed_at = datetime.now(timezone.utc)
-    submission.rejection_reason = None
-    db.add(submission)
+class KYCReviewError(ValueError):
+    """A review action was refused; the message is safe to show the admin."""
 
-    result = await db.execute(select(User).where(User.id == submission.user_id))
-    user = result.scalar_one()
-    user.kyc_status = KYCStatus.approved
+
+async def _review(
+    db: AsyncSession,
+    submission: KYCSubmission,
+    admin: User,
+    *,
+    decision: KYCSubmissionStatus,
+    user_status: KYCStatus,
+    rejection_reason: Optional[str],
+) -> KYCSubmission:
+    """Record one KYC decision on a submission that is still pending (FR-KYC-03/04).
+
+    Conditional on `status = pending`, like every other state transition here: a
+    submission that has already been reviewed must not be reviewable again. Two
+    admins opening the same queue, a double-clicked button, or a stale link would
+    otherwise flip the user's kyc_status — and an approve on an
+    already-rejected submission would hand them the ability to send money.
+
+    The user row is updated only when that conditional actually claims the
+    submission, so the two can never disagree.
+    """
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        update(KYCSubmission)
+        .where(
+            KYCSubmission.id == submission.id,
+            KYCSubmission.status == KYCSubmissionStatus.pending,
+        )
+        .values(
+            status=decision,
+            reviewed_by=admin.id,
+            reviewed_at=now,
+            rejection_reason=rejection_reason,
+        )
+        .returning(KYCSubmission.id)
+        .execution_options(synchronize_session=False)
+    )
+    if result.scalar_one_or_none() is None:
+        await db.commit()  # nothing changed; commit keeps loaded objects usable
+        raise KYCReviewError("This submission has already been reviewed.")
+
+    user = (
+        await db.execute(select(User).where(User.id == submission.user_id))
+    ).scalar_one()
+    user.kyc_status = user_status
     db.add(user)
 
     await db.commit()
     await db.refresh(submission)
     return submission
+
+
+async def approve_kyc(
+    db: AsyncSession, submission: KYCSubmission, admin: User
+) -> KYCSubmission:
+    return await _review(
+        db, submission, admin,
+        decision=KYCSubmissionStatus.approved,
+        user_status=KYCStatus.approved,
+        rejection_reason=None,
+    )
 
 
 async def reject_kyc(
@@ -112,18 +159,9 @@ async def reject_kyc(
 ) -> KYCSubmission:
     if not reason.strip():
         raise ValueError("A rejection reason is required.")
-
-    submission.status = KYCSubmissionStatus.rejected
-    submission.reviewed_by = admin.id
-    submission.reviewed_at = datetime.now(timezone.utc)
-    submission.rejection_reason = reason.strip()
-    db.add(submission)
-
-    result = await db.execute(select(User).where(User.id == submission.user_id))
-    user = result.scalar_one()
-    user.kyc_status = KYCStatus.rejected
-    db.add(user)
-
-    await db.commit()
-    await db.refresh(submission)
-    return submission
+    return await _review(
+        db, submission, admin,
+        decision=KYCSubmissionStatus.rejected,
+        user_status=KYCStatus.rejected,
+        rejection_reason=reason.strip(),
+    )

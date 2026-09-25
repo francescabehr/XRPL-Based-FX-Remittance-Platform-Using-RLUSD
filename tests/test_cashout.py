@@ -1050,6 +1050,52 @@ async def test_preview_rejects_an_over_balance_amount(db, client):
     assert "at most" in response.text
 
 
+# --- amount parsing (AUDIT #10, #19) ---
+
+@pytest.mark.parametrize("raw", ["1e40", "1E40", "-1e40"])
+def test_parse_amount_refuses_an_overflowing_amount(raw):
+    """AUDIT #10: the quantize sat outside the try, so Decimal("1e40") escaped as
+    a bare InvalidOperation — a 500 on /cashout/preview, which catches only
+    CashOutError."""
+    with pytest.raises(CashOutError):
+        cashout_service.parse_amount(raw)
+
+
+@pytest.mark.parametrize("raw", ["0.0000004", "1e-40", "0.0000001"])
+def test_parse_amount_refuses_an_amount_that_rounds_away(raw):
+    """AUDIT #19: positive on the >0 check, zero after quantising. It survived
+    only because the fee floor caught it later; with cashout_fee_min_usd=0 it
+    reached uctusd() and raised there."""
+    with pytest.raises(CashOutError, match="smallest amount"):
+        cashout_service.parse_amount(raw)
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [("1.0000005", "1.000001"), ("1.0000025", "1.000003"), ("1.0000015", "1.000002")],
+)
+def test_parse_amount_rounds_half_up_like_fx_service(raw, expected):
+    """AUDIT #19: a bare quantize() uses ROUND_HALF_EVEN, so 1.0000005 rounded
+    DOWN here while fx_service rounded it UP — two roundings of one amount."""
+    assert cashout_service.parse_amount(raw) == Decimal(expected)
+    assert cashout_service.parse_amount(raw) == fx_service._q(
+        Decimal(raw), fx_service.QUANT_UCTUSD
+    )
+
+
+@pytest.mark.parametrize("raw", ["1e40", "0.0000004", "abc", "-5", "0"])
+async def test_preview_refuses_bad_amounts_without_a_500(db, client, raw):
+    user, _ = await funded_recipient(db, "100")
+
+    with logged_in(user):
+        response = await client.post(
+            "/cashout/preview", data={"uctusd_amount": raw, "target_currency": "USD"}
+        )
+
+    assert response.status_code == 400   # not 500
+    assert "cashout" in response.text.lower() or "amount" in response.text.lower()
+
+
 async def test_detail_page_renders_for_the_owner(db, client):
     req, user, _ = await a_request(db, balance="100", amount="10", currency="ZAR")
 

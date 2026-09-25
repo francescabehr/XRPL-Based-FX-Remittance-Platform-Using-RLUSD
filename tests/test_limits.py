@@ -98,7 +98,7 @@ async def test_admin_can_update_tier(db: AsyncSession, seed_tiers):
 
 # --- usage now computed from real transactions (Phase 4 un-stub, FR-LIM-01..04) ---
 
-async def _insert_txn(db, user, zar: str, cashin_status=None, days_ago: int = 0):
+async def _insert_txn(db, user, zar: str, cashin_status=None, days_ago: int = 0, created_at=None):
     """Insert a minimal remittance row for the given sender."""
     import uuid as _uuid
     from datetime import datetime, timedelta, timezone as _tz
@@ -113,7 +113,7 @@ async def _insert_txn(db, user, zar: str, cashin_status=None, days_ago: int = 0)
         country="United States", payout_currency="USD", relationship="Friend",
     )
 
-    created = datetime.now(_tz.utc) - timedelta(days=days_ago)
+    created = created_at or (datetime.now(_tz.utc) - timedelta(days=days_ago))
     txn = Transaction(
         id=_uuid.uuid4(),
         sender_id=user.id,
@@ -196,3 +196,78 @@ async def test_check_limit_uses_real_usage(db: AsyncSession, seed_tiers):
 
     ok = await check_limit(db, user, Decimal("500"))
     assert ok["allowed"] is True
+
+
+# --- window boundaries follow the clock the user reads (AUDIT #16) ---
+#
+# Boundaries used to be UTC midnight while every displayed timestamp was
+# DISPLAY_TIMEZONE. In SAST (UTC+02:00) a send at 00:30 showed as "today" but
+# counted against the previous UTC day, so the daily allowance appeared to reset
+# at 02:00 local rather than at midnight.
+
+def test_day_start_is_local_midnight_expressed_in_utc():
+    from datetime import datetime, time, timezone as _tz
+    from zoneinfo import ZoneInfo
+
+    from app.config import settings
+    from app.services.limit_service import day_start_utc
+
+    day = date(2026, 9, 15)
+    start = day_start_utc(day)
+
+    assert start.tzinfo is not None
+    # It is midnight in the display timezone...
+    local = start.astimezone(ZoneInfo(settings.display_timezone))
+    assert (local.date(), local.time()) == (day, time.min)
+    # ...which in SAST is 22:00 UTC the day before, not 00:00 UTC.
+    offset = ZoneInfo(settings.display_timezone).utcoffset(datetime.combine(day, time.min))
+    assert start == datetime.combine(day, time.min, tzinfo=_tz.utc) - offset
+
+
+async def test_a_send_just_after_local_midnight_counts_against_the_new_day(
+    db: AsyncSession, seed_tiers
+):
+    """The exact case: 00:30 SAST is 22:30 UTC the previous day."""
+    from datetime import datetime, time, timedelta
+    from zoneinfo import ZoneInfo
+
+    from app.config import settings
+    from app.services.limit_service import day_start_utc, display_today, get_daily_usage
+
+    user = await _approved_user(db, "tz1")
+    tz = ZoneInfo(settings.display_timezone)
+    today_local = display_today()
+
+    # 00:30 local today — before UTC midnight if the offset is positive.
+    just_after_midnight = datetime.combine(today_local, time(0, 30), tzinfo=tz)
+    await _insert_txn(db, user, "500", created_at=just_after_midnight)
+
+    # It lands inside today's local window...
+    assert await get_daily_usage(db, user.id) == Decimal("500")
+    assert just_after_midnight.astimezone(ZoneInfo("UTC")) >= day_start_utc(today_local)
+
+    # ...and 30 minutes before local midnight belongs to YESTERDAY, not today.
+    before_midnight = datetime.combine(today_local, time(0, 0), tzinfo=tz) - timedelta(minutes=30)
+    await _insert_txn(db, user, "700", created_at=before_midnight)
+    assert await get_daily_usage(db, user.id) == Decimal("500")  # unchanged
+
+
+async def test_admin_date_filter_covers_the_whole_local_day(db: AsyncSession, seed_tiers):
+    """AUDIT #16: _day_bounds built UTC midnight from a date the admin picked in
+    their own timezone, so the first hours of each local day were invisible."""
+    from datetime import datetime, time
+    from zoneinfo import ZoneInfo
+
+    from app.config import settings
+    from app.services.cashin_service import list_transactions
+    from app.services.limit_service import display_today
+
+    user = await _approved_user(db, "tz2")
+    tz = ZoneInfo(settings.display_timezone)
+    today_local = display_today()
+
+    early = datetime.combine(today_local, time(0, 30), tzinfo=tz)   # 22:30 UTC yesterday
+    txn = await _insert_txn(db, user, "900", created_at=early)
+
+    found = await list_transactions(db, date_from=today_local, date_to=today_local)
+    assert txn.id in [t.id for t in found]

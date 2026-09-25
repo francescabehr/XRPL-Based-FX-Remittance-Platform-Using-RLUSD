@@ -1,19 +1,26 @@
 """
 FR-LIM-01..05  Remittance limit enforcement.
 
-Usage is summed over real `transactions` rows for the calendar day / month in UTC.
+Usage is summed over real `transactions` rows for the calendar day / month as the
+user experiences them — boundaries are computed in DISPLAY_TIMEZONE and converted
+to UTC for the query. Timestamps are still stored in UTC; only the window edges
+are local. A send at 00:30 SAST otherwise showed as "today" while counting
+against the previous UTC day, so the daily allowance appeared to reset at 02:00.
+
 Callers must pass the *same* AsyncSession they will insert the new transaction on,
 so the check and the insert commit as one transaction (prevents a TOCTOU race
 under concurrent sends from the same user).
 """
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timezone
 from decimal import Decimal
 from typing import Optional
+from zoneinfo import ZoneInfo
 import uuid
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models.platform_config import LimitTier
 from app.models.transaction import CashInStatus, Transaction
 from app.models.user import KYCStatus, User
@@ -77,18 +84,33 @@ async def _sum_zar_since(
     return Decimal(result.scalar_one())
 
 
+def display_tz() -> ZoneInfo:
+    """The timezone the user reads every timestamp in (templating.localtime)."""
+    return ZoneInfo(settings.display_timezone)
+
+
+def display_today() -> date:
+    """Today's date as the user sees it, not as UTC sees it."""
+    return datetime.now(display_tz()).date()
+
+
+def day_start_utc(day: date) -> datetime:
+    """The UTC instant at which `day` begins in DISPLAY_TIMEZONE.
+
+    Built from the date rather than by replacing fields on an aware datetime, so
+    a zone with DST cannot land on a non-existent local midnight.
+    """
+    return datetime.combine(day, time.min, tzinfo=display_tz()).astimezone(timezone.utc)
+
+
 async def get_daily_usage(db: AsyncSession, user_id: uuid.UUID) -> Decimal:
-    """ZAR sent by this user so far in the current UTC calendar day (FR-LIM-01)."""
-    now = datetime.now(timezone.utc)
-    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    return await _sum_zar_since(db, user_id, start_of_day)
+    """ZAR sent by this user so far in the current local calendar day (FR-LIM-01)."""
+    return await _sum_zar_since(db, user_id, day_start_utc(display_today()))
 
 
 async def get_monthly_usage(db: AsyncSession, user_id: uuid.UUID) -> Decimal:
-    """ZAR sent by this user so far in the current UTC calendar month (FR-LIM-02)."""
-    now = datetime.now(timezone.utc)
-    start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    return await _sum_zar_since(db, user_id, start_of_month)
+    """ZAR sent by this user so far in the current local calendar month (FR-LIM-02)."""
+    return await _sum_zar_since(db, user_id, day_start_utc(display_today().replace(day=1)))
 
 
 # --- main check ---

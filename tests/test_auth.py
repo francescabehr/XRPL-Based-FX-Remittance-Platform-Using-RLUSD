@@ -71,3 +71,36 @@ async def test_login_invalid_credentials(client: AsyncClient):
     response = await client.post("/login", data={"email": "noone@example.com", "password": "wrong"})
     assert response.status_code == 401
     assert b"Invalid" in response.content
+
+
+# --- the seeded admin can actually log in (AUDIT #18) ---
+
+async def test_seeded_admin_email_is_normalised(db: AsyncSession, monkeypatch):
+    """AUDIT #18: seed_admin stored ADMIN_EMAIL verbatim while every lookup
+    lowercases, so an ADMIN_EMAIL with uppercase created an admin who could never
+    log in and whose duplicate check never matched."""
+    import app.database as database
+    from app.config import settings
+    from app.scripts import seed_admin
+    from app.services.auth_service import authenticate_user, get_user_by_email
+    from tests.conftest import _TestSession
+
+    monkeypatch.setattr(settings, "admin_email", "  Admin.User@Example.COM ")
+    monkeypatch.setattr(settings, "admin_mobile", " +27820000999 ")
+    monkeypatch.setattr(settings, "admin_name", "Seeded Admin")
+    monkeypatch.setattr(settings, "admin_password", "AdminPass1!")
+    monkeypatch.setattr(seed_admin, "AsyncSessionLocal", _TestSession)
+
+    await seed_admin.seed()
+
+    stored = await get_user_by_email(db, "admin.user@example.com")
+    assert stored is not None
+    assert stored.email == "admin.user@example.com"   # normalised, not verbatim
+    assert stored.mobile == "+27820000999"            # and stripped
+    assert stored.is_admin
+
+    # The thing that actually matters: they can log in.
+    assert await authenticate_user(db, "Admin.User@Example.COM", "AdminPass1!") is not None
+
+    # And re-seeding recognises them instead of trying to insert a duplicate.
+    await seed_admin.seed()

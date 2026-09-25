@@ -355,6 +355,57 @@ async def test_post_remittance_refuses_an_unreadable_price_lock(client, db, over
     assert await _count(db, sender.id) == 0            # nothing booked
 
 
+# --- arithmetic at the edges (AUDIT #11, #12) ---
+
+async def test_post_remittance_survives_an_absurd_amount(client, db):
+    """AUDIT #11: calculate_quote raises InvalidOperation on 1e40. /quote and the
+    review page handled it; this path caught only RemittanceError, so it 500ed."""
+    sender = await approved_sender(db)
+    ben = await beneficiary_for(db, sender, await registered_recipient(db))
+    form = await _post_form(db, ben, zar_amount="1e40")
+
+    with logged_in(sender):
+        r = await client.post("/remittances", data=form, follow_redirects=False)
+
+    assert r.status_code == 302        # not a 500
+    assert r.headers["location"].startswith("/send")
+    assert await _count(db, sender.id) == 0
+
+
+async def test_a_zero_effective_rate_is_a_503_not_a_500(client, db, seed_fee_config):
+    """AUDIT #12: DivisionByZero is a sibling of InvalidOperation, not a subclass,
+    so catching only InvalidOperation left a zero rate as an unhandled 500."""
+    from decimal import DivisionByZero, InvalidOperation
+    assert not issubclass(DivisionByZero, InvalidOperation)   # the premise
+
+    sender = await approved_sender(db)
+    ben = await beneficiary_for(db, sender, await registered_recipient(db))
+    seed_fee_config.market_rate_zar_per_usd = Decimal("0")
+    await db.commit()
+
+    with logged_in(sender):
+        quote = await client.get(f"/quote?beneficiary_id={ben.id}&zar_amount=1000")
+        review = await client.get(f"/send/review?beneficiary_id={ben.id}&zar_amount=1000",
+                                  follow_redirects=False)
+
+    assert quote.status_code == 503    # not 500
+    assert review.status_code == 302   # back to the send page with a message
+
+
+async def test_post_remittance_survives_a_zero_effective_rate(client, db, seed_fee_config):
+    sender = await approved_sender(db)
+    ben = await beneficiary_for(db, sender, await registered_recipient(db))
+    form = await _post_form(db, ben)              # priced while the rate is sane
+    seed_fee_config.market_rate_zar_per_usd = Decimal("0")
+    await db.commit()
+
+    with logged_in(sender):
+        r = await client.post("/remittances", data=form, follow_redirects=False)
+
+    assert r.status_code == 302        # not a 500
+    assert await _count(db, sender.id) == 0
+
+
 @pytest.mark.parametrize("missing", ["exchange_rate", "transaction_fee", "uctusd_amount"])
 async def test_post_remittance_refuses_a_missing_price_lock_field(client, db, missing):
     sender = await approved_sender(db)
@@ -422,3 +473,83 @@ async def test_cashin_patch_api_is_admin_only(client, db, monkeypatch):
         assert r.json()["cashin_status"] == "failed" and r.json()["cashin_updated_at"]
         again = await client.patch(f"/transactions/{txn.id}/cashin", json={"status": "received"})
         assert again.status_code == 409
+
+
+# --- abandoned cash-ins release their allowance (AUDIT #17) ---
+#
+# A pending cash-in must count against the sender's limit (excluding in-flight
+# rows would reopen the TOCTOU hole limit_service closes), so one that is never
+# confirmed held the sender's daily and monthly allowance permanently.
+
+async def _age_cashin(txn_id, hours):
+    from datetime import datetime, timedelta, timezone
+
+    from app.models.transaction import Transaction
+    from sqlalchemy import update as sa_update
+
+    async with _TestSession() as s:
+        await s.execute(
+            sa_update(Transaction).where(Transaction.id == txn_id).values(
+                created_at=datetime.now(timezone.utc) - timedelta(hours=hours)
+            )
+        )
+        await s.commit()
+
+
+async def test_an_abandoned_cashin_stops_consuming_allowance(db):
+    from app.services.limit_service import get_daily_usage, get_monthly_usage
+
+    txn, sender, _ = await remittance(db, "1000")
+    assert await get_daily_usage(db, sender.id) == Decimal("1000")   # held while pending
+
+    await _age_cashin(txn.id, hours=25)
+    async with _TestSession() as s:
+        assert await cashin_service.expire_stale_cashins(s) >= 1
+
+    assert await get_daily_usage(db, sender.id) == Decimal("0")
+    assert await get_monthly_usage(db, sender.id) == Decimal("0")
+
+    row = await cashin_service.get_transaction(db, txn.id)
+    assert row.cashin_status == CashInStatus.failed
+    assert "not confirmed in time" in row.cashin_failure_reason
+    assert row.settlement_status == SettlementStatus.not_queued  # nothing was sent
+
+
+async def test_a_fresh_pending_cashin_is_left_alone(db):
+    from app.services.limit_service import get_daily_usage
+
+    txn, sender, _ = await remittance(db, "1000")
+
+    async with _TestSession() as s:
+        await cashin_service.expire_stale_cashins(s)
+
+    row = await cashin_service.get_transaction(db, txn.id)
+    assert row.cashin_status == CashInStatus.pending          # still awaiting confirmation
+    assert await get_daily_usage(db, sender.id) == Decimal("1000")
+
+
+async def test_expiry_never_touches_a_confirmed_cashin(db):
+    """The guard that matters: a confirmed cash-in is settling, and must not be
+    dragged back to failed however old it is."""
+    txn, _, _ = await remittance(db, "1000")
+    await cashin_service.mark_cashin_received(db, txn, reviewer=None, enqueue=RecordingEnqueue())
+    await _age_cashin(txn.id, hours=24 * 30)
+
+    async with _TestSession() as s:
+        await cashin_service.expire_stale_cashins(s)
+
+    row = await cashin_service.get_transaction(db, txn.id)
+    assert row.cashin_status == CashInStatus.received
+    assert row.settlement_status == SettlementStatus.queued
+
+
+async def test_expiry_is_idempotent(db):
+    txn, _, _ = await remittance(db, "1000")
+    await _age_cashin(txn.id, hours=25)
+
+    async with _TestSession() as s:
+        first = await cashin_service.expire_stale_cashins(s)
+        second = await cashin_service.expire_stale_cashins(s)
+
+    assert first >= 1
+    assert second == 0        # nothing left to expire

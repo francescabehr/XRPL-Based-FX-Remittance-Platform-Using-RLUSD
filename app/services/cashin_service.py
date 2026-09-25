@@ -25,8 +25,8 @@ from app.models.user import KYCStatus, User
 from app.services import queue_service, xrpl_service
 from app.services.beneficiary_service import get_beneficiary, refresh_recipient_link
 from app.services.fx_service import AmountTooSmall, quote_for
-from app.services.limit_service import check_limit
-from app.workers.settlement_worker import complete_settlement
+from app.services.limit_service import check_limit, day_start_utc
+from app.workers.settlement_worker import complete_settlement, fail_settlement
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,19 @@ Enqueue = Callable[[str, str], object]
 
 # Mock processor: this test card is always declined, so FR-CI-04 can be demoed.
 DECLINED_TEST_CARD = "4000000000000002"
+
+# How long a cash-in may sit `pending` before it is abandoned (FR-LIM-01/02).
+#
+# A pending row holds the sender's daily and monthly allowance — in-flight rows
+# must count, or two concurrent sends would each see the same headroom (the
+# TOCTOU hole limit_service exists to close). Without an expiry, a send that is
+# never confirmed holds that allowance forever.
+#
+# Hours, not minutes: `pending` means "awaiting confirmation from the payment
+# processor", which in this build is an admin working the cash-in queue. A short
+# window would cancel perfectly good transactions waiting on a human. This is the
+# analogue of a card authorisation that is never captured.
+CASHIN_EXPIRY = timedelta(hours=24)
 
 
 class RemittanceError(ValueError):
@@ -194,15 +207,25 @@ async def create_remittance(
 
 
 async def _publish(db: AsyncSession, txn: Transaction, enqueue: Enqueue) -> None:
-    """Publish the settlement message; a queue outage fails visibly, never silently."""
+    """Publish the settlement message; a queue outage fails visibly, never silently.
+
+    The failure write is conditional on the row still being `queued`. Redis can
+    accept a job and still raise (a timeout on the response, say), so by the time
+    this runs a worker may already have claimed the row and moved it to
+    `processing`. Stamping `failed` over that worker used to leave the payment
+    landing on-ledger while complete_settlement's conditional matched nothing —
+    the recipient was never credited.
+    """
     try:
         enqueue(str(txn.idempotency_key), str(txn.id))
     except Exception as exc:  # noqa: BLE001 — Redis down, etc.
-        txn.settlement_status = SettlementStatus.failed
-        txn.xrpl_error_reason = f"queue_unavailable: {type(exc).__name__}; retry from the admin monitor"
-        db.add(txn)
-        await db.commit()
         logger.error("Could not enqueue settlement for %s: %s", txn.id, exc)
+        await fail_settlement(
+            db,
+            txn,
+            f"queue_unavailable: {type(exc).__name__}; retry from the admin monitor",
+            from_statuses=(SettlementStatus.queued,),
+        )
 
 
 async def mark_cashin_received(
@@ -275,6 +298,45 @@ def _is_stuck(txn: Transaction) -> bool:
     )
 
 
+async def expire_stale_cashins(
+    db: AsyncSession, older_than: timedelta = CASHIN_EXPIRY
+) -> int:
+    """Fail cash-ins that were never confirmed, releasing the allowance they hold.
+
+    One conditional UPDATE, guarded on the expected state: only `pending` rows
+    older than the window move, so a cash-in confirmed a moment ago is untouched
+    no matter how often this runs. Nothing on-chain has happened for these rows —
+    a pending cash-in is never queued for settlement — so failing them moves no
+    money; it only stops them consuming limit allowance indefinitely.
+
+    Returns how many were expired. Safe to run repeatedly.
+    """
+    cutoff = _now() - older_than
+    result = await db.execute(
+        update(Transaction)
+        .where(
+            Transaction.cashin_status == CashInStatus.pending,
+            Transaction.created_at < cutoff,
+        )
+        .values(
+            cashin_status=CashInStatus.failed,
+            cashin_failure_reason=(
+                "Payment was not confirmed in time; this transfer was cancelled. "
+                "Nothing was sent and your limit allowance has been released."
+            ),
+            cashin_updated_at=_now(),
+            updated_at=_now(),
+        )
+        .returning(Transaction.id)
+        .execution_options(synchronize_session=False)
+    )
+    expired = list(result.scalars().all())
+    await db.commit()
+    if expired:
+        logger.warning("Expired %s unconfirmed cash-in(s) older than %s", len(expired), older_than)
+    return len(expired)
+
+
 async def _refuse_unless_provably_dead(
     txn: Transaction,
     latest_ledger=xrpl_service.get_latest_validated_ledger,
@@ -303,6 +365,34 @@ async def _refuse_unless_provably_dead(
             "The server is missing ledger history for this attempt, so a missing "
             "payment proves nothing. Retry once its history is complete."
         )
+
+
+def _archived_attempts(txn: Transaction) -> list[dict]:
+    """The attempt history with the current attempt retired onto the end.
+
+    Hash and ledger range are archived together, never one without the other:
+    a bare hash cannot be investigated, because "absent from the ledger" is only
+    meaningful against the range the payment could have appeared in. Keeping the
+    hash but dropping the range would re-create the ambiguity that made the
+    wall-clock resend unsafe in the first place.
+
+    Written in the same conditional UPDATE that clears the live fields, so the
+    record moves rather than being destroyed.
+    """
+    history = list(txn.settlement_previous_attempts or [])
+    if not txn.xrpl_tx_hash:
+        return history  # nothing was ever signed; there is no attempt to keep
+    history.append(
+        {
+            "tx_hash": txn.xrpl_tx_hash,
+            "last_ledger_sequence": txn.settlement_last_ledger_sequence,
+            "submitted_ledger_index": txn.settlement_submitted_ledger_index,
+            "attempts": txn.settlement_attempts,
+            "failure_reason": txn.xrpl_error_reason,
+            "retired_at": _now().isoformat(),
+        }
+    )
+    return history
 
 
 async def retry_settlement(
@@ -344,7 +434,8 @@ async def retry_settlement(
             await _refuse_unless_provably_dead(txn, latest_ledger, ledger_range)
 
     # Guarded on status + updated_at: if anything touched the row since it was
-    # read, nothing changes and the admin is asked to refresh.
+    # read, nothing changes and the admin is asked to refresh. The archive is
+    # computed from that same read, so it cannot be built from stale data either.
     result = await db.execute(
         update(Transaction)
         .where(
@@ -356,11 +447,13 @@ async def retry_settlement(
             settlement_status=SettlementStatus.queued,
             settlement_attempts=0,
             xrpl_error_reason=None,
+            # Cleared so the row can be claimed and signed again — and archived
+            # first, hash and range together, so the retired attempt stays
+            # traceable on the ledger.
             xrpl_tx_hash=None,
-            # The dead attempt's range belongs to the dead attempt; the next
-            # signing writes its own.
             settlement_last_ledger_sequence=None,
             settlement_submitted_ledger_index=None,
+            settlement_previous_attempts=_archived_attempts(txn),
             updated_at=_now(),
         )
         .returning(Transaction.id)
@@ -390,11 +483,15 @@ async def requeue_stuck(
 # --- queries ---
 
 def _with_parties(stmt):
+    # populate_existing, for the same reason cashout_service._with_parties uses it:
+    # the settlement worker updates these rows in its own session, so a cached
+    # instance in this one could otherwise render a status, hash or attempt
+    # history that is already out of date.
     return stmt.options(
         selectinload(Transaction.beneficiary),
         selectinload(Transaction.sender),
         selectinload(Transaction.recipient),
-    )
+    ).execution_options(populate_existing=True)
 
 
 async def get_transaction(db: AsyncSession, txn_id: uuid.UUID) -> Optional[Transaction]:
@@ -458,8 +555,13 @@ MONITOR_LIMIT = 500
 
 
 def _day_bounds(day: date) -> datetime:
-    """UTC midnight at the start of `day` — timestamps are stored in UTC."""
-    return datetime.combine(day, time.min, tzinfo=timezone.utc)
+    """The UTC instant at which `day` begins in DISPLAY_TIMEZONE.
+
+    The admin picks a date in their own timezone and every timestamp on the page
+    is rendered in it, so the filter must bound the same local day. Building UTC
+    midnight instead silently dropped the first hours of each local day.
+    """
+    return day_start_utc(day)
 
 
 async def list_transactions(

@@ -250,6 +250,54 @@ async def test_timeout_result_is_unknown_not_a_failure(ledger, monkeypatch):
     assert result.tx_hash is not None
 
 
+async def test_validated_failure_is_read_from_the_real_library(monkeypatch):
+    """The classifier is matched against xrpl-py's ACTUAL wording, not a string
+    we wrote ourselves.
+
+    _VALIDATED_FAILURE is pinned to xrpl-py 4.0.0's
+    _wait_for_final_transaction_outcome. If a version bump rewords that message,
+    this test fails loudly — instead of every real tec* failure silently being
+    reclassified as UNKNOWN, which would strand cash-outs that should have been
+    reversed and left their reserves debited.
+
+    So: drive the real function with a ledger that validates a tec* result, let
+    it raise its own exception, and classify that.
+    """
+    from xrpl.asyncio.transaction import reliable_submission
+    from xrpl.models.requests import Ledger, Tx
+    from xrpl.models.response import Response, ResponseStatus
+
+    monkeypatch.setattr(reliable_submission, "_LEDGER_CLOSE_TIME", 0)
+
+    class LedgerValidatingATecFailure:
+        """Answers exactly the two requests the real polling loop makes."""
+
+        def __init__(self):
+            self.requests = []
+
+        async def _request_impl(self, request, *args, **kwargs):
+            self.requests.append(type(request).__name__)
+            if isinstance(request, Ledger):
+                # Still inside the window, so it goes on to look the tx up.
+                return Response(status=ResponseStatus.SUCCESS, result={"ledger_index": 100})
+            assert isinstance(request, Tx)
+            return Response(
+                status=ResponseStatus.SUCCESS,
+                result={"validated": True, "meta": {"TransactionResult": "tecPATH_DRY"}},
+            )
+
+    client = LedgerValidatingATecFailure()
+    with pytest.raises(XRPLReliableSubmissionException) as raised:
+        await reliable_submission._wait_for_final_transaction_outcome(
+            "ABCDEF", client, "tesSUCCESS", last_ledger_sequence=200
+        )
+
+    # The library really did consult the ledger before raising.
+    assert client.requests == ["Ledger", "Tx"]
+    # And the message it produced is one we read as a proven failure.
+    assert xrpl_service._classify(raised.value) == (xrpl_service.FAILED, "tecPATH_DRY")
+
+
 def test_unspecified_failure_with_a_hash_defaults_to_unknown():
     """The conservative default: anything signed but unresolved is not a failure."""
     assert xrpl_service.XRPLResult(False, "whatever", "HASH").resolution == xrpl_service.UNKNOWN

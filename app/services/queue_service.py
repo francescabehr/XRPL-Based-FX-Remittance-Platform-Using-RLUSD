@@ -20,6 +20,18 @@ SETTLE_JOB = "app.workers.settlement_worker.settle"
 BURN_JOB = "app.workers.cashout_worker.burn"
 JOB_TIMEOUT = 300  # seconds; a Testnet payment validates in ~4-10 s
 
+# Every settlement is signed by the one treasury account, and xrpl-py's autofill
+# reads that account's next sequence number per call. Two workers autofilling at
+# once get the SAME sequence: one payment validates and the other is rejected
+# tefPAST_SEQ. Held across the XRPL round trip — which is the point, since the
+# sequence is only consumed once the payment is submitted.
+#
+# The timeout matches JOB_TIMEOUT so a worker killed mid-payment cannot hold the
+# lock forever; RQ would have abandoned its job by then anyway.
+TREASURY_LOCK = "settlement:treasury-sequence"
+TREASURY_LOCK_TIMEOUT = JOB_TIMEOUT
+TREASURY_LOCK_WAIT = JOB_TIMEOUT
+
 _queue: Optional[Queue] = None
 
 
@@ -28,6 +40,20 @@ def get_queue() -> Queue:
     if _queue is None:
         _queue = Queue(QUEUE_NAME, connection=Redis.from_url(settings.redis_url))
     return _queue
+
+
+def treasury_lock():
+    """Serialise treasury signing across workers (see TREASURY_LOCK).
+
+    Returns a redis-py lock usable as a context manager. Acquiring blocks up to
+    TREASURY_LOCK_WAIT and raises on timeout, which the worker treats as a
+    transient failure — nothing has been signed at that point, so a retry is safe.
+    """
+    return get_queue().connection.lock(
+        TREASURY_LOCK,
+        timeout=TREASURY_LOCK_TIMEOUT,
+        blocking_timeout=TREASURY_LOCK_WAIT,
+    )
 
 
 def _job_kwargs(transaction_id: str, what: str = "settle transaction") -> dict:

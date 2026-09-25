@@ -11,16 +11,23 @@ import uuid
 
 
 async def seed() -> None:
+    # Normalised exactly as auth_service does. Login looks users up with
+    # email.lower().strip(), so an ADMIN_EMAIL with any uppercase used to create
+    # an admin who could never log in — and whose duplicate check never matched,
+    # so re-running this tried to insert them again.
+    email = (settings.admin_email or "").lower().strip()
+    mobile = (settings.admin_mobile or "").strip()
+
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(User).where(User.email == settings.admin_email))
+        result = await db.execute(select(User).where(User.email == email))
         if result.scalar_one_or_none():
-            print(f"Admin already exists: {settings.admin_email}")
+            print(f"Admin already exists: {email}")
             return
 
         admin = User(
             id=uuid.uuid4(),
-            email=settings.admin_email,
-            mobile=settings.admin_mobile,
+            email=email,
+            mobile=mobile,
             full_name=settings.admin_name,
             password_hash=get_password_hash(settings.admin_password),
             is_admin=True,
@@ -30,7 +37,7 @@ async def seed() -> None:
         )
         db.add(admin)
         await db.commit()
-        print(f"Admin created: {settings.admin_email}")
+        print(f"Admin created: {email}")
 
 
 if __name__ == "__main__":

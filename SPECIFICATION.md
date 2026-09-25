@@ -347,6 +347,32 @@ Summarised here; stated in full in [requirements.md](requirements.md) §9.2.
 - The platform relies on the issuer having Default Ripple enabled, which lets treasury-to-recipient
   payments find a path. The issuer controls that setting; it was confirmed working by test payment.
 
+**Two deliberate design decisions**, recorded so they are not mistaken for defects and "corrected"
+later:
+
+- **The cash-out fee is charged in USD before conversion (FR-CO-02).** The payout is
+  `(UCTUSD amount − fee) × rate`, not `(UCTUSD amount × rate) − fee`. Taking the fee first keeps a
+  single definition of the fee for both payout currencies — `cashout_fee_min_usd` is a USD floor, so
+  subtracting it after converting to ZAR would apply a USD figure to a ZAR amount — and makes the
+  completed payout equal the estimate shown at quote time, which is computed by the same function
+  (`fx_service.cashout_payout`, shared by the sender's quote and the recipient's cash-out). The two
+  formulas differ whenever the fee is non-zero. FR-CO-02's acceptance criterion in
+  [requirements.md](requirements.md) should read: *"Displayed payout matches (UCTUSD amount − fee) ×
+  rate for the selected currency, the fee being charged in USD before conversion."*
+  Note also that the cash-out fee is **destroyed in the burn** rather than retained as tokens: the
+  full `uctusd_amount` is burned and the fee is deducted only when computing the simulated fiat
+  payout, so the fee is not visible as platform revenue on-ledger. Any future platform P&L modelling
+  has to take it from the database, not from the treasury balance.
+
+- **The price lock refuses on any change, favourable or not.** Between the quote and the payment the
+  send is re-priced server-side, and the transaction is refused unless the exchange rate, the
+  transaction fee and the UCTUSD amount all still match what the sender was shown. A change in the
+  sender's favour is refused too. This is deliberate: the sender confirms exact figures, so what they
+  agreed to is what they pay, and there is never a payment at a price no screen ever displayed. It
+  matches the cash-out flow, which re-prices under the wallet lock and raises `PricingChanged` on any
+  difference. Loosening it to "refuse only if worse" would mean a sender could be charged a price they
+  never saw, and would split one rule into two.
+
 ---
 
 ## 12. Operations
@@ -367,9 +393,11 @@ attempt count, and are retried or recovered from there. Cash-outs with an unknow
 `/admin/cashout` for reconciliation against the ledger. Neither action re-sends a payment that the
 ledger has already accepted.
 
-**Timezone:** timestamps are stored and computed in UTC — including the daily and monthly limit
-windows, which reset at midnight UTC — and displayed in `DISPLAY_TIMEZONE`, by default South African
-Standard Time.
+**Timezone:** timestamps are stored in UTC and displayed in `DISPLAY_TIMEZONE`, by default South
+African Standard Time. Window boundaries are computed in that display timezone and converted to UTC
+for querying, so the daily and monthly limit windows reset at local midnight and the admin date
+filters cover the whole local day — the day a user reads on screen is the day their allowance is
+counted against.
 
 ---
 

@@ -63,7 +63,9 @@ async def get_quote(
     except AmountTooSmall as exc:
         # The amount is the problem, not the platform — 400, not 503.
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except (FXConfigError, InvalidOperation) as exc:
+    except (FXConfigError, ArithmeticError) as exc:
+        # ArithmeticError, not InvalidOperation: DivisionByZero is its sibling,
+        # not its subclass, and an effective rate of 0 raises that one.
         raise HTTPException(status_code=503, detail=f"Quote unavailable: {exc}") from exc
 
     # FR-LIM-03: an over-limit amount is surfaced here, before any payment step.
@@ -135,7 +137,7 @@ async def _quote_context(db: AsyncSession, user: User, beneficiary_id: str, zar_
         quote = await quote_for(db, amount, ben.payout_currency)
     except AmountTooSmall as exc:
         return {"error": str(exc)}
-    except (FXConfigError, InvalidOperation) as exc:
+    except (FXConfigError, ArithmeticError) as exc:
         return {"error": f"Quotes are unavailable right now: {exc}"}
 
     limit = await check_limit(db, user, quote.zar_amount)
@@ -298,6 +300,12 @@ async def create_remittance(
             card=cashin_service.MockCard(card_number, card_expiry, card_cvv, card_name),
             accepted=accepted,
         )
+    except (FXConfigError, ArithmeticError) as exc:
+        # calculate_quote raises InvalidOperation on an absurd amount (1e40) and
+        # DivisionByZero on a zero effective rate. /quote and _quote_context both
+        # handle these; this path used to let them become a 500.
+        set_flash(request, f"Quotes are unavailable right now: {exc}", "danger")
+        return _back_to_send(beneficiary_id, zar_amount)
     except cashin_service.RemittanceError as exc:
         ctx = await _quote_context(db, user, beneficiary_id, zar_amount)
         if "quote" not in ctx:

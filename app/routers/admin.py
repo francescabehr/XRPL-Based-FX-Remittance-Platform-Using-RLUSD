@@ -12,6 +12,7 @@ from app.dependencies import get_flash, require_admin, set_flash
 from app.models.transaction import CashInStatus, SettlementStatus
 from app.services import cashin_service, cashout_service, fx_service
 from app.services.kyc_service import (
+    KYCReviewError,
     approve_kyc,
     get_pending_submissions,
     get_submission_by_id,
@@ -77,7 +78,12 @@ async def kyc_approve(
         set_flash(request, "Submission not found.", "danger")
         return RedirectResponse(url="/admin/kyc", status_code=302)
 
-    await approve_kyc(db, submission, user)
+    try:
+        await approve_kyc(db, submission, user)
+    except KYCReviewError as exc:
+        set_flash(request, str(exc), "warning")
+        return RedirectResponse(url="/admin/kyc", status_code=302)
+
     set_flash(request, f"KYC approved for {submission.user.full_name}.", "success")
     return RedirectResponse(url="/admin/kyc", status_code=302)
 
@@ -97,6 +103,9 @@ async def kyc_reject(
 
     try:
         await reject_kyc(db, submission, user, reason)
+    except KYCReviewError as exc:
+        set_flash(request, str(exc), "warning")
+        return RedirectResponse(url="/admin/kyc", status_code=302)
     except ValueError as exc:
         set_flash(request, str(exc), "danger")
         return RedirectResponse(url=f"/admin/kyc/{submission_id}", status_code=302)

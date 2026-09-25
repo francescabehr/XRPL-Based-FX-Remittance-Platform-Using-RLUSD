@@ -22,7 +22,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Callable, Optional
 
 from sqlalchemy import and_, func, or_, select, update
@@ -78,14 +78,33 @@ class CashOutPricing:
 
 
 def parse_amount(raw: str) -> Decimal:
-    """Parse a user-entered UCTUSD amount to 6 dp, or refuse it."""
+    """Parse a user-entered UCTUSD amount to 6 dp, or refuse it.
+
+    Every rejection is a CashOutError, including the ones the quantise itself
+    raises: "1e40" is finite and positive but overflows at 6 dp, and escaping as a
+    bare InvalidOperation turned /cashout/preview into a 500.
+
+    ROUND_HALF_UP to match fx_service — a bare quantize() uses the context
+    default, ROUND_HALF_EVEN, so 1.0000005 rounded down here and up there.
+    """
     try:
         amount = Decimal(str(raw).strip().replace(",", ""))
     except (InvalidOperation, AttributeError, ValueError):
         raise CashOutError("Enter a valid UCTUSD amount.") from None
     if not amount.is_finite() or amount <= 0:
         raise CashOutError("Enter a cash-out amount greater than zero.")
-    return amount.quantize(QUANT_UCTUSD)
+
+    try:
+        amount = amount.quantize(QUANT_UCTUSD, rounding=ROUND_HALF_UP)
+    except ArithmeticError:
+        raise CashOutError("That cash-out amount is too large.") from None
+    if amount <= 0:
+        # Positive, but smaller than the ledger's smallest unit: it would reach
+        # uctusd() as zero and raise there instead of being refused here.
+        raise CashOutError(
+            f"The smallest amount you can cash out is {QUANT_UCTUSD:f} UCTUSD."
+        )
+    return amount
 
 
 def parse_currency(raw: str) -> PayoutCurrency:

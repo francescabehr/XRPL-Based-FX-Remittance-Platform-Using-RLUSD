@@ -6,8 +6,18 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, Enum as SAEnum, ForeignKey, Integer, Numeric, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Enum as SAEnum,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    text,
+)
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -101,6 +111,14 @@ class Transaction(Base):
     settlement_last_ledger_sequence: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     settlement_submitted_ledger_index: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     settlement_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    # Attempts retired by an admin retry, newest last. Each entry keeps the hash
+    # AND its ledger range together, because a hash without its range cannot be
+    # reasoned about — "not on the ledger" would again be indistinguishable from
+    # "this node cannot see it". Never read by the money path; it exists so a
+    # payment that may have landed is still traceable after a re-send.
+    settlement_previous_attempts: Mapped[list] = mapped_column(
+        JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb")
+    )
     xrpl_error_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     settled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
