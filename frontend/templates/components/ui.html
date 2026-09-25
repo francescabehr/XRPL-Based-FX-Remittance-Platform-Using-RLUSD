@@ -1,0 +1,107 @@
+{#- Layout and feedback components (UI_REDESIGN.md §4).
+
+    Usage:
+      {% from "components/ui.html" import stat_tile, progress, stepper, SEND_STEPS,
+                                          empty_state, drawer, flash, check_draw %}
+-#}
+
+{#- The send flow as it really is: /send (recipient + amount) → /send/review →
+    /send/pay → /transactions/{id}. -#}
+{%- set SEND_STEPS = ["Details", "Review", "Pay", "Status"] -%}
+
+{#- Progress bar filled with transform: scaleX. The text label keeps colour from
+    being the only signal. -#}
+{% macro progress(pct, label, tone=none) -%}
+{%- set value = [[pct|float, 0]|max, 100]|min -%}
+<div class="ds-progress{% if tone %} ds-progress--{{ tone }}{% endif %}" role="progressbar"
+     aria-label="{{ label }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ value|round|int }}"
+     data-progress="{{ value }}" style="--ds-progress: {{ value / 100 }}">
+  <div class="ds-progress__bar"></div>
+</div>
+{%- endmacro %}
+
+{#- A summary figure. `value` may be markup from amount(). -#}
+{% macro stat_tile(label, value, sublabel=none, pct=none, tone=none, href=none) -%}
+{%- set tag = "a" if href else "div" -%}
+<{{ tag }} class="ds-stat-tile{% if tone %} ds-stat-tile--{{ tone }}{% endif %}{% if href %} ds-card-link{% endif %}"{% if href %} href="{{ href }}"{% endif %}>
+  <span class="ds-stat-tile__label">{{ label }}</span>
+  <span class="ds-stat-tile__value">{{ value }}</span>
+  {%- if pct is not none %}{{ progress(pct, label, tone) }}{% endif %}
+  {%- if sublabel %}<span class="ds-stat-tile__sub">{{ sublabel }}</span>{% endif %}
+</{{ tag }}>
+{%- endmacro %}
+
+{#- Steps are labels or (label, href) pairs; `current` is 1-based. Completed
+    steps with an href link back. -#}
+{% macro stepper(steps, current, label="Progress") -%}
+{%- set count = steps|length -%}
+{%- set filled = ((current - 1) / (count - 1)) if count > 1 else 0 -%}
+<ol class="ds-stepper" aria-label="{{ label }}" style="--ds-steps: {{ count }}; --ds-step-progress: {{ [[filled, 0]|max, 1]|min }}">
+  {%- for step in steps %}
+  {%- set text = step if step is string else step[0] -%}
+  {%- set href = none if step is string else step[1] -%}
+  {%- set i = loop.index %}
+  <li class="ds-stepper__step{% if i < current %} is-done{% elif i == current %} is-current{% endif %}"{% if i == current %} aria-current="step"{% endif %}>
+    <span class="ds-stepper__marker" aria-hidden="true">{% if i < current %}<i class="bi bi-check-lg"></i>{% else %}{{ i }}{% endif %}</span>
+    <span class="ds-stepper__label">
+      {%- if href and i < current %}<a href="{{ href }}">{{ text }}</a>{% else %}{{ text }}{% endif -%}
+      {%- if i < current %}<span class="visually-hidden"> (completed)</span>{% endif -%}
+    </span>
+  </li>
+  {%- endfor %}
+</ol>
+{%- endmacro %}
+
+{#- Every list needs one. `action` = {"label": ..., "href": ..., "icon": optional}. -#}
+{% macro empty_state(title, message=none, action=none, icon="inbox") -%}
+<div class="ds-empty-state">
+  <span class="ds-empty-state__icon" aria-hidden="true"><i class="bi bi-{{ icon }}"></i></span>
+  <p class="ds-empty-state__title">{{ title }}</p>
+  {%- if message %}<p class="ds-empty-state__message">{{ message }}</p>{% endif %}
+  {%- if action %}
+  <a href="{{ action.href }}" class="btn btn-primary">
+    {%- if action.icon %}<i class="bi bi-{{ action.icon }} me-1" aria-hidden="true"></i>{% endif %}{{ action.label -}}
+  </a>
+  {%- endif %}
+</div>
+{%- endmacro %}
+
+{#- Right-hand detail drawer. Open it with a real link carrying
+    data-drawer-open="{{ id }}" so it degrades to a plain page without JS.
+      {% call drawer("txn-drawer", "Transfer details") %} … {% endcall %} -#}
+{% macro drawer(id, title) -%}
+<div class="ds-drawer-root" id="{{ id }}" hidden>
+  <div class="ds-drawer-backdrop" data-drawer-close></div>
+  <aside class="ds-drawer" role="dialog" aria-modal="true" aria-labelledby="{{ id }}-title" tabindex="-1">
+    <header class="ds-drawer__header">
+      <h2 class="ds-drawer__title" id="{{ id }}-title">{{ title }}</h2>
+      <button type="button" class="btn-close" data-drawer-close aria-label="Close"></button>
+    </header>
+    <div class="ds-drawer__body">{{ caller() }}</div>
+  </aside>
+</div>
+{%- endmacro %}
+
+{#- Flash message. kind ∈ success | info | warning | danger (Bootstrap names,
+    as set_flash() uses). Success and info auto-dismiss after 5s; warnings and
+    errors stay until closed. -#}
+{% macro flash(message, kind="info") -%}
+{%- set icons = {"success": "check-circle-fill", "info": "info-circle-fill",
+                 "warning": "exclamation-triangle-fill", "danger": "x-circle-fill"} -%}
+<div class="alert alert-{{ kind }} ds-flash" role="{{ 'alert' if kind in ('danger', 'warning') else 'status' }}"
+     {%- if kind in ("success", "info") %} data-autodismiss{% endif %}>
+  <i class="bi bi-{{ icons.get(kind, 'info-circle-fill') }} ds-flash__icon" aria-hidden="true"></i>
+  <div class="ds-flash__body">{{ message }}</div>
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
+</div>
+{%- endmacro %}
+
+{#- A check mark that draws itself once (pass drawn=false to trigger later
+    with UI.replay(el, "is-drawn")). -#}
+{% macro check_draw(size=48, drawn=true, label=none) -%}
+<svg class="ds-check-draw{% if drawn %} is-drawn{% endif %}" width="{{ size }}" height="{{ size }}" viewBox="0 0 52 52"
+     {%- if label %} role="img" aria-label="{{ label }}"{% else %} aria-hidden="true"{% endif %} focusable="false">
+  <circle cx="26" cy="26" r="24"/>
+  <path d="M15 27l7 7 15-15"/>
+</svg>
+{%- endmacro %}

@@ -10,7 +10,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.config import settings
 from app.database import AsyncSessionLocal, engine
 from app.services import cashin_service, cashout_service
-from app.routers import admin, auth, beneficiaries, cashout, kyc, sender, transactions, wallet
+from app.routers import admin, auth, beneficiaries, cashout, dev, kyc, sender, transactions, wallet
 
 
 logger = logging.getLogger(__name__)
@@ -93,6 +93,9 @@ app.include_router(transactions.router)
 app.include_router(wallet.router)
 app.include_router(cashout.router)
 app.include_router(admin.router)
+# Styleguide and other developer pages exist only when DEBUG=true.
+if settings.debug:
+    app.include_router(dev.router)
 
 
 @app.get("/")

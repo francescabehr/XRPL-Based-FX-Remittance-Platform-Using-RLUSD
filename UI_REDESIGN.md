@@ -5,7 +5,7 @@ This brief is for Claude Code. It explains how to redesign the front end of our 
 ## 0. Context
 
 - **App:** ECO5040W class project, a cross-border remittance prototype. A sender in South Africa pays ZAR, and the recipient receives UCTUSD, a test IOU on the XRPL Testnet, in a custodial web wallet. The recipient can then request a simulated fiat cash-out.
-- **Stack:** Python back end with server-rendered Jinja templates under `frontend/templates/`, extending `base.html`, and PostgreSQL.
+- **Stack:** Python (FastAPI) back end with server-rendered Jinja templates under `frontend/templates/`, extending `base.html`, and PostgreSQL. Static files live in `frontend/static/` and are served at `/static/`. Styling is **Bootstrap 5.3 (CDN), skinned** by `frontend/static/css/design-system.css`.
 - **Scope:** Visual and UX only. Do not change routes, form field names, business logic, fee or FX calculations, or database models unless a phase below says so explicitly. All existing tests must keep passing.
 - **Audience for the result:** Lecturers assessing a live demo. The demo path needs to look polished, clear and trustworthy, like a real fintech product.
 
@@ -22,6 +22,7 @@ Reference screenshots are in the `design_references/` folder in the project root
 | `stripe-landing.png` | Stripe | Bold marketing hero typography. Use it only as inspiration for the landing page. |
 | `uvodo-landing.png` | Uvodo | A friendly landing hero with floating "product" cards. |
 | `uvodo-onboarding.png` | Uvodo | A "Let's get you started" checklist card with a progress bar and completed and pending steps. |
+| `base-processing.png` | Base | A calm, centred "Processing — do not close this window" state. Use it for the **"Settling on XRPL…"** state (queued/processing settlements). |
 
 **Rules for using the references:**
 - Borrow **patterns and layout ideas only**.
@@ -47,14 +48,14 @@ Before any edits:
 1. **Templates:** List every template, the route that renders it, and which role sees it (sender, recipient, admin, public).
 2. **Styling:** Record how styling currently works: inline styles, a CSS file, a framework such as Bootstrap or Tailwind, or a mix.
 3. **Components:** Identify repeated UI pieces that should become shared macros or partials, such as buttons, cards, status badges, tables, forms, flash messages and amount displays.
-4. **Navigation:** Flag dead links (e.g. `/admin/cashout`, `/admin/transactions`) and inconsistencies.
+4. **Navigation:** Flag dead links and inconsistencies. (The Phase 1 audit found no dead links: `/admin/cashout` and `/admin/transactions` are live routes. See UI_AUDIT.md §4.)
 5. **Plan:** Propose which screens fall under the demo path (Phase 4) and which are secondary (Phase 5).
 
 Write the audit to `UI_AUDIT.md` in the project root, then stop and wait for approval.
 
 ## 4. Phase 2: Design system foundation
 
-Build `static/css/design-system.css`, or the project's equivalent static path. It should define:
+Build `frontend/static/css/design-system.css` (served at `/static/css/design-system.css`, loaded after Bootstrap in `base.html`). **Skin Bootstrap, don't replace it:** map the tokens onto Bootstrap's CSS variables and theme its own `.btn`, `.card`, `.badge`, `.alert`, `.table` and form classes in place. Keep the grid, collapse and dropdown JS. Anything Bootstrap doesn't have gets a new class prefixed `ds-`. It should define:
 
 - **CSS custom properties on `:root`:**
   - colour tokens: `--bg`, `--surface`, `--border`, `--text`, `--text-muted`, `--accent`, `--accent-hover`, `--accent-soft`, `--success`, `--warning`, `--danger`, `--info`, each with a `-soft` background variant;
@@ -63,11 +64,11 @@ Build `static/css/design-system.css`, or the project's equivalent static path. I
   - radius values;
   - one or two shadows.
 - **Base element styles:** body, headings, links, form inputs, selects, labels, focus rings (visible and accessible), and tables.
-- **Component classes:** `.btn` (primary / secondary / ghost / danger), `.card`, `.badge` with a status modifier, `.amount`, `.stat-tile`, `.stepper`, `.drawer`, `.empty-state`, `.flash`.
+- **Component classes:** themed Bootstrap `.btn-primary` / `.btn-outline-secondary` (secondary) / `.btn-danger`, plus `.ds-btn-ghost`; themed `.card`; `.badge` with a `.ds-status--{tone}` modifier; and the new `.ds-amount`, `.ds-stat-tile`, `.ds-progress`, `.ds-stepper`, `.ds-breakdown`, `.ds-drawer`, `.ds-empty-state`, `.ds-flash`, `.ds-card-link`.
 
-Also create Jinja macros in `templates/components/`:
+Also create Jinja macros in `frontend/templates/components/` (`status.html`, `money.html`, `ui.html`, `xrpl.html`):
 - `status_badge(status)`: a single source of truth that maps each status to a colour and label (see section 6).
-- `amount(value, currency, size)`
+- `amount(value, currency, size)`: matches the app's existing formats: `R1,000.00` (ZAR), `$1,000.00` (USD), `50.874404 UCTUSD` (UCTUSD, 6dp). The symbol/code and the number are always in one text node.
 - `stat_tile(label, value, sublabel)`
 - `stepper(steps, current)`
 - `empty_state(title, message, action)`
@@ -98,13 +99,13 @@ Motion must explain what is happening or confirm that something worked. It is ne
   - count-ups show the final value immediately;
   - state changes still happen, just instantly.
 
-**Utilities to build in `design-system.css`:**
-- `.fade-in` and `.slide-up`: small entrance animations, 8px of travel.
-- `.skeleton`: a grey block with a shimmer sweep, used as a loading placeholder.
-- `.pulse-dot`: a small pulsing dot for in-progress states.
-- `.check-draw`: an SVG check mark that draws itself with `stroke-dashoffset`.
-- `.drawer` open and close: slides in from the right, with a backdrop fading to ~40% opacity.
-- `.flash` enter and auto-dismiss:
+**Utilities to build in `design-system.css`** (all prefixed `ds-`):
+- `.ds-fade-in` and `.ds-slide-up`: small entrance animations, 8px of travel.
+- `.ds-skeleton`: a grey block with a shimmer sweep, used as a loading placeholder.
+- `.ds-pulse-dot`: a small pulsing dot for in-progress states.
+- `.ds-check-draw`: an SVG check mark that draws itself with `stroke-dashoffset`.
+- `.ds-drawer` open and close: slides in from the right, with a backdrop fading to ~40% opacity.
+- `.ds-flash` enter and auto-dismiss:
   - slides in from the top;
   - auto-dismisses after 5s for success and info messages only;
   - errors stay until closed.
@@ -112,7 +113,7 @@ Motion must explain what is happening or confirm that something worked. It is ne
   - buttons: darken on hover and scale to 0.98 on press;
   - cards: a slight lift on hover (`translateY(-2px)` plus a stronger shadow), applied only to clickable cards.
 
-**JS helpers.** Add a small `static/js/ui.js`, loaded with `defer`:
+**JS helpers.** Add a small `frontend/static/js/ui.js`, loaded with `defer`:
 - `countUp(el, to, {duration})`: animates a number to a new value with tabular numerals and correct decimal places. It respects reduced motion.
 - `copyToClipboard(btn)`: swaps the label to "Copied" for 1.5s.
 - Drawer open and close:
@@ -131,22 +132,26 @@ Rebuild `base.html`:
   - the active state highlighted with `--accent-soft`;
   - user name and initials avatar at the bottom, with logout.
 - **Top bar:** page title, plus the KYC status badge for non-admin users.
-- **Flash messages:** styled with the `.flash` variants.
-- **Dead links:** remove or hide nav links that have no route.
+- **Flash messages:** styled with the `.ds-flash` variants.
+- **Navigation fixes (from UI_AUDIT.md §4):** role-aware links (send/beneficiaries/history only for `can_send`; wallet, cash out and **My cash-outs** (`/cashout/history`) for `can_receive`), an active state, admin links in workflow order starting at the new **Overview** (`/admin`), and the accessibility gaps (labels tied to inputs, `aria-label` on icon buttons, `aria-hidden` icons, disabled actions that are really disabled).
+- **Flash name clash:** `base.html` reads a `flash` context variable. Import the flash macro under an alias (e.g. `flash as flash_message`), because a top-level name `flash` in a child template shadows that variable.
 
 ## 6. Status vocabulary
 
-Every status is displayed through the `status_badge` macro.
+Every status is displayed through the macros in `frontend/templates/components/status.html` (`status_badge(status, domain)`, `transaction_badge(txn)`, `cashout_badge(req)`). The table below uses the **real enum values from the models** (approved in the Phase 1 review). Badges always include their text label.
 
-| Domain | Statuses |
-|---|---|
-| KYC | not_submitted, pending, approved, rejected |
-| Cash-in | awaiting_payment, confirmed, failed |
-| Settlement | queued, submitted, validated, failed |
-| Cash-out | requested, approved, completed, failed |
+| Domain | Enum values (code) | Label → colour |
+|---|---|---|
+| KYC (`users.kyc_status`) | not_submitted, pending, approved, rejected | Not started → grey; Awaiting approval → amber; Verified → green; Rejected → red |
+| KYC submission (`kyc_submissions.status`) | pending, approved, rejected | as above |
+| Cash-in (`transactions.cashin_status`) | pending, received, failed | Awaiting payment → amber; Payment received → green; Failed → red |
+| Settlement (`transactions.settlement_status`) | not_queued, queued, processing, completed, failed | Not started → grey; Queued → amber; Settling on XRPL… → amber + pulse; Settled on XRPL → green; Failed → red |
+| Transaction overall | derived: failed cash-in → Failed; pending cash-in → Awaiting payment; otherwise the settlement state | reuses the rows above |
+| Cash-out (`cashout_requests.status`) | requested, approved, completed, failed, plus the derived **Awaiting ledger confirmation** (approved + burn hash + outcome unknown) | Requested → amber; Approved → amber + pulse; Awaiting ledger confirmation → amber; Completed → green; Failed → red |
+| Beneficiary link | linked / not registered | Linked → green; Not registered → grey |
+| AML flag | boolean | AML review → red |
 
-- **Colours:** green for approved, confirmed, validated and completed; amber for pending, awaiting_payment, queued, submitted and requested; red for rejected and failed; grey for not_submitted.
-- **Match the code:** Use the real status values from the models. If they differ from this table, follow the code and update this table.
+The pulse dot marks only states that are genuinely in progress. Keep any text the tests assert on verbatim (e.g. "Awaiting ledger confirmation").
 
 ## 7. Phase 4: Demo-path screens (highest priority)
 
@@ -154,7 +159,7 @@ Redesign these screens in order. After each one, run the tests and check it at d
 
 ### 7.1 Onboarding and KYC (pattern: Uvodo checklist)
 
-**Placement:** On the sender dashboard, until the user is fully set up.
+**Placement:** On the shared `/dashboard`, until the user is fully set up. The dashboard is **role-aware**: `can_send` users see the onboarding/KYC, limits and send content; `can_receive` users see a wallet-balance section with a **Cash out** button; dual-role users see both.
 
 **Content:**
 - A "Get started" card with a progress bar and three steps:
@@ -168,7 +173,7 @@ Redesign these screens in order. After each one, run the tests and check it at d
 
 **Motion:**
 - The progress bar fills to its current value on load, using `scaleX` over `--dur-slow`.
-- A step that has just been completed shows `.check-draw` once.
+- A step that has just been completed shows `.ds-check-draw` once.
 
 ### 7.2 Sender dashboard (pattern: Wise home)
 
@@ -183,14 +188,14 @@ Redesign these screens in order. After each one, run the tests and check it at d
 
 ### 7.3 Send flow and quote (pattern: Wise send flow)
 
-- **Stepper:** Recipient → Amount → Review → Pay (cash-in). Map these steps onto the existing routes and forms; do not change the logic.
+- **Stepper:** **Details → Review → Pay → Status**, matching the real routes: Details = `/send` (recipient and amount on one GET form; do **not** split it into separate routes), Review = `/send/review`, Pay = `/send/pay`, Status = `/transactions/{id}`. Do not change the logic.
 - **Amount step:**
   - The ZAR input is prominent.
   - Below it, a live breakdown with one row each for: exchange rate, transaction fee, FX margin, net amount converted, **Recipient gets X UCTUSD** (the hero figure), cash-out fee, and estimated payout.
-  - Every value comes from the existing `/quote` endpoint; do not recompute anything in the front end.
+  - Every value comes from the existing `GET /quote` endpoint (JSON; also returns `limit_ok`, `limit_reason`, `daily_remaining`, `monthly_remaining`); do not recompute anything in the front end.
 - **Limits:** If the amount would exceed the daily or monthly limit, show an inline error explaining which limit and by how much.
 - **Review step:** A summary card and a clear confirm button.
-- **Pay step:** The simulated cash-in instructions, e.g. a reference number, and a status of "awaiting confirmation".
+- **Pay step:** The simulated card form (`/send/pay`; keep the hidden price-lock inputs). After submit, the **Status** step (`/transactions/{id}`) shows the reference and "Awaiting payment" until an admin confirms the cash-in, then the settlement progress.
 
 **Motion:**
 - **Stepper:** The connector fills between steps as the user advances.
@@ -199,12 +204,12 @@ Redesign these screens in order. After each one, run the tests and check it at d
   - `countUp` moves "Recipient gets" to its new value; the other rows cross-fade.
   - While a request is in flight, dim the breakdown slightly. Do not blank it.
 - **Limit error:** The inline error slides down in place. No shaking.
-- **Confirmation:** When cash-in is confirmed, show a success state with `.check-draw` and the summary card sliding up.
+- **Confirmation:** On the Status page, when the cash-in is confirmed and the settlement validates (seen via polling), show a success state with `.ds-check-draw` and the summary card sliding up.
 
 ### 7.4 Recipient wallet (pattern: Revolut list and drawer)
 
 - **Top:** The balance in large type (UCTUSD), with a **Cash out** button.
-- **List:** Transactions show incoming and outgoing icons, a counterparty, a date, a signed amount and a status. Failed items are struck through with a red marker.
+- **List:** Merge incoming remittances and **cash-outs (as outgoing)** into one list; the project brief requires the wallet to show outgoing/cash-out transactions. Each item shows an incoming/outgoing icon, a counterparty, a date, a signed amount and a status. Failed items are struck through with a red marker. `/cashout/history` stays, and gets a nav entry.
 - **Detail drawer:** Clicking a transaction opens a right-hand drawer, or a full page on mobile. It shows:
   - status, amount, fee, exchange rate and dates;
   - the **XRPL transaction hash**, with a copy button and a link to the Testnet explorer.
@@ -212,13 +217,13 @@ Redesign these screens in order. After each one, run the tests and check it at d
 - **No-JS fallback:** Without JavaScript, the drawer can be a plain detail page.
 
 **Motion.** This is the showcase moment of the demo.
-- **In-progress settlements:** Queued and submitted transactions show `.pulse-dot` next to "Settling on XRPL…".
+- **In-progress settlements:** Queued and submitted transactions show `.ds-pulse-dot` next to "Settling on XRPL…".
 - **Live status updates:** While any transaction on the page is in progress, poll its status every 2–3s.
   - Use a lightweight JSON status endpoint; one read-only GET route is allowed for this.
   - Stop polling once every transaction on the page has reached a final state, or after 2 minutes.
 - **On validation:**
   - the badge colour-transitions to green;
-  - `.check-draw` plays once;
+  - `.ds-check-draw` plays once;
   - the balance counts up to its new value;
   - the XRPL hash appears in the row and drawer with a fade-in.
 - **On failure:** The badge turns red and the amount strikes through, animating the line across. There is no celebratory motion.
@@ -235,13 +240,13 @@ Redesign these screens in order. After each one, run the tests and check it at d
 
 **Motion:**
 - The "You receive" figure uses the same `countUp` behaviour as the send flow.
-- In the status timeline, the current step shows `.pulse-dot` and completed steps are solid.
+- In the status timeline, the current step shows `.ds-pulse-dot` and completed steps are solid.
 
 ### 7.6 Admin area (pattern: Stripe dashboard)
 
-- **Overview:** Stat tiles for pending KYC, cash-ins awaiting confirmation, pending cash-outs, failed settlements and settlements validated today.
+- **Overview:** A new page at `/admin` (behind `require_admin`) and the admin landing page after login. Stat tiles for pending KYC, cash-ins awaiting confirmation, pending cash-outs, failed settlements and settlements validated today.
 - **Queues:** KYC, cash-in and cash-out queues are clean tables. Each row has a status badge and inline Approve / Reject actions.
-- **Actions:** Destructive or irreversible actions ask for confirmation.
+- **Actions:** Destructive or irreversible actions ask for confirmation. This includes cash-in received/failed, cash-out approve and settlement retry (in-page confirmation, not only native `confirm()`).
 - **Failed settlements:** Listed prominently, like Stripe's "Failed payments".
 - **Config pages:** Fee and limit configuration forms sit in cards with clear labels and units.
 
@@ -253,20 +258,20 @@ Redesign these screens in order. After each one, run the tests and check it at d
 ## 8. Phase 5: Secondary screens
 
 These screens should be consistent with the design system but need less polish:
-- landing page, including a simple hero inspired by the Uvodo and Stripe landing pages;
+- landing page at `/` for signed-out users (new route; lower priority), including a simple hero inspired by the Uvodo and Stripe landing pages;
 - login and register;
-- profile;
+- profile at `/profile` (new route; lower priority);
 - beneficiaries list and form;
 - full transaction history;
 - empty states (every list needs one);
-- 404 and 403 pages.
+- 404 and 403 pages (new HTML exception handlers; today FastAPI returns JSON).
 
 ## 9. Working rules for Claude Code
 
 - **Approval gates:** Work phase by phase. Stop after Phase 1 and Phase 2 for review.
-- **Dependencies:** Avoid heavy new ones. Plain CSS with custom properties is preferred; if the project already uses a CSS framework, work with it rather than adding another. Small vanilla JS is fine for the drawer, copy buttons and live quote updates.
-- **Preserve behaviour:** Keep every form's `name`s, `action`s and CSRF tokens unchanged, and keep existing element IDs that tests depend on.
-- **Tests:** Run the test suite after each screen. If tests assert on HTML text that you have changed, update the assertions only where the change is purely cosmetic, and list those changes.
+- **Dependencies:** Avoid heavy new ones. The project uses Bootstrap 5.3: **skin it** via CSS custom properties and in-place theming of its own classes. Never add a second framework or create classes that collide with Bootstrap's. New classes are prefixed `ds-`. Small vanilla JS is fine for the drawer, copy buttons and live quote updates.
+- **Preserve behaviour:** Keep every form's `name`s, `action`s and methods unchanged (including the hidden price-lock inputs), keep existing element IDs, and keep the attribute order the perf harness scrapes (UI_AUDIT.md §6).
+- **Tests:** Run the test suite after each screen. Keep any text the tests assert on verbatim (list in UI_AUDIT.md §6).
 - **Security:** Never render private keys, seeds or secrets in any template, including dev pages.
 - **Motion checks:** Test with reduced motion enabled. In Chrome DevTools, open Rendering and emulate `prefers-reduced-motion`. Every screen must still work and make sense with it on.
 - **Verification:** After each phase, take screenshots at 1440px and 390px widths (headless browser if available). Compare them against this brief and the references, and fix what's off before reporting.

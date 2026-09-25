@@ -1,0 +1,882 @@
+/* ==========================================================================
+   Design system — tokens, Bootstrap skin, ds- components, motion.
+
+   Rules (UI_REDESIGN.md §9):
+   - Bootstrap is skinned, not replaced: its own classes (.btn, .card, .badge,
+     .alert, .table, .form-control…) are themed in place.
+   - Anything Bootstrap does not have is a new class prefixed `ds-`.
+   - Motion animates transform/opacity only (colour on badges and buttons),
+     never blocks an action, and collapses to ~0ms under reduced motion.
+   ========================================================================== */
+
+
+/* 1. Tokens ---------------------------------------------------------------- */
+
+:root {
+  /* Colour */
+  --bg: #F7F7FA;
+  --surface: #FFFFFF;
+  --border: #E6E6EE;
+  --border-strong: #D5D6E0;
+  --border-input: #868B9C;   /* 3.4:1 on white — form controls must meet 3:1 (WCAG 1.4.11) */
+  --text: #16161D;
+  --text-muted: #5B6071;
+
+  --accent: #4F46E5;
+  --accent-hover: #4338CA;
+  --accent-active: #3730A3;
+  --accent-soft: #EEF0FF;
+
+  --success: #177245;
+  --success-soft: #E7F6EE;
+  --warning: #A2560B;
+  --warning-soft: #FEF3E2;
+  --danger: #C2272D;
+  --danger-hover: #A11F24;
+  --danger-soft: #FDECEC;
+  --info: #1F5BD8;
+  --info-soft: #EAF1FE;
+  --neutral: #5B6071;
+  --neutral-soft: #EFF0F4;
+
+  /* Type */
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-amount-lg: 2rem;
+  --text-amount-xl: clamp(2.25rem, 5vw, 3.25rem);
+
+  /* Spacing — 4px base */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Shape */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --shadow-sm: 0 1px 2px rgba(22, 22, 29, 0.04), 0 1px 3px rgba(22, 22, 29, 0.06);
+  --shadow-md: 0 4px 12px rgba(22, 22, 29, 0.08), 0 2px 4px rgba(22, 22, 29, 0.04);
+
+  /* Motion */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+
+  /* 2. Bootstrap mapping --------------------------------------------------- */
+
+  --bs-body-bg: var(--bg);
+  --bs-body-bg-rgb: 247, 247, 250;
+  --bs-body-color: var(--text);
+  --bs-body-color-rgb: 22, 22, 29;
+  --bs-body-font-family: var(--font-sans);
+  --bs-font-sans-serif: var(--font-sans);
+  --bs-font-monospace: var(--font-mono);
+  --bs-emphasis-color: var(--text);
+  --bs-secondary-color: var(--text-muted);
+  --bs-secondary-bg: var(--neutral-soft);
+  --bs-tertiary-bg: var(--bg);
+  --bs-border-color: var(--border);
+  --bs-border-radius: var(--radius-md);
+  --bs-border-radius-sm: var(--radius-sm);
+  --bs-border-radius-lg: var(--radius-lg);
+  --bs-border-radius-pill: var(--radius-pill);
+  --bs-link-color: var(--accent);
+  --bs-link-color-rgb: 79, 70, 229;
+  --bs-link-hover-color: var(--accent-hover);
+  --bs-link-hover-color-rgb: 67, 56, 202;
+  --bs-code-color: var(--accent-hover);
+  --bs-focus-ring-color: rgba(79, 70, 229, 0.25);
+
+  --bs-primary: var(--accent);
+  --bs-primary-rgb: 79, 70, 229;
+  --bs-primary-bg-subtle: var(--accent-soft);
+  --bs-primary-text-emphasis: var(--accent-hover);
+  --bs-primary-border-subtle: #D6D9FB;
+
+  --bs-secondary: var(--neutral);
+  --bs-secondary-rgb: 91, 96, 113;
+  --bs-secondary-bg-subtle: var(--neutral-soft);
+  --bs-secondary-text-emphasis: var(--neutral);
+  --bs-secondary-border-subtle: var(--border-strong);
+
+  --bs-success: var(--success);
+  --bs-success-rgb: 23, 114, 69;
+  --bs-success-bg-subtle: var(--success-soft);
+  --bs-success-text-emphasis: var(--success);
+  --bs-success-border-subtle: #BFE5CF;
+
+  --bs-warning: var(--warning);
+  --bs-warning-rgb: 162, 86, 11;
+  --bs-warning-bg-subtle: var(--warning-soft);
+  --bs-warning-text-emphasis: var(--warning);
+  --bs-warning-border-subtle: #F7D9AE;
+
+  --bs-danger: var(--danger);
+  --bs-danger-rgb: 194, 39, 45;
+  --bs-danger-bg-subtle: var(--danger-soft);
+  --bs-danger-text-emphasis: var(--danger);
+  --bs-danger-border-subtle: #F6C4C6;
+
+  --bs-info: var(--info);
+  --bs-info-rgb: 31, 91, 216;
+  --bs-info-bg-subtle: var(--info-soft);
+  --bs-info-text-emphasis: var(--info);
+  --bs-info-border-subtle: #C6D8FB;
+
+  --bs-light-rgb: 247, 247, 250;
+}
+
+
+/* 3. Bootstrap component theming ------------------------------------------- */
+
+/* Buttons: pill, semibold, darken on hover, press to 0.98. */
+.btn {
+  --bs-btn-border-radius: var(--radius-pill);
+  --bs-btn-font-weight: 600;
+  --bs-btn-padding-x: 1.125rem;
+  --bs-btn-focus-box-shadow: 0 0 0 3px rgba(var(--bs-btn-focus-shadow-rgb), 0.3);
+  transition:
+    color var(--dur-fast) var(--ease-in-out),
+    background-color var(--dur-fast) var(--ease-in-out),
+    border-color var(--dur-fast) var(--ease-in-out),
+    box-shadow var(--dur-fast) var(--ease-in-out),
+    transform var(--dur-fast) var(--ease-in-out);
+}
+.btn:active,
+.btn.active { transform: scale(0.98); }
+.btn-sm { --bs-btn-padding-x: 0.75rem; }
+
+.btn-primary {
+  --bs-btn-bg: var(--accent);
+  --bs-btn-border-color: var(--accent);
+  --bs-btn-hover-bg: var(--accent-hover);
+  --bs-btn-hover-border-color: var(--accent-hover);
+  --bs-btn-active-bg: var(--accent-active);
+  --bs-btn-active-border-color: var(--accent-active);
+  --bs-btn-disabled-bg: var(--accent);
+  --bs-btn-disabled-border-color: var(--accent);
+  --bs-btn-focus-shadow-rgb: 79, 70, 229;
+}
+.btn-success {
+  --bs-btn-bg: var(--success);
+  --bs-btn-border-color: var(--success);
+  --bs-btn-hover-bg: #125C37;
+  --bs-btn-hover-border-color: #125C37;
+  --bs-btn-active-bg: #0E4A2C;
+  --bs-btn-active-border-color: #0E4A2C;
+  --bs-btn-disabled-bg: var(--success);
+  --bs-btn-disabled-border-color: var(--success);
+  --bs-btn-focus-shadow-rgb: 23, 114, 69;
+}
+.btn-danger {
+  --bs-btn-bg: var(--danger);
+  --bs-btn-border-color: var(--danger);
+  --bs-btn-hover-bg: var(--danger-hover);
+  --bs-btn-hover-border-color: var(--danger-hover);
+  --bs-btn-active-bg: #86191D;
+  --bs-btn-active-border-color: #86191D;
+  --bs-btn-disabled-bg: var(--danger);
+  --bs-btn-disabled-border-color: var(--danger);
+  --bs-btn-focus-shadow-rgb: 194, 39, 45;
+}
+.btn-warning {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: var(--warning);
+  --bs-btn-border-color: var(--warning);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: #85460A;
+  --bs-btn-hover-border-color: #85460A;
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: #6E3A08;
+  --bs-btn-active-border-color: #6E3A08;
+  --bs-btn-focus-shadow-rgb: 162, 86, 11;
+}
+.btn-outline-primary {
+  --bs-btn-color: var(--accent);
+  --bs-btn-border-color: #C9CCF8;
+  --bs-btn-hover-color: var(--accent-hover);
+  --bs-btn-hover-bg: var(--accent-soft);
+  --bs-btn-hover-border-color: var(--accent);
+  --bs-btn-active-color: var(--accent-active);
+  --bs-btn-active-bg: #E1E4FD;
+  --bs-btn-active-border-color: var(--accent);
+  --bs-btn-disabled-color: var(--accent);
+  --bs-btn-disabled-border-color: #C9CCF8;
+  --bs-btn-focus-shadow-rgb: 79, 70, 229;
+}
+/* "Secondary" in the brief = white pill with a subtle border. */
+.btn-outline-secondary {
+  --bs-btn-color: var(--text);
+  --bs-btn-bg: var(--surface);
+  --bs-btn-border-color: var(--border-strong);
+  --bs-btn-hover-color: var(--text);
+  --bs-btn-hover-bg: var(--neutral-soft);
+  --bs-btn-hover-border-color: var(--border-strong);
+  --bs-btn-active-color: var(--text);
+  --bs-btn-active-bg: #E4E5EC;
+  --bs-btn-active-border-color: var(--border-strong);
+  --bs-btn-disabled-color: var(--text-muted);
+  --bs-btn-disabled-border-color: var(--border);
+  --bs-btn-focus-shadow-rgb: 91, 96, 113;
+}
+.btn-outline-danger {
+  --bs-btn-color: var(--danger);
+  --bs-btn-border-color: var(--bs-danger-border-subtle);
+  --bs-btn-hover-color: var(--danger-hover);
+  --bs-btn-hover-bg: var(--danger-soft);
+  --bs-btn-hover-border-color: var(--danger);
+  --bs-btn-active-color: var(--danger-hover);
+  --bs-btn-active-bg: #FAD9DA;
+  --bs-btn-active-border-color: var(--danger);
+  --bs-btn-focus-shadow-rgb: 194, 39, 45;
+}
+.btn-outline-success {
+  --bs-btn-color: var(--success);
+  --bs-btn-border-color: var(--bs-success-border-subtle);
+  --bs-btn-hover-color: #125C37;
+  --bs-btn-hover-bg: var(--success-soft);
+  --bs-btn-hover-border-color: var(--success);
+  --bs-btn-active-color: #125C37;
+  --bs-btn-active-bg: #D3EFE0;
+  --bs-btn-active-border-color: var(--success);
+  --bs-btn-focus-shadow-rgb: 23, 114, 69;
+}
+.btn-link {
+  --bs-btn-color: var(--accent);
+  --bs-btn-hover-color: var(--accent-hover);
+  --bs-btn-active-color: var(--accent-active);
+  --bs-btn-font-weight: 600;
+  text-decoration: none;
+}
+/* Ghost: a quiet action that still reads as a button. */
+.ds-btn-ghost {
+  --bs-btn-color: var(--accent);
+  --bs-btn-bg: transparent;
+  --bs-btn-border-color: transparent;
+  --bs-btn-hover-color: var(--accent-hover);
+  --bs-btn-hover-bg: var(--accent-soft);
+  --bs-btn-hover-border-color: transparent;
+  --bs-btn-active-color: var(--accent-active);
+  --bs-btn-active-bg: #E1E4FD;
+  --bs-btn-active-border-color: transparent;
+  --bs-btn-disabled-color: var(--text-muted);
+  --bs-btn-disabled-bg: transparent;
+  --bs-btn-disabled-border-color: transparent;
+  --bs-btn-focus-shadow-rgb: 79, 70, 229;
+}
+
+/* Cards: white on the near-white ground, soft border + shadow. */
+.card {
+  --bs-card-bg: var(--surface);
+  --bs-card-border-color: var(--border);
+  --bs-card-border-radius: var(--radius-lg);
+  --bs-card-inner-border-radius: calc(var(--radius-lg) - 1px);
+  --bs-card-cap-bg: transparent;
+  --bs-card-cap-padding-y: 0.875rem;
+  --bs-card-spacer-x: 1.25rem;
+  box-shadow: var(--shadow-sm);
+}
+.card.shadow-sm { box-shadow: var(--shadow-sm) !important; }
+.card-header { font-weight: 600; }
+
+/* Tables: transparent inside cards, quiet header. */
+.table {
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--text);
+  --bs-table-border-color: var(--border);
+  --bs-table-hover-bg: rgba(79, 70, 229, 0.035);
+  --bs-table-hover-color: var(--text);
+  --bs-table-striped-bg: rgba(22, 22, 29, 0.02);
+}
+.table > :not(caption) > * > * { padding: 0.75rem 1rem; }
+.table-light {
+  --bs-table-bg: var(--bg);
+  --bs-table-color: var(--text-muted);
+  --bs-table-border-color: var(--border);
+}
+.table > thead th {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Badges: pill, semibold. Status colours come from .ds-status--*. */
+.badge {
+  --bs-badge-font-weight: 600;
+  --bs-badge-border-radius: var(--radius-pill);
+  --bs-badge-padding-x: 0.625em;
+  --bs-badge-padding-y: 0.375em;
+  letter-spacing: 0.01em;
+}
+
+/* Alerts: soft fill, no heavy border. */
+.alert {
+  --bs-alert-border-radius: var(--radius-md);
+  --bs-alert-border-color: transparent;
+}
+
+/* Bootstrap progress (kept for legacy markup; new code uses .ds-progress). */
+.progress {
+  --bs-progress-bg: var(--neutral-soft);
+  --bs-progress-bar-bg: var(--accent);
+  --bs-progress-border-radius: var(--radius-pill);
+}
+
+/* Forms */
+.form-control,
+.form-select {
+  background-color: var(--surface);
+  border-color: var(--border-input);
+  border-radius: var(--radius-md);
+  transition:
+    border-color var(--dur-fast) var(--ease-in-out),
+    box-shadow var(--dur-fast) var(--ease-in-out);
+}
+.form-control-sm,
+.form-select-sm { border-radius: var(--radius-sm); }
+.form-control:focus,
+.form-select:focus {
+  background-color: var(--surface);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+}
+.form-control::placeholder { color: #6B7082; }
+.form-control:disabled,
+.form-select:disabled { background-color: var(--neutral-soft); }
+.input-group-text {
+  background: var(--bg);
+  border-color: var(--border-input);
+  color: var(--text-muted);
+}
+.form-check-input {
+  background-color: var(--surface);
+  border-color: var(--border-input);
+}
+.form-check-input:checked {
+  background-color: var(--accent);
+  border-color: var(--accent);
+}
+.form-check-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+}
+.form-text { color: var(--text-muted); }
+
+/* Dropdowns / lists / nav */
+.dropdown-menu {
+  --bs-dropdown-bg: var(--surface);
+  --bs-dropdown-border-color: var(--border);
+  --bs-dropdown-border-radius: var(--radius-md);
+  --bs-dropdown-link-active-bg: var(--accent);
+  --bs-dropdown-link-hover-bg: var(--accent-soft);
+  box-shadow: var(--shadow-md);
+}
+.list-group {
+  --bs-list-group-bg: var(--surface);
+  --bs-list-group-border-color: var(--border);
+  --bs-list-group-action-hover-bg: var(--accent-soft);
+  --bs-list-group-active-bg: var(--accent);
+  --bs-list-group-active-border-color: var(--accent);
+}
+
+
+/* 4. Base elements ---------------------------------------------------------- */
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6 {
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--text);
+}
+.form-label { font-weight: 500; }
+.text-muted { color: var(--text-muted) !important; }
+code, .font-monospace { font-family: var(--font-mono); }
+
+/* One visible focus ring for keyboard users everywhere. */
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.tnum { font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
+
+
+/* 5. Components ------------------------------------------------------------- */
+
+/* Amount — money is the hero. Symbol/code and number share one text node. */
+.ds-amount {
+  font-weight: 600;
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  color: var(--text);
+}
+.ds-amount--sm { font-size: var(--text-sm); }
+.ds-amount--md { font-size: var(--text-base); }
+.ds-amount--lg { font-size: var(--text-amount-lg); line-height: 1.15; letter-spacing: -0.02em; }
+.ds-amount--xl { font-size: var(--text-amount-xl); line-height: 1.1; letter-spacing: -0.025em; }
+.ds-amount--negative { color: var(--text); }
+.ds-amount--positive { color: var(--success); }
+
+/* Status badge — soft fill, strong text, always a label. */
+.ds-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  border: 1px solid transparent;
+  transition:
+    background-color var(--dur-base) var(--ease-in-out),
+    color var(--dur-base) var(--ease-in-out),
+    border-color var(--dur-base) var(--ease-in-out);
+}
+.ds-status--success { background-color: var(--success-soft); color: var(--success); border-color: var(--bs-success-border-subtle); }
+.ds-status--warning { background-color: var(--warning-soft); color: var(--warning); border-color: var(--bs-warning-border-subtle); }
+.ds-status--danger  { background-color: var(--danger-soft);  color: var(--danger);  border-color: var(--bs-danger-border-subtle); }
+.ds-status--info    { background-color: var(--info-soft);    color: var(--info);    border-color: var(--bs-info-border-subtle); }
+.ds-status--neutral { background-color: var(--neutral-soft); color: var(--neutral); border-color: var(--border); }
+
+/* Progress bar — filled with scaleX, never width. */
+.ds-progress {
+  --ds-progress: 0;
+  position: relative;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--neutral-soft);
+  overflow: hidden;
+}
+.ds-progress__bar {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--accent);
+  transform: scaleX(var(--ds-progress));
+  transform-origin: left center;
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+.ds-progress--success .ds-progress__bar { background: var(--success); }
+.ds-progress--warning .ds-progress__bar { background: var(--warning); }
+.ds-progress--danger  .ds-progress__bar { background: var(--danger); }
+
+/* Stat tile */
+.ds-stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  height: 100%;
+}
+.ds-stat-tile__label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.ds-stat-tile__value {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.ds-stat-tile__value .ds-amount { font-size: inherit; font-weight: inherit; }
+.ds-stat-tile__sub {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+.ds-stat-tile--warning .ds-stat-tile__value { color: var(--warning); }
+.ds-stat-tile--danger  .ds-stat-tile__value { color: var(--danger); }
+.ds-stat-tile--success .ds-stat-tile__value { color: var(--success); }
+
+/* Stepper — connector fills with scaleX as the user advances. */
+.ds-stepper {
+  --ds-step-progress: 0;
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  list-style: none;
+  margin: 0 0 var(--space-6);
+  padding: 0;
+  counter-reset: ds-step;
+}
+.ds-stepper::before,
+.ds-stepper::after {
+  content: "";
+  position: absolute;
+  top: 13px;
+  /* From the first marker's centre to the last's (steps are equal width). */
+  left: calc(100% / (var(--ds-steps, 4) * 2));
+  right: calc(100% / (var(--ds-steps, 4) * 2));
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--border);
+}
+.ds-stepper::after {
+  background: var(--accent);
+  transform: scaleX(var(--ds-step-progress));
+  transform-origin: left center;
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+.ds-stepper__step {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  flex: 1 1 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-align: center;
+}
+.ds-stepper__marker {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--border-strong);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  transition:
+    background-color var(--dur-base) var(--ease-in-out),
+    border-color var(--dur-base) var(--ease-in-out),
+    color var(--dur-base) var(--ease-in-out);
+}
+.ds-stepper__step.is-done .ds-stepper__marker {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.ds-stepper__step.is-current { color: var(--text); font-weight: 600; }
+.ds-stepper__step.is-current .ds-stepper__marker {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+.ds-stepper__label a { color: inherit; text-decoration: none; }
+.ds-stepper__label a:hover { color: var(--accent); }
+
+/* Breakdown — Wise-style line items. */
+.ds-breakdown {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ds-breakdown__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  transition: opacity var(--dur-base) var(--ease-in-out);
+}
+.ds-breakdown__row + .ds-breakdown__row { border-top: 1px dashed var(--border); }
+.ds-breakdown__icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--neutral-soft);
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+.ds-breakdown__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-muted);
+}
+.ds-breakdown__label small { display: block; font-size: var(--text-xs); }
+.ds-breakdown__value {
+  flex: 0 0 auto;
+  text-align: right;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.ds-breakdown__row--muted .ds-breakdown__value { color: var(--text-muted); font-weight: 400; }
+.ds-breakdown__row--hero {
+  margin: var(--space-2) 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  border-top: 0 !important;
+}
+.ds-breakdown__row--hero + .ds-breakdown__row { border-top: 0; }
+.ds-breakdown__row--hero .ds-breakdown__icon { background: var(--surface); color: var(--accent); }
+.ds-breakdown__row--hero .ds-breakdown__label { color: var(--text); font-weight: 600; }
+.ds-breakdown__row--hero .ds-breakdown__value { font-size: var(--text-xl); font-weight: 700; }
+/* While a quote request is in flight: dim, never blank. */
+.ds-breakdown.is-loading .ds-breakdown__row { opacity: 0.55; }
+
+/* Drawer — slides in from the right. */
+.ds-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  background: rgba(22, 22, 29, 0.4);
+  opacity: 0;
+  transition: opacity var(--dur-slow) var(--ease-out);
+}
+.ds-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1055;
+  display: flex;
+  flex-direction: column;
+  width: min(420px, 100vw);
+  background: var(--surface);
+  box-shadow: -8px 0 32px rgba(22, 22, 29, 0.12);
+  transform: translateX(100%);
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+/* The root carries [hidden] while closed, so a closed drawer is never focusable. */
+.ds-drawer-root.is-open .ds-drawer { transform: translateX(0); }
+.ds-drawer-root.is-open .ds-drawer-backdrop { opacity: 1; }
+.ds-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--border);
+}
+.ds-drawer__title { margin: 0; font-size: var(--text-lg); }
+.ds-drawer__body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: var(--space-6);
+}
+@media (max-width: 575.98px) {
+  .ds-drawer { width: 100vw; box-shadow: none; }
+}
+body.ds-scroll-lock { overflow: hidden; }
+
+/* Empty state */
+.ds-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-12) var(--space-6);
+  text-align: center;
+  color: var(--text-muted);
+}
+.ds-empty-state__icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--space-2);
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 1.5rem;
+}
+.ds-empty-state__title { margin: 0; font-size: var(--text-lg); font-weight: 600; color: var(--text); }
+.ds-empty-state__message { margin: 0; max-width: 36ch; }
+.ds-empty-state .btn { margin-top: var(--space-3); }
+
+/* Clickable card — lift only on things you can click. */
+.ds-card-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  transition:
+    transform var(--dur-base) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out);
+}
+.ds-stat-tile.ds-card-link { display: flex; }
+.ds-card-link:hover,
+.ds-card-link:focus-visible {
+  color: inherit;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Hash — monospace, copy + explorer link. */
+.ds-hash {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+.ds-hash__copy {
+  --bs-btn-padding-x: 0.5rem;
+  --bs-btn-padding-y: 0.125rem;
+  --bs-btn-font-size: var(--text-xs);
+  font-family: var(--font-sans);
+}
+
+.visually-hidden-focusable:not(:focus):not(:focus-within) { position: absolute !important; }
+
+
+/* 6. Motion utilities ------------------------------------------------------- */
+
+@keyframes ds-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ds-slide-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes ds-slide-down { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+@keyframes ds-shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@keyframes ds-pulse { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(2.6); opacity: 0; } }
+@keyframes ds-draw { to { stroke-dashoffset: 0; } }
+@keyframes ds-pop { 0% { transform: scale(0.85); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+.ds-fade-in { animation: ds-fade-in var(--dur-slow) var(--ease-out) both; }
+.ds-slide-up { animation: ds-slide-up var(--dur-slow) var(--ease-out) both; }
+
+/* Skeleton — loading placeholder with a shimmer sweep. */
+.ds-skeleton {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  min-height: 1em;
+  border-radius: var(--radius-sm);
+  background: var(--neutral-soft);
+  color: transparent !important;
+}
+.ds-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+  transform: translateX(-100%);
+  animation: ds-shimmer 1.4s var(--ease-in-out) infinite;
+}
+
+/* Pulse dot — only on things genuinely in progress. */
+.ds-pulse-dot {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.ds-pulse-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: currentColor;
+  animation: ds-pulse 1.6s var(--ease-out) infinite;
+}
+
+/* Check mark that draws itself once. */
+.ds-check-draw { display: inline-block; color: var(--success); }
+.ds-check-draw circle,
+.ds-check-draw path {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ds-check-draw circle { stroke-width: 2; stroke-dasharray: 151; stroke-dashoffset: 151; }
+.ds-check-draw path { stroke-width: 3; stroke-dasharray: 36; stroke-dashoffset: 36; }
+.ds-check-draw.is-drawn { animation: ds-pop var(--dur-slow) var(--ease-out) both; }
+.ds-check-draw.is-drawn circle { animation: ds-draw var(--dur-slow) var(--ease-out) forwards; }
+.ds-check-draw.is-drawn path { animation: ds-draw var(--dur-slow) var(--ease-out) var(--dur-base) forwards; }
+
+/* Strike — a failed amount; the line animates across. */
+.ds-strike {
+  position: relative;
+  display: inline-block;
+  color: var(--text-muted);
+}
+.ds-strike::after {
+  content: "";
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  top: 52%;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--danger);
+  transform: scaleX(1);
+  transform-origin: left center;
+  animation: ds-strike var(--dur-slow) var(--ease-out) both;
+}
+@keyframes ds-strike { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* Flash — slides in from the top; ui.js handles auto-dismiss. */
+.ds-flash {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  box-shadow: var(--shadow-sm);
+  animation: ds-slide-down var(--dur-slow) var(--ease-out) both;
+  transition:
+    opacity var(--dur-base) var(--ease-in-out),
+    transform var(--dur-base) var(--ease-in-out);
+}
+.ds-flash__icon { flex: 0 0 auto; font-size: 1.1rem; line-height: 1.4; }
+.ds-flash__body { flex: 1 1 auto; min-width: 0; }
+.ds-flash .btn-close { flex: 0 0 auto; margin-left: auto; }
+.ds-flash.is-leaving { opacity: 0; transform: translateY(-8px); }
+
+
+/* Reduced motion (mandatory). The class variant powers the styleguide toggle.
+   State still changes — it just changes instantly. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0.01ms; --dur-base: 0.01ms; --dur-slow: 0.01ms; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+  .ds-skeleton::after,
+  .ds-pulse-dot::after { animation: none !important; }
+}
+html.ds-reduce-motion { --dur-fast: 0.01ms; --dur-base: 0.01ms; --dur-slow: 0.01ms; }
+html.ds-reduce-motion *,
+html.ds-reduce-motion *::before,
+html.ds-reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  transition-delay: 0ms !important;
+  scroll-behavior: auto !important;
+}
+html.ds-reduce-motion .ds-skeleton::after,
+html.ds-reduce-motion .ds-pulse-dot::after { animation: none !important; }

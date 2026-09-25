@@ -207,3 +207,14 @@ Empty states are applied everywhere.
 4. **Recipient home:** keep one shared `/dashboard`, or add a wallet-balance section for `can_receive` users?
 5. **Status labels:** approve the §5 table as the replacement for brief §6.
 
+
+## 10. Decisions (Phase 1 review)
+
+1. **Bootstrap:** skin it, don't remove it. Tokens map onto Bootstrap's CSS variables and its own `.btn/.card/.badge/.alert` are themed in place; grid, collapse and dropdown JS stay. New classes only for things Bootstrap lacks, prefixed `ds-`.
+2. **New routes approved:** `/dev/styleguide` (debug only), one read-only JSON status GET for polling, an admin overview at `/admin` (behind `require_admin`, and the admin landing page after login), HTML 404/403 handlers, a landing page at `/` for signed-out users, and `/profile`. Landing and profile are Phase 5, lower priority.
+3. **Wallet:** merge cash-outs into the wallet list as outgoing transactions (the project brief requires it). Keep `/cashout/history` and add it to the nav.
+4. **Recipient home:** one shared `/dashboard`, role-aware: a wallet-balance section with Cash out for `can_receive`; send/KYC/limits content only for `can_send`.
+5. **Status labels:** the §5 table is approved and now replaces UI_REDESIGN.md §6. Test-asserted text stays verbatim.
+6. **Send flow:** `/send` stays one route. The stepper is Details (recipient + amount) → Review → Pay → Status (`/transactions/{id}`). The live quote calls the existing `GET /quote`.
+7. **Amounts:** `R1,000.00`, `$1,000.00`, `50.874404 UCTUSD`, with the symbol/code and number in one text node.
+8. **Phase 3** fixes the §4 navigation and accessibility issues. Irreversible admin actions (cash-in received/failed, cash-out approve, settlement retry) get confirmation.

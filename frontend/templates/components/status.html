@@ -1,0 +1,88 @@
+{#- Status badges — the single source of truth for status labels and colours
+    (UI_REDESIGN.md §6). Keyed by the real enum values from the models.
+    Tones: success (green), warning (amber), danger (red), info (blue), neutral (grey).
+    `pulse` marks states that are genuinely in progress.
+
+    Usage:
+      {% from "components/status.html" import status_badge, transaction_badge, cashout_badge %}
+      {{ status_badge(user.kyc_status, "kyc") }}
+      {{ transaction_badge(txn) }}   {{ cashout_badge(req) }}
+-#}
+
+{%- set STATUS = {
+  "kyc": {
+    "not_submitted": ("Not started", "neutral", false),
+    "pending": ("Awaiting approval", "warning", false),
+    "approved": ("Verified", "success", false),
+    "rejected": ("Rejected", "danger", false),
+  },
+  "kyc_submission": {
+    "pending": ("Awaiting approval", "warning", false),
+    "approved": ("Verified", "success", false),
+    "rejected": ("Rejected", "danger", false),
+  },
+  "cashin": {
+    "pending": ("Awaiting payment", "warning", false),
+    "received": ("Payment received", "success", false),
+    "failed": ("Failed", "danger", false),
+  },
+  "settlement": {
+    "not_queued": ("Not started", "neutral", false),
+    "queued": ("Queued", "warning", false),
+    "processing": ("Settling on XRPL…", "warning", true),
+    "completed": ("Settled on XRPL", "success", false),
+    "failed": ("Failed", "danger", false),
+  },
+  "cashout": {
+    "requested": ("Requested", "warning", false),
+    "approved": ("Approved", "warning", true),
+    "awaiting_ledger": ("Awaiting ledger confirmation", "warning", false),
+    "completed": ("Completed", "success", false),
+    "failed": ("Failed", "danger", false),
+  },
+  "beneficiary": {
+    "linked": ("Linked", "success", false),
+    "not_registered": ("Not registered", "neutral", false),
+  },
+  "aml": {
+    "flagged": ("AML review", "danger", false),
+  },
+} -%}
+
+{#- Any status as a badge. `status` may be an enum member or its string value.
+    An unknown value renders as a neutral badge rather than raising. -#}
+{% macro status_badge(status, domain, class="") -%}
+{%- set key = (status.value if status.value is defined else status)|string -%}
+{%- set entry = STATUS.get(domain, {}).get(key) -%}
+{%- if entry -%}
+  {%- set label, tone, pulse = entry -%}
+{%- else -%}
+  {%- set label, tone, pulse = (key|replace("_", " ")|capitalize, "neutral", false) -%}
+{%- endif -%}
+<span class="badge ds-status ds-status--{{ tone }}{% if class %} {{ class }}{% endif %}" data-status="{{ key }}">
+  {%- if pulse %}<span class="ds-pulse-dot" aria-hidden="true"></span>{% endif %}{{ label -}}
+</span>
+{%- endmacro %}
+
+{#- One overall state for a remittance: a failed or pending cash-in wins,
+    otherwise the settlement state tells the story. -#}
+{% macro transaction_badge(txn, class="") -%}
+{%- set cashin = (txn.cashin_status.value if txn.cashin_status.value is defined else txn.cashin_status)|string -%}
+{%- if cashin == "failed" -%}
+  {{ status_badge("failed", "cashin", class) }}
+{%- elif cashin == "pending" -%}
+  {{ status_badge("pending", "cashin", class) }}
+{%- else -%}
+  {{ status_badge(txn.settlement_status, "settlement", class) }}
+{%- endif -%}
+{%- endmacro %}
+
+{#- A cash-out, including the derived "Awaiting ledger confirmation" state
+    (approved, burn submitted, outcome not yet known). -#}
+{% macro cashout_badge(req, class="") -%}
+{%- if req.awaiting_ledger_confirmation -%}
+  {{ status_badge("awaiting_ledger", "cashout", class) }}
+{%- else -%}
+  {{ status_badge(req.status, "cashout", class) }}
+{%- endif -%}
+{%- endmacro %}

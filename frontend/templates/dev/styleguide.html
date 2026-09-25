@@ -1,0 +1,630 @@
+{% extends "base.html" %}
+{% from "components/status.html" import STATUS, status_badge %}
+{% from "components/money.html" import amount, breakdown, breakdown_row %}
+{% from "components/ui.html" import SEND_STEPS, stepper, stat_tile, progress, empty_state, drawer, check_draw, flash as flash_message %}
+{#- Imported under an alias: a top-level name `flash` would shadow the `flash` variable base.html checks. -#}
+{% from "components/xrpl.html" import tx_hash %}
+{% block title %}Styleguide — dev{% endblock %}
+
+{% block content %}
+<style>
+  /* Styleguide-only layout. Nothing here is part of the design system. */
+  .sg-toc { position: sticky; top: 1rem; }
+  .sg-toc a { display: block; padding: 0.25rem 0.75rem; border-radius: var(--radius-pill); color: var(--text-muted); text-decoration: none; font-size: var(--text-sm); }
+  .sg-toc a:hover { background: var(--accent-soft); color: var(--accent); }
+  .sg-section { scroll-margin-top: 1rem; margin-bottom: var(--space-12); }
+  .sg-section > h2 { font-size: var(--text-xl); margin-bottom: var(--space-4); }
+  .sg-swatch { border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; background: var(--surface); }
+  .sg-swatch__chip { height: 56px; }
+  .sg-swatch__meta { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
+  .sg-swatch__meta code { color: var(--text-muted); }
+  .sg-row { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+  .sg-label { font-size: var(--text-xs); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); margin: var(--space-4) 0 var(--space-2); }
+  .sg-demo { padding: var(--space-5); }
+</style>
+
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+  <div>
+    <p class="sg-label mt-0 mb-1">Developer page · DEBUG only</p>
+    <h1 class="h3 mb-1">Design system styleguide</h1>
+    <p class="text-muted mb-0">Every component in <code>design-system.css</code>, <code>ui.js</code> and <code>templates/components/</code>, rendered from sample data.</p>
+  </div>
+  <div class="form-check form-switch mb-0">
+    <input class="form-check-input" type="checkbox" role="switch" id="sg-reduce-motion">
+    <label class="form-check-label" for="sg-reduce-motion">Simulate reduced motion</label>
+    <div class="form-text mt-0" id="sg-os-motion">OS setting: checking…</div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <nav class="col-lg-2 d-none d-lg-block" aria-label="Styleguide sections">
+    <div class="sg-toc">
+      {% for id, name in [("colour", "Colour"), ("type", "Typography"), ("buttons", "Buttons"), ("forms", "Forms"),
+                          ("cards", "Cards"), ("status", "Status badges"), ("amounts", "Amounts"), ("tiles", "Stat tiles"),
+                          ("stepper", "Stepper"), ("breakdown", "Breakdown"), ("tables", "Tables"), ("empty", "Empty state"),
+                          ("flash", "Flash"), ("hash", "XRPL hash"), ("drawer", "Drawer"), ("motion", "Motion")] %}
+      <a href="#{{ id }}">{{ name }}</a>
+      {% endfor %}
+    </div>
+  </nav>
+
+  <div class="col-lg-10">
+
+    {# ── Colour ─────────────────────────────────────────────────────────── #}
+    <section class="sg-section" id="colour" aria-labelledby="colour-h">
+      <h2 id="colour-h">Colour</h2>
+      <p class="text-muted">One accent, used sparingly. Semantic colours carry meaning only: green success, amber pending, red failed, blue/grey info. Every text/background pair below passes WCAG AA (≥ 4.5:1).</p>
+      <div class="row g-3">
+        {% for token, hex, note in [
+          ("--bg", "#F7F7FA", "App background"), ("--surface", "#FFFFFF", "Cards"), ("--border", "#E6E6EE", "Hairlines"),
+          ("--text", "#16161D", "18.0:1 on surface"), ("--text-muted", "#5B6071", "6.3:1 on surface"),
+          ("--accent", "#4F46E5", "6.3:1 · primary actions"), ("--accent-hover", "#4338CA", "Hover"), ("--accent-soft", "#EEF0FF", "Active nav, hero rows"),
+          ("--success", "#177245", "5.3:1 on soft"), ("--success-soft", "#E7F6EE", ""),
+          ("--warning", "#A2560B", "4.9:1 on soft"), ("--warning-soft", "#FEF3E2", ""),
+          ("--danger", "#C2272D", "5.1:1 on soft"), ("--danger-soft", "#FDECEC", ""),
+          ("--info", "#1F5BD8", "5.2:1 on soft"), ("--info-soft", "#EAF1FE", ""),
+          ("--neutral", "#5B6071", "5.5:1 on soft"), ("--neutral-soft", "#EFF0F4", "")] %}
+        <div class="col-6 col-md-4 col-xl-3">
+          <div class="sg-swatch">
+            <div class="sg-swatch__chip" style="background: var({{ token }})"></div>
+            <div class="sg-swatch__meta"><strong>{{ token }}</strong><br><code>{{ hex }}</code>{% if note %} · {{ note }}{% endif %}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    {# ── Typography ─────────────────────────────────────────────────────── #}
+    <section class="sg-section" id="type" aria-labelledby="type-h">
+      <h2 id="type-h">Typography</h2>
+      <div class="card"><div class="card-body">
+        <p class="sg-label mt-0">Inter · one typeface</p>
+        <h1>Heading 1 — Send money home</h1>
+        <h2>Heading 2 — Recipient gets</h2>
+        <h3>Heading 3 — Awaiting approval</h3>
+        <h4>Heading 4 — Settled on XRPL</h4>
+        <p class="mb-2">Body text. Short and human: “Recipient gets”, “Awaiting approval”, “Settled on XRPL”. <a href="#type">An inline link</a>.</p>
+        <p class="text-muted small mb-3">Muted small text for secondary detail.</p>
+        <p class="sg-label">Hero amount · --text-amount-xl</p>
+        {{ amount(quote.uctusd_amount, "UCTUSD", size="xl") }}
+      </div></div>
+    </section>
+
+    {# ── Buttons ────────────────────────────────────────────────────────── #}
+    <section class="sg-section" id="buttons" aria-labelledby="buttons-h">
+      <h2 id="buttons-h">Buttons</h2>
+      <div class="card"><div class="card-body">
+        <p class="sg-label mt-0">Primary · secondary · ghost · danger</p>
+        <div class="sg-row">
+          <button type="button" class="btn btn-primary"><i class="bi bi-send me-1" aria-hidden="true"></i>Send money</button>
+          <button type="button" class="btn btn-outline-secondary">Add money</button>
+          <button type="button" class="btn ds-btn-ghost">See all</button>
+          <button type="button" class="btn btn-danger">Reject</button>
+        </div>
+        <p class="sg-label">Outline / success · small · disabled</p>
+        <div class="sg-row">
+          <button type="button" class="btn btn-outline-primary">Review</button>
+          <button type="button" class="btn btn-success"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>Approve</button>
+          <button type="button" class="btn btn-outline-danger">Mark failed</button>
+          <button type="button" class="btn btn-primary btn-sm">Small</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm">Small</button>
+          <button type="button" class="btn btn-primary" disabled>Disabled</button>
+        </div>
+        <p class="small text-muted mt-3 mb-0">Hover darkens; press scales to 0.98; keyboard focus shows a 2px accent ring.</p>
+      </div></div>
+    </section>
+
+    {# ── Forms ──────────────────────────────────────────────────────────── #}
+    <section class="sg-section" id="forms" aria-labelledby="forms-h">
+      <h2 id="forms-h">Form controls</h2>
+      <div class="card"><div class="card-body">
+        <form class="row g-3" onsubmit="return false" novalidate>
+          <div class="col-md-6">
+            <label class="form-label" for="sg-amount">Amount (ZAR)</label>
+            <div class="input-group">
+              <span class="input-group-text">R</span>
+              <input type="number" class="form-control" id="sg-amount" placeholder="1000.00" aria-describedby="sg-amount-help">
+            </div>
+            <div class="form-text" id="sg-amount-help">R9,000.00 available today</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="sg-recipient">Send to</label>
+            <select class="form-select" id="sg-recipient">
+              <option>Thandi Mokoena · South Africa · paid out in ZAR</option>
+              <option>Sam Carter · United States · paid out in USD</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="sg-invalid">Card number</label>
+            <input type="text" class="form-control is-invalid" id="sg-invalid" value="4242" aria-describedby="sg-invalid-msg" aria-invalid="true">
+            <div class="invalid-feedback" id="sg-invalid-msg">Card number is not valid.</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="sg-notes">Source of funds</label>
+            <textarea class="form-control" id="sg-notes" rows="2" placeholder="e.g. Salary, business income, savings…"></textarea>
+          </div>
+          <div class="col-md-6">
+            <fieldset>
+              <legend class="form-label fs-6">Payout currency</legend>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="sg-cur" id="sg-cur-usd" checked>
+                <label class="form-check-label" for="sg-cur-usd">USD</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="sg-cur" id="sg-cur-zar">
+                <label class="form-check-label" for="sg-cur-zar">ZAR</label>
+              </div>
+            </fieldset>
+          </div>
+          <div class="col-md-6">
+            <div class="form-check mt-md-4">
+              <input class="form-check-input" type="checkbox" id="sg-check" checked>
+              <label class="form-check-label" for="sg-check">I confirm these details are correct</label>
+            </div>
+          </div>
+        </form>
+      </div></div>
+    </section>
+
+    {# ── Cards ──────────────────────────────────────────────────────────── #}
+    <section class="sg-section" id="cards" aria-labelledby="cards-h">
+      <h2 id="cards-h">Cards</h2>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="card h-100">
+            <div class="card-header">Static card</div>
+            <div class="card-body">White surface, subtle border, 16px radius. No hover lift — it isn't clickable.</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <a href="#cards" class="card ds-card-link h-100">
+            <div class="card-body">
+              <p class="fw-semibold mb-1">Clickable card <i class="bi bi-chevron-right" aria-hidden="true"></i></p>
+              <p class="text-muted mb-0">Lifts 2px with a stronger shadow on hover and keyboard focus.</p>
+            </div>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    {# ── Status badges ──────────────────────────────────────────────────── #}
+    <section class="sg-section" id="status" aria-labelledby="status-h">
+      <h2 id="status-h">Status badges</h2>
+      <p class="text-muted">Rendered by looping over <code>STATUS</code> in <code>components/status.html</code> — the single source of truth. Badges always carry text; the dot marks work genuinely in progress.</p>
+      <div class="card"><div class="table-responsive">
+        <table class="table mb-0 align-middle">
+          <thead><tr><th scope="col">Domain</th><th scope="col">Value</th><th scope="col">Badge</th></tr></thead>
+          <tbody>
+            {% for domain, values in STATUS.items() %}
+              {% for value in values %}
+              <tr>
+                <td class="fw-semibold">{% if loop.first %}{{ domain }}{% endif %}</td>
+                <td><code>{{ value }}</code></td>
+                <td>{{ status_badge(value, domain) }}</td>
+              </tr>
+              {% endfor %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div></div>
+    </section>
+
+    {# ── Amounts ────────────────────────────────────────────────────────── #}
+    <section class="sg-section" id="amounts" aria-labelledby="amounts-h">
+      <h2 id="amounts-h">Amounts</h2>
+      <div class="card"><div class="card-body">
+        <p class="sg-label mt-0">Sizes · sm / md / lg / xl</p>
+        <div class="sg-row">
+          {{ amount(quote.zar_amount, "ZAR", size="sm") }}
+          {{ amount(quote.zar_amount, "ZAR") }}
+          {{ amount(quote.zar_amount, "ZAR", size="lg") }}
+          {{ amount(quote.zar_amount, "ZAR", size="xl") }}
+        </div>
+        <p class="sg-label">Formats · ZAR · USD · UCTUSD · signed · cash-out payout at 6dp</p>
+        <div class="sg-row">
+          {{ amount(quote.zar_amount, "ZAR") }}
+          {{ amount(quote.payout_estimate, "USD") }}
+          {{ amount(quote.uctusd_amount, "UCTUSD") }}
+          {{ amount(quote.uctusd_amount, "UCTUSD", signed=true, class="ds-amount--positive") }}
+          {{ amount(-quote.zar_amount, "ZAR") }}
+          {{ amount(166.5, "USD", decimals=6) }}
+        </div>
+      </div></div>
+    </section>
+
+    {# ── Stat tiles ─────────────────────────────────────────────────────── #}
+    <section class="sg-section" id="tiles" aria-labelledby="tiles-h">
+      <h2 id="tiles-h">Stat tiles</h2>
+      <div class="row g-3">
+        <div class="col-md-4">{{ stat_tile("Daily limit", amount(1000, "ZAR"), "R9,000.00 left of R10,000.00", pct=10) }}</div>
+        <div class="col-md-4">{{ stat_tile("Monthly limit", amount(38500, "ZAR"), "R11,500.00 left of R50,000.00", pct=77, tone="warning") }}</div>
+        <div class="col-md-4">{{ stat_tile("Failed settlements", 2, "Needs attention", tone="danger", href="#tiles") }}</div>
+      </div>
+      <p class="sg-label">Standalone progress</p>
+      <div style="max-width: 420px">{{ progress(64, "Onboarding progress") }}</div>
+    </section>
+
+    {# ── Stepper ────────────────────────────────────────────────────────── #}
+    <section class="sg-section" id="stepper" aria-labelledby="stepper-h">
+      <h2 id="stepper-h">Stepper</h2>
+      <p class="text-muted">The send flow as it really runs: Details (recipient + amount on <code>/send</code>) → Review → Pay → Status (<code>/transactions/{id}</code>).</p>
+      <div class="card"><div class="card-body">
+        {% for n in range(1, 5) %}
+          <p class="sg-label{% if loop.first %} mt-0{% endif %}">Step {{ n }}</p>
+          {{ stepper(SEND_STEPS, n) }}
+        {% endfor %}
+        <p class="sg-label">Live — the connector fills as you advance</p>
+        <div id="sg-stepper-live">{{ stepper(SEND_STEPS, 1, label="Demo progress") }}</div>
+        <div class="sg-row">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-sg-step="-1">Back</button>
+          <button type="button" class="btn btn-primary btn-sm" data-sg-step="1">Next step</button>
+        </div>
+      </div></div>
+    </section>
+
+    {# ── Breakdown ──────────────────────────────────────────────────────── #}
+    <section class="sg-section" id="breakdown" aria-labelledby="breakdown-h">
+      <h2 id="breakdown-h">Breakdown</h2>
+      <div class="row g-3">
+        <div class="col-lg-7">
+          <div class="card"><div class="card-body">
+            <p class="text-muted mb-1">You send</p>
+            <div class="mb-3">{{ amount(quote.zar_amount, "ZAR", size="lg") }}</div>
+            {% call breakdown(id="sg-breakdown", live=true) %}
+              {{ breakdown_row("Exchange rate", "R" ~ "%.4f"|format(quote.exchange_rate) ~ " per USD", icon="arrow-left-right",
+                               hint="market R" ~ "%.4f"|format(quote.market_rate) ~ " + " ~ "%.2f"|format(quote.fx_margin * 100) ~ "% FX margin") }}
+              {{ breakdown_row("Transaction fee", "− " ~ amount(quote.transaction_fee, "ZAR"), icon="receipt") }}
+              {{ breakdown_row("Amount converted", amount(quote.net_zar_converted, "ZAR"), icon="currency-exchange") }}
+              {{ breakdown_row("Recipient gets", amount(quote.uctusd_amount, "UCTUSD", count_up=true), icon="person-check", hero=true) }}
+              {{ breakdown_row("Estimated cash-out fee", amount(quote.cashout_fee_estimate, "UCTUSD"), icon="cash-coin", muted=true) }}
+              {{ breakdown_row("Estimated payout", amount(quote.payout_estimate, "USD"), icon="bank", muted=true) }}
+            {% endcall %}
+            <div class="sg-row mt-2">
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="sg-quote-refresh">Simulate quote update</button>
+              <span class="small text-muted">Dims while “in flight”, then “Recipient gets” counts to the new value.</span>
+            </div>
+          </div></div>
+        </div>
+      </div>
+    </section>
+
+    {# ── Tables ─────────────────────────────────────────────────────────── #}
+    <section class="sg-section" id="tables" aria-labelledby="tables-h">
+      <h2 id="tables-h">Tables</h2>
+      <div class="card"><div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead><tr><th scope="col">Date</th><th scope="col">To</th><th scope="col" class="text-end">Sent</th><th scope="col" class="text-end">Recipient gets</th><th scope="col">Status</th></tr></thead>
+          <tbody>
+            <tr><td class="text-muted small">24 Sep 2026 14:02</td><td class="fw-semibold">Thandi Mokoena</td><td class="text-end">{{ amount(1000, "ZAR") }}</td><td class="text-end">{{ amount(quote.uctusd_amount, "UCTUSD") }}</td><td>{{ status_badge("completed", "settlement") }}</td></tr>
+            <tr><td class="text-muted small">24 Sep 2026 13:41</td><td class="fw-semibold">Sam Carter</td><td class="text-end">{{ amount(500, "ZAR") }}</td><td class="text-end">{{ amount(25.834658, "UCTUSD") }}</td><td>{{ status_badge("processing", "settlement") }}</td></tr>
+            <tr><td class="text-muted small">23 Sep 2026 09:15</td><td class="fw-semibold">Thandi Mokoena</td><td class="text-end"><span class="ds-strike">{{ amount(250, "ZAR") }}</span></td><td class="text-end text-muted">—</td><td>{{ status_badge("failed", "cashin") }}</td></tr>
+          </tbody>
+        </table>
+      </div></div>
+    </section>
+
+    {# ── Empty state ────────────────────────────────────────────────────── #}
+    <section class="sg-section" id="empty" aria-labelledby="empty-h">
+      <h2 id="empty-h">Empty state</h2>
+      <div class="card">
+        {{ empty_state("No transfers yet", "When you send money, it shows up here with its status.", {"label": "Send money", "href": "#empty", "icon": "send"}, icon="arrow-left-right") }}
+      </div>
+    </section>
+
+    {# ── Flash ──────────────────────────────────────────────────────────── #}
+    <section class="sg-section" id="flash" aria-labelledby="flash-h">
+      <h2 id="flash-h">Flash messages</h2>
+      <p class="text-muted">Slide in from the top. Success and info auto-dismiss after 5s (paused while hovered or focused); warnings and errors stay until closed.</p>
+      <div id="sg-flash-static">
+        {{ flash_message("Cash-in confirmed for R1,000.00. Settlement queued.", "success") }}
+        {{ flash_message("Your cash-out request was sent for review.", "info") }}
+        {{ flash_message("Your KYC must be approved before you can send money.", "warning") }}
+        {{ flash_message("Card number is not valid.", "danger") }}
+      </div>
+      <div class="sg-row">
+        {% for kind in ["success", "info", "warning", "danger"] %}
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-sg-flash="{{ kind }}">Show {{ kind }}</button>
+        {% endfor %}
+      </div>
+      <template id="sg-flash-templates">
+        {% for kind, msg in [("success", "Saved. Your changes are live."), ("info", "Quote refreshed."),
+                             ("warning", "Daily limit exceeded by R500.00."), ("danger", "Settlement failed: tecPATH_DRY.")] %}
+        <div data-kind="{{ kind }}">{{ flash_message(msg, kind) }}</div>
+        {% endfor %}
+      </template>
+      <div id="sg-flash-target" class="mt-3"></div>
+    </section>
+
+    {# ── XRPL hash ──────────────────────────────────────────────────────── #}
+    <section class="sg-section" id="hash" aria-labelledby="hash-h">
+      <h2 id="hash-h">XRPL transaction hash</h2>
+      <div class="card"><div class="card-body">
+        <p class="sg-label mt-0">Truncated with copy + explorer link · empty</p>
+        <div class="sg-row">{{ tx_hash(sample_hash) }} {{ tx_hash(none) }}</div>
+        <p class="small text-muted mt-2 mb-0">Sample hash for layout only — not a real transaction.</p>
+      </div></div>
+    </section>
+
+    {# ── Drawer ─────────────────────────────────────────────────────────── #}
+    <section class="sg-section" id="drawer" aria-labelledby="drawer-h">
+      <h2 id="drawer-h">Drawer</h2>
+      <p class="text-muted">Slides in from the right with a 40% backdrop. Focus is trapped inside, Esc closes, and focus returns to the opener. The trigger is a real link, so without JS it navigates to the detail page.</p>
+      <a href="#drawer" class="btn btn-outline-secondary" data-drawer-open="sg-drawer">Open transfer details</a>
+    </section>
+
+    {# ── Motion ─────────────────────────────────────────────────────────── #}
+    <section class="sg-section" id="motion" aria-labelledby="motion-h">
+      <h2 id="motion-h">Motion</h2>
+      <p class="text-muted">Motion explains what is happening or confirms something worked. It never blocks an action. Use the “Simulate reduced motion” switch at the top: everything still changes state, just instantly.</p>
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="card h-100"><div class="card-body">
+            <p class="sg-label mt-0">Entrances · .ds-fade-in / .ds-slide-up</p>
+            <div class="sg-row mb-3">
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-sg-replay="sg-fade" data-sg-class="ds-fade-in">Replay fade-in</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-sg-replay="sg-slide" data-sg-class="ds-slide-up">Replay slide-up</button>
+            </div>
+            <div class="sg-row">
+              <div id="sg-fade" class="ds-fade-in card px-3 py-2">Fade in</div>
+              <div id="sg-slide" class="ds-slide-up card px-3 py-2">Slide up 8px</div>
+            </div>
+          </div></div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="card h-100"><div class="card-body">
+            <p class="sg-label mt-0">Loading · .ds-skeleton</p>
+            <div id="sg-skeleton-slot" aria-busy="true">
+              <span class="ds-skeleton mb-2" style="width: 40%; height: 14px"></span>
+              <span class="ds-skeleton mb-2" style="width: 70%; height: 32px"></span>
+              <span class="ds-skeleton" style="width: 55%; height: 14px"></span>
+            </div>
+            <button type="button" class="btn btn-outline-secondary btn-sm mt-3" id="sg-skeleton-toggle">Load content</button>
+          </div></div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="card h-100"><div class="card-body">
+            <p class="sg-label mt-0">In progress · .ds-pulse-dot</p>
+            <p class="d-flex align-items-center gap-2 mb-2 text-warning fw-semibold"><span class="ds-pulse-dot" aria-hidden="true"></span>Settling on XRPL…</p>
+            <p class="small text-muted mb-0">Loops only on things genuinely in progress; stops under reduced motion.</p>
+          </div></div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="card h-100"><div class="card-body">
+            <p class="sg-label mt-0">Success · .ds-check-draw</p>
+            <div class="sg-row">
+              <span id="sg-check">{{ check_draw(56) }}</span>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="sg-check-replay">Replay</button>
+            </div>
+          </div></div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="card h-100"><div class="card-body">
+            <p class="sg-label mt-0">countUp · tabular numerals</p>
+            <div class="mb-3">{{ amount(4250.75, "ZAR", size="lg", count_up=true, class="d-inline-block") }}</div>
+            <div id="sg-count" class="mb-3">{{ amount(0, "UCTUSD", size="lg") }}</div>
+            <div class="input-group input-group-sm" style="max-width: 280px">
+              <label class="input-group-text" for="sg-count-to">Count to</label>
+              <input type="number" class="form-control" id="sg-count-to" value="51.669316" step="0.000001">
+              <button type="button" class="btn btn-primary" id="sg-count-go">Go</button>
+            </div>
+          </div></div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="card h-100"><div class="card-body">
+            <p class="sg-label mt-0">Failure · .ds-strike</p>
+            <p class="mb-2"><span class="ds-strike" id="sg-strike">{{ amount(250, "ZAR") }}</span></p>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="sg-strike-replay">Replay strike</button>
+          </div></div>
+        </div>
+
+        <div class="col-12">
+          <div class="card"><div class="card-body">
+            <p class="sg-label mt-0">Live settlement · UI.poll with a mocked fetcher</p>
+            <p class="small text-muted">Walks queued → processing → completed at a 1.2s interval (the real page polls a JSON status route every 2–3s and stops at a final state or after 2 minutes).</p>
+            <div class="d-flex flex-wrap align-items-center gap-4">
+              <div>
+                <div class="text-muted small">Balance</div>
+                <div id="sg-poll-balance">{{ amount(0, "UCTUSD", size="lg") }}</div>
+              </div>
+              <div>
+                <div class="text-muted small">Incoming</div>
+                <div id="sg-poll-amount">{{ amount(quote.uctusd_amount, "UCTUSD", signed=true) }}</div>
+              </div>
+              <div>
+                <div class="text-muted small">Status</div>
+                <div class="d-flex align-items-center gap-2">
+                  <span id="sg-poll-badge">{{ status_badge("queued", "settlement") }}</span>
+                  <span id="sg-poll-check" hidden>{{ check_draw(24, drawn=false) }}</span>
+                </div>
+              </div>
+              <div>
+                <div class="text-muted small">XRPL hash</div>
+                <div id="sg-poll-hash"><span class="text-muted">—</span></div>
+              </div>
+            </div>
+            <div class="sg-row mt-3">
+              <button type="button" class="btn btn-primary btn-sm" id="sg-poll-start">Start settlement</button>
+              <button type="button" class="btn btn-outline-danger btn-sm" id="sg-poll-fail">Fail instead</button>
+            </div>
+            <template id="sg-badge-templates">
+              {% for value in ["queued", "processing", "completed", "failed"] %}<span data-value="{{ value }}">{{ status_badge(value, "settlement") }}</span>{% endfor %}
+            </template>
+            <template id="sg-hash-template">{{ tx_hash(sample_hash) }}</template>
+          </div></div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+{% call drawer("sg-drawer", "Transfer details") %}
+  <div class="mb-3">{{ amount(quote.uctusd_amount, "UCTUSD", size="lg", signed=true, class="ds-amount--positive") }}</div>
+  <p class="text-muted mb-4">From Lerato Dlamini · 24 Sep 2026 14:02</p>
+  {% call breakdown() %}
+    {{ breakdown_row("Status", status_badge("completed", "settlement")) }}
+    {{ breakdown_row("Sent", amount(quote.zar_amount, "ZAR")) }}
+    {{ breakdown_row("Fee", amount(quote.transaction_fee, "ZAR")) }}
+    {{ breakdown_row("Exchange rate", "R" ~ "%.4f"|format(quote.exchange_rate) ~ " per USD") }}
+    {{ breakdown_row("XRPL transaction", tx_hash(sample_hash)) }}
+  {% endcall %}
+  <label class="form-label mt-4" for="sg-drawer-note">Focus-trap check</label>
+  <input type="text" class="form-control mb-3" id="sg-drawer-note" placeholder="Tab cycles within the drawer">
+  <button type="button" class="btn btn-outline-secondary w-100" data-drawer-close>Close</button>
+{% endcall %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* Styleguide demos only. ui.js is deferred, so wait for it. */
+document.addEventListener("DOMContentLoaded", function () {
+  var UI = window.UI;
+  var html = document.documentElement;
+
+  // Reduced-motion toggle + OS read-out.
+  var toggle = document.getElementById("sg-reduce-motion");
+  var osNote = document.getElementById("sg-os-motion");
+  var mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+  function showOs() { osNote.textContent = "OS setting: " + (mq.matches ? "reduce motion ON" : "no preference"); }
+  showOs();
+  if (mq.addEventListener) mq.addEventListener("change", showOs);
+  toggle.addEventListener("change", function () { html.classList.toggle("ds-reduce-motion", toggle.checked); });
+
+  // Live stepper.
+  var step = 1;
+  document.querySelectorAll("[data-sg-step]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      step = Math.max(1, Math.min(4, step + parseInt(btn.dataset.sgStep, 10)));
+      var list = document.querySelector("#sg-stepper-live .ds-stepper");
+      list.style.setProperty("--ds-step-progress", String((step - 1) / 3));
+      list.querySelectorAll(".ds-stepper__step").forEach(function (li, i) {
+        var n = i + 1;
+        li.classList.toggle("is-done", n < step);
+        li.classList.toggle("is-current", n === step);
+        if (n === step) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current");
+        li.querySelector(".ds-stepper__marker").innerHTML = n < step ? '<i class="bi bi-check-lg"></i>' : String(n);
+      });
+    });
+  });
+
+  // Quote update: dim while in flight, then count "Recipient gets".
+  var quoteVal = 51.669316;
+  document.getElementById("sg-quote-refresh").addEventListener("click", function () {
+    var list = document.getElementById("sg-breakdown");
+    list.classList.add("is-loading");
+    setTimeout(function () {
+      quoteVal = +(quoteVal * (0.9 + Math.random() * 0.2)).toFixed(6);
+      list.classList.remove("is-loading");
+      UI.countUp(list.querySelector("[data-count-up]"), quoteVal);
+    }, 600);
+  });
+
+  // Entrances.
+  document.querySelectorAll("[data-sg-replay]").forEach(function (btn) {
+    btn.addEventListener("click", function () { UI.replay(document.getElementById(btn.dataset.sgReplay), btn.dataset.sgClass); });
+  });
+
+  // Skeleton → content.
+  var slot = document.getElementById("sg-skeleton-slot");
+  var skeletonHtml = slot.innerHTML;
+  document.getElementById("sg-skeleton-toggle").addEventListener("click", function () {
+    var loaded = slot.getAttribute("aria-busy") === "false";
+    if (loaded) {
+      slot.innerHTML = skeletonHtml;
+      slot.setAttribute("aria-busy", "true");
+      this.textContent = "Load content";
+    } else {
+      slot.innerHTML = '<div class="ds-fade-in"><div class="text-muted small">Available to send today</div>' +
+        '<div class="ds-amount ds-amount--lg">R9,000.00</div><div class="small text-muted">of R10,000.00 daily limit</div></div>';
+      slot.setAttribute("aria-busy", "false");
+      this.textContent = "Show skeleton";
+    }
+  });
+
+  // Check draw + strike replays.
+  document.getElementById("sg-check-replay").addEventListener("click", function () {
+    UI.replay(document.querySelector("#sg-check .ds-check-draw"), "is-drawn");
+  });
+  document.getElementById("sg-strike-replay").addEventListener("click", function () {
+    var el = document.getElementById("sg-strike");
+    UI.replay(el, "ds-strike");
+  });
+
+  // countUp demo.
+  document.getElementById("sg-count-go").addEventListener("click", function () {
+    UI.countUp(document.querySelector("#sg-count .ds-amount"), parseFloat(document.getElementById("sg-count-to").value) || 0,
+      { decimals: 6, suffix: " UCTUSD" });
+  });
+
+  // Flash triggers.
+  document.querySelectorAll("[data-sg-flash]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var tpl = document.getElementById("sg-flash-templates").content.querySelector('[data-kind="' + btn.dataset.sgFlash + '"] .ds-flash');
+      var node = tpl.cloneNode(true);
+      document.getElementById("sg-flash-target").prepend(node);
+      UI.wire(document.getElementById("sg-flash-target"));
+    });
+  });
+
+  // Mock settlement poll.
+  var badgeSlot = document.getElementById("sg-poll-badge");
+  var checkSlot = document.getElementById("sg-poll-check");
+  var hashSlot = document.getElementById("sg-poll-hash");
+  var amountEl = document.querySelector("#sg-poll-amount .ds-amount");
+  var balanceEl = document.querySelector("#sg-poll-balance .ds-amount");
+  var poller = null;
+
+  function badge(value) {
+    return document.getElementById("sg-badge-templates").content.querySelector('[data-value="' + value + '"] .badge').cloneNode(true);
+  }
+  // Swap the badge's tone and label in place so the colour transitions.
+  function setBadge(value) {
+    var current = badgeSlot.querySelector(".badge");
+    var next = badge(value);
+    current.className = next.className;
+    current.dataset.status = value;
+    current.innerHTML = next.innerHTML;
+  }
+  function reset() {
+    if (poller) poller.stop();
+    setBadge("queued");
+    checkSlot.hidden = true;
+    hashSlot.innerHTML = '<span class="text-muted">—</span>';
+    amountEl.parentNode.classList.remove("ds-strike");
+    UI.countUp(balanceEl, 0, { duration: 0, decimals: 6, suffix: " UCTUSD" });
+  }
+  function run(finalState) {
+    reset();
+    var states = ["queued", "processing", "processing", finalState];
+    var i = 0;
+    poller = UI.poll("/mock/status", {
+      interval: 1200,
+      fetcher: function () { return Promise.resolve({ settlement_status: states[Math.min(i++, states.length - 1)] }); },
+      isDone: function (d) { return d.settlement_status === "completed" || d.settlement_status === "failed"; },
+      onUpdate: function (d) {
+        setBadge(d.settlement_status);
+        if (d.settlement_status === "completed") {
+          checkSlot.hidden = false;
+          UI.replay(checkSlot.querySelector(".ds-check-draw"), "is-drawn");
+          UI.countUp(balanceEl, 51.669316, { decimals: 6, suffix: " UCTUSD" });
+          hashSlot.innerHTML = "";
+          var hash = document.getElementById("sg-hash-template").content.firstElementChild.cloneNode(true);
+          hash.classList.add("ds-fade-in");
+          hashSlot.appendChild(hash);
+        } else if (d.settlement_status === "failed") {
+          amountEl.parentNode.classList.add("ds-strike");
+        }
+      },
+    });
+  }
+  document.getElementById("sg-poll-start").addEventListener("click", function () { run("completed"); });
+  document.getElementById("sg-poll-fail").addEventListener("click", function () { run("failed"); });
+});
+</script>
+{% endblock %}
