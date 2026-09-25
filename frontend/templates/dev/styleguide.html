@@ -53,24 +53,45 @@
     {# ── Colour ─────────────────────────────────────────────────────────── #}
     <section class="sg-section" id="colour" aria-labelledby="colour-h">
       <h2 id="colour-h">Colour</h2>
-      <p class="text-muted">One accent, used sparingly. Semantic colours carry meaning only: green success, amber pending, red failed, blue/grey info. Every text/background pair below passes WCAG AA (≥ 4.5:1).</p>
-      <div class="row g-3">
-        {% for token, hex, note in [
+      <p class="text-muted">Deep teal is the brand; bubblegum pink is a highlight used only as a fill (never text on white, never a status); lavender is the soft accent. Status colours are separate from the brand and use three tones. Every text pair shown passes WCAG AA (≥ 4.5:1).</p>
+      {% for group, note, swatches in [
+        ("Brand · deep teal", "Buttons, links, heading accents, key amounts.", [
+          ("--accent", "#1B4B4F", "9.7:1 on white · white on it 9.7:1"), ("--accent-hover", "#143A3D", "Hover"),
+          ("--accent-active", "#0F2D2F", "Pressed"), ("--accent-soft", "#E6EEEE", "Hover wash · teal 8.2:1"),
+          ("--accent-mid", "#069494", "Icon circles, chart lines · 3.7:1 (not body text)")]),
+        ("Highlight · bubblegum pink", "Fills only: progress, active nav, check, focus halo, “Recipient gets”. Text on pink is --highlight-ink (5.4:1). Pink on white is 2.65:1, so it sits on or beside teal (3.7:1). Never used for status — danger stays red.", [
+          ("--highlight", "#FF69B4", "Ink text 5.4:1"), ("--highlight-hover", "#FC5AAB", "Ink text 4.9:1"),
+          ("--highlight-soft", "#FFE3F1", "Ink text 12.0:1"), ("--highlight-ink", "#102E31", "Text on pink · 14.4:1 on white")]),
+        ("Soft accent · lavender", "Secondary buttons, avatars, soft card highlights. Text is lavender-ink.", [
+          ("--lavender", "#D9C8F5", "Ink 6.7:1"), ("--lavender-soft", "#EDE4FB", "Ink 8.4:1"), ("--lavender-ink", "#4A2E86", "10.4:1 on white")]),
+        ("Status · vivid / tint / deep", "Vivid = dots and bars (always beside a text label). Tint = background. Deep = text.", [
+          ("--success-vivid", "#12B76A", "Dots, bars"), ("--success-soft", "#ECFDF3", "Tint"), ("--success", "#027A48", "5.1:1 on tint"),
+          ("--warning-vivid", "#F79009", "Dots, bars"), ("--warning-soft", "#FFFAEB", "Tint"), ("--warning", "#B54708", "5.2:1 on tint"),
+          ("--danger-vivid", "#F04438", "Dots, bars"), ("--danger-soft", "#FEF3F2", "Tint"), ("--danger", "#B42318", "6.1:1 on tint"),
+          ("--info-vivid", "#2E90FA", "Dots, bars"), ("--info-soft", "#EFF8FF", "Tint"), ("--info", "#175CD3", "5.6:1 on tint")]),
+        ("Neutrals", "Near-white ground, white cards, quiet borders.", [
           ("--bg", "#F7F7FA", "App background"), ("--surface", "#FFFFFF", "Cards"), ("--border", "#E6E6EE", "Hairlines"),
-          ("--text", "#16161D", "18.0:1 on surface"), ("--text-muted", "#5B6071", "6.3:1 on surface"),
-          ("--accent", "#4F46E5", "6.3:1 · primary actions"), ("--accent-hover", "#4338CA", "Hover"), ("--accent-soft", "#EEF0FF", "Active nav, hero rows"),
-          ("--success", "#177245", "5.3:1 on soft"), ("--success-soft", "#E7F6EE", ""),
-          ("--warning", "#A2560B", "4.9:1 on soft"), ("--warning-soft", "#FEF3E2", ""),
-          ("--danger", "#C2272D", "5.1:1 on soft"), ("--danger-soft", "#FDECEC", ""),
-          ("--info", "#1F5BD8", "5.2:1 on soft"), ("--info-soft", "#EAF1FE", ""),
-          ("--neutral", "#5B6071", "5.5:1 on soft"), ("--neutral-soft", "#EFF0F4", "")] %}
+          ("--border-input", "#868B9C", "Form controls · 3.4:1"), ("--text", "#16161D", "18.0:1 on surface"),
+          ("--text-muted", "#5B6071", "6.3:1 on surface"), ("--neutral-soft", "#EFF0F4", "Grey badges · 5.5:1")]),
+      ] %}
+      <p class="sg-label">{{ group }}</p>
+      <p class="small text-muted mb-2">{{ note }}</p>
+      <div class="row g-3 mb-2">
+        {% for token, hex, detail in swatches %}
         <div class="col-6 col-md-4 col-xl-3">
           <div class="sg-swatch">
             <div class="sg-swatch__chip" style="background: var({{ token }})"></div>
-            <div class="sg-swatch__meta"><strong>{{ token }}</strong><br><code>{{ hex }}</code>{% if note %} · {{ note }}{% endif %}</div>
+            <div class="sg-swatch__meta"><strong>{{ token }}</strong><br><code>{{ hex }}</code> · {{ detail }}</div>
           </div>
         </div>
         {% endfor %}
+      </div>
+      {% endfor %}
+      <p class="sg-label">Highlight vs danger — never interchangeable</p>
+      <div class="sg-row">
+        <span class="d-inline-flex align-items-center gap-2"><span style="display:inline-block;width:40px;height:20px;border-radius:999px;background:var(--highlight)" aria-hidden="true"></span>Highlight · pink #FF69B4 (hue 330°)</span>
+        <span class="d-inline-flex align-items-center gap-2"><span style="display:inline-block;width:40px;height:20px;border-radius:999px;background:var(--danger-vivid)" aria-hidden="true"></span>Danger vivid · red #F04438 (hue 4°)</span>
+        {{ status_badge("failed", "settlement") }}
       </div>
     </section>
 
@@ -94,12 +115,13 @@
     <section class="sg-section" id="buttons" aria-labelledby="buttons-h">
       <h2 id="buttons-h">Buttons</h2>
       <div class="card"><div class="card-body">
-        <p class="sg-label mt-0">Primary · secondary · ghost · danger</p>
+        <p class="sg-label mt-0">Primary · secondary (lavender) · ghost · danger · highlight (pink)</p>
         <div class="sg-row">
           <button type="button" class="btn btn-primary"><i class="bi bi-send me-1" aria-hidden="true"></i>Send money</button>
           <button type="button" class="btn btn-outline-secondary">Add money</button>
           <button type="button" class="btn ds-btn-ghost">See all</button>
           <button type="button" class="btn btn-danger">Reject</button>
+          <button type="button" class="btn ds-btn-highlight">Highlight</button>
         </div>
         <p class="sg-label">Outline / success · small · disabled</p>
         <div class="sg-row">
@@ -387,7 +409,7 @@
         <div class="col-md-6">
           <div class="card h-100"><div class="card-body">
             <p class="sg-label mt-0">In progress · .ds-pulse-dot</p>
-            <p class="d-flex align-items-center gap-2 mb-2 text-warning fw-semibold"><span class="ds-pulse-dot" aria-hidden="true"></span>Settling on XRPL…</p>
+            <p class="d-flex align-items-center gap-2 mb-2 text-warning fw-semibold"><span class="ds-pulse-dot" style="--ds-dot: var(--warning-vivid)" aria-hidden="true"></span>Settling on XRPL…</p>
             <p class="small text-muted mb-0">Loops only on things genuinely in progress; stops under reduced motion.</p>
           </div></div>
         </div>

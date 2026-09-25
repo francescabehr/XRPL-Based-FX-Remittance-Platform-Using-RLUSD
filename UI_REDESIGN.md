@@ -33,9 +33,19 @@ Reference screenshots are in the `design_references/` folder in the project root
 
 The look should be calm, confident and precise: a trustworthy money app, not a crypto casino.
 
-- **Background:** Near-white app background, with white cards on top separated by very subtle borders or shadows.
-- **Accent:** One accent colour, a deep indigo/violet, used sparingly for primary actions, active navigation and key figures.
-  - Semantic colours are reserved for status and carry meaning, not decoration: green for success, amber for pending, red for failed, blue/grey for info.
+- **Background:** Near-white app background (`--bg` #F7F7FA), with white cards (`--surface` #FFFFFF) on top separated by very subtle borders or shadows.
+- **Palette** (deep teal brand, bubblegum-pink highlight, lavender soft accent; tokens in `design-system.css`):
+
+  | Role | Token(s) | Value | Use |
+  |---|---|---|---|
+  | Brand / primary | `--accent`, `--accent-hover`, `--accent-active`, `--accent-soft` | deep teal #1B4B4F, #143A3D, #0F2D2F, wash #E6EEEE | Buttons, links, heading accents, key amounts. White text on it is 9.7:1. |
+| Mid-tone teal | `--accent-mid` | #069494 | Secondary elements: icon circles/glyphs, chart lines. 3.7:1 on white, so fine for icons and graphics but **not body text**. |
+  | Highlight | `--highlight`, `--highlight-hover`, `--highlight-soft`, `--highlight-ink` | bubblegum pink #FF69B4, #FC5AAB, #FFE3F1; ink #102E31 | **Fills only, never text on white** (2.65:1): progress bars, active nav item, check-draw, focus halo, the "Recipient gets" hero row. Text on pink is the very dark teal `--highlight-ink` (5.4:1 on pink, 4.9:1 on hover). Pink sits on or next to teal so the shape keeps its contrast (the progress track is teal: 3.7:1). **Pink is never a status colour**: danger stays red (#F04438, hue 4° vs pink's 330°), and pink never appears in badges, alerts or error states. |
+  | Soft accent | `--lavender`, `--lavender-soft`, `--lavender-ink` | #D9C8F5, tint #EDE4FB, ink #4A2E86 | Secondary buttons, avatar backgrounds, soft card highlights, empty-state icons. Text on it is lavender-ink (8.4:1 on the tint). |
+  | Status (separate from brand) | `--{success,warning,danger,info}-vivid` / `-soft` / base | success #12B76A / #ECFDF3 / #027A48 · warning #F79009 / #FFFAEB / #B54708 · danger #F04438 / #FEF3F2 / #B42318 · info #2E90FA / #EFF8FF / #175CD3 | Three tones: **vivid** for dots and bars (always beside a text label), **tint** for backgrounds, **deep** for text (≥ 4.5:1 on tint and on white). |
+  | Neutral | `--neutral`, `--neutral-soft`, `--text`, `--text-muted`, `--border`, `--border-input` | #5B6071, #EFF0F4, #16161D, #5B6071, #E6E6EE, #868B9C | Grey badges, body text, muted text, hairlines, form-control borders (3.4:1). |
+
+  Focus rings are a 2px deep-teal outline with a pink halo, so the teal carries the contrast. Semantic colours are reserved for status and carry meaning, not decoration. Every text/background pair is checked for WCAG AA.
 - **Money:** Money is the hero. Amounts are large and semibold, use tabular numerals, and always show the currency code (ZAR, UCTUSD, USD).
 - **Shape:** Generous whitespace, rounded corners (roughly 12–16px on cards) and pill-shaped buttons.
 - **Font:** One typeface. Use Inter from Google Fonts, with `font-feature-settings: "tnum"` on amounts.

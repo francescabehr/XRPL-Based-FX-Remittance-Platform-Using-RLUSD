@@ -13,7 +13,9 @@
 /* 1. Tokens ---------------------------------------------------------------- */
 
 :root {
-  /* Colour */
+  /* Colour — brand: deep teal · highlight: bubblegum pink · soft accent: lavender.
+     Status colours are separate from the brand and use three tones:
+     vivid base (dots, bars), light tint (backgrounds), deep shade (text ≥ 4.5:1). */
   --bg: #F7F7FA;
   --surface: #FFFFFF;
   --border: #E6E6EE;
@@ -22,20 +24,34 @@
   --text: #16161D;
   --text-muted: #5B6071;
 
-  --accent: #4F46E5;
-  --accent-hover: #4338CA;
-  --accent-active: #3730A3;
-  --accent-soft: #EEF0FF;
+  /* Brand / primary — buttons, links, heading accents, key amounts. */
+  --accent: #1B4B4F;         /* 9.7:1 on white */
+  --accent-hover: #143A3D;
+  --accent-active: #0F2D2F;
+  --accent-soft: #E6EEEE;    /* teal wash for hover states */
+  --accent-border: #B9CDCE;
+  --accent-mid: #069494;     /* mid-tone teal: icon circles, chart lines (3.7:1 on white — not for body text) */
 
-  --success: #177245;
-  --success-soft: #E7F6EE;
-  --warning: #A2560B;
-  --warning-soft: #FEF3E2;
-  --danger: #C2272D;
-  --danger-hover: #A11F24;
-  --danger-soft: #FDECEC;
-  --info: #1F5BD8;
-  --info-soft: #EAF1FE;
+  /* Highlight — FILLS ONLY, never text on white (2.65:1) and never a status colour.
+     Text on pink is --highlight-ink (5.4:1). Pink sits on/next to teal so the shape
+     keeps its contrast (pink on the teal track is 3.7:1). */
+  --highlight: #FF69B4;
+  --highlight-hover: #FC5AAB;  /* ink 4.9:1 */
+  --highlight-soft: #FFE3F1;   /* ink 12.0:1 */
+  --highlight-ink: #102E31;
+
+  /* Soft accent — secondary buttons, avatars, soft card highlights. Text is lavender-ink. */
+  --lavender: #D9C8F5;
+  --lavender-soft: #EDE4FB;
+  --lavender-ink: #4A2E86;   /* 8.4:1 on lavender-soft */
+
+  /* Status: deep (text) / -soft (tint) / -vivid (dots, bars — always beside a text label) */
+  --success: #027A48;  --success-soft: #ECFDF3;  --success-vivid: #12B76A;  --success-border: #ABEFC6;
+  --warning: #B54708;  --warning-soft: #FFFAEB;  --warning-vivid: #F79009;  --warning-border: #FEDF89;
+  --danger:  #B42318;  --danger-soft:  #FEF3F2;  --danger-vivid:  #F04438;  --danger-border:  #FECDCA;
+  --info:    #175CD3;  --info-soft:    #EFF8FF;  --info-vivid:    #2E90FA;  --info-border:    #B2DDFF;
+  --danger-hover: #912018;
+  --success-hover: #05603A;
   --neutral: #5B6071;
   --neutral-soft: #EFF0F4;
 
@@ -97,17 +113,17 @@
   --bs-border-radius-lg: var(--radius-lg);
   --bs-border-radius-pill: var(--radius-pill);
   --bs-link-color: var(--accent);
-  --bs-link-color-rgb: 79, 70, 229;
+  --bs-link-color-rgb: 27, 75, 79;
   --bs-link-hover-color: var(--accent-hover);
-  --bs-link-hover-color-rgb: 67, 56, 202;
-  --bs-code-color: var(--accent-hover);
-  --bs-focus-ring-color: rgba(79, 70, 229, 0.25);
+  --bs-link-hover-color-rgb: 20, 58, 61;
+  --bs-code-color: var(--lavender-ink);
+  --bs-focus-ring-color: rgba(255, 105, 180, 0.5);
 
   --bs-primary: var(--accent);
-  --bs-primary-rgb: 79, 70, 229;
+  --bs-primary-rgb: 27, 75, 79;
   --bs-primary-bg-subtle: var(--accent-soft);
-  --bs-primary-text-emphasis: var(--accent-hover);
-  --bs-primary-border-subtle: #D6D9FB;
+  --bs-primary-text-emphasis: var(--accent);
+  --bs-primary-border-subtle: var(--accent-border);
 
   --bs-secondary: var(--neutral);
   --bs-secondary-rgb: 91, 96, 113;
@@ -116,28 +132,28 @@
   --bs-secondary-border-subtle: var(--border-strong);
 
   --bs-success: var(--success);
-  --bs-success-rgb: 23, 114, 69;
+  --bs-success-rgb: 2, 122, 72;
   --bs-success-bg-subtle: var(--success-soft);
   --bs-success-text-emphasis: var(--success);
-  --bs-success-border-subtle: #BFE5CF;
+  --bs-success-border-subtle: var(--success-border);
 
   --bs-warning: var(--warning);
-  --bs-warning-rgb: 162, 86, 11;
+  --bs-warning-rgb: 181, 71, 8;
   --bs-warning-bg-subtle: var(--warning-soft);
   --bs-warning-text-emphasis: var(--warning);
-  --bs-warning-border-subtle: #F7D9AE;
+  --bs-warning-border-subtle: var(--warning-border);
 
   --bs-danger: var(--danger);
-  --bs-danger-rgb: 194, 39, 45;
+  --bs-danger-rgb: 180, 35, 24;
   --bs-danger-bg-subtle: var(--danger-soft);
   --bs-danger-text-emphasis: var(--danger);
-  --bs-danger-border-subtle: #F6C4C6;
+  --bs-danger-border-subtle: var(--danger-border);
 
   --bs-info: var(--info);
-  --bs-info-rgb: 31, 91, 216;
+  --bs-info-rgb: 23, 92, 211;
   --bs-info-bg-subtle: var(--info-soft);
   --bs-info-text-emphasis: var(--info);
-  --bs-info-border-subtle: #C6D8FB;
+  --bs-info-border-subtle: var(--info-border);
 
   --bs-light-rgb: 247, 247, 250;
 }
@@ -150,7 +166,7 @@
   --bs-btn-border-radius: var(--radius-pill);
   --bs-btn-font-weight: 600;
   --bs-btn-padding-x: 1.125rem;
-  --bs-btn-focus-box-shadow: 0 0 0 3px rgba(var(--bs-btn-focus-shadow-rgb), 0.3);
+  --bs-btn-focus-box-shadow: 0 0 0 4px rgba(255, 105, 180, 0.55);
   transition:
     color var(--dur-fast) var(--ease-in-out),
     background-color var(--dur-fast) var(--ease-in-out),
@@ -163,99 +179,116 @@
 .btn-sm { --bs-btn-padding-x: 0.75rem; }
 
 .btn-primary {
+  --bs-btn-color: #fff;
   --bs-btn-bg: var(--accent);
   --bs-btn-border-color: var(--accent);
+  --bs-btn-hover-color: #fff;
   --bs-btn-hover-bg: var(--accent-hover);
   --bs-btn-hover-border-color: var(--accent-hover);
+  --bs-btn-active-color: #fff;
   --bs-btn-active-bg: var(--accent-active);
   --bs-btn-active-border-color: var(--accent-active);
+  --bs-btn-disabled-color: #fff;
   --bs-btn-disabled-bg: var(--accent);
   --bs-btn-disabled-border-color: var(--accent);
-  --bs-btn-focus-shadow-rgb: 79, 70, 229;
 }
 .btn-success {
+  --bs-btn-color: #fff;
   --bs-btn-bg: var(--success);
   --bs-btn-border-color: var(--success);
-  --bs-btn-hover-bg: #125C37;
-  --bs-btn-hover-border-color: #125C37;
-  --bs-btn-active-bg: #0E4A2C;
-  --bs-btn-active-border-color: #0E4A2C;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: var(--success-hover);
+  --bs-btn-hover-border-color: var(--success-hover);
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: #054F31;
+  --bs-btn-active-border-color: #054F31;
   --bs-btn-disabled-bg: var(--success);
   --bs-btn-disabled-border-color: var(--success);
-  --bs-btn-focus-shadow-rgb: 23, 114, 69;
 }
 .btn-danger {
+  --bs-btn-color: #fff;
   --bs-btn-bg: var(--danger);
   --bs-btn-border-color: var(--danger);
+  --bs-btn-hover-color: #fff;
   --bs-btn-hover-bg: var(--danger-hover);
   --bs-btn-hover-border-color: var(--danger-hover);
-  --bs-btn-active-bg: #86191D;
-  --bs-btn-active-border-color: #86191D;
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: #7A271A;
+  --bs-btn-active-border-color: #7A271A;
   --bs-btn-disabled-bg: var(--danger);
   --bs-btn-disabled-border-color: var(--danger);
-  --bs-btn-focus-shadow-rgb: 194, 39, 45;
 }
 .btn-warning {
   --bs-btn-color: #fff;
   --bs-btn-bg: var(--warning);
   --bs-btn-border-color: var(--warning);
   --bs-btn-hover-color: #fff;
-  --bs-btn-hover-bg: #85460A;
-  --bs-btn-hover-border-color: #85460A;
+  --bs-btn-hover-bg: #93370D;
+  --bs-btn-hover-border-color: #93370D;
   --bs-btn-active-color: #fff;
-  --bs-btn-active-bg: #6E3A08;
-  --bs-btn-active-border-color: #6E3A08;
-  --bs-btn-focus-shadow-rgb: 162, 86, 11;
+  --bs-btn-active-bg: #7A2E0E;
+  --bs-btn-active-border-color: #7A2E0E;
+}
+/* Highlight button: pink fill, very dark teal text — for the one celebratory action. */
+.ds-btn-highlight {
+  --bs-btn-color: var(--highlight-ink);
+  --bs-btn-bg: var(--highlight);
+  --bs-btn-border-color: var(--highlight);
+  --bs-btn-hover-color: var(--highlight-ink);
+  --bs-btn-hover-bg: var(--highlight-hover);
+  --bs-btn-hover-border-color: var(--highlight-hover);
+  --bs-btn-active-color: var(--highlight-ink);
+  --bs-btn-active-bg: var(--highlight-hover);
+  --bs-btn-active-border-color: var(--highlight-hover);
 }
 .btn-outline-primary {
   --bs-btn-color: var(--accent);
-  --bs-btn-border-color: #C9CCF8;
-  --bs-btn-hover-color: var(--accent-hover);
+  --bs-btn-border-color: var(--accent-border);
+  --bs-btn-hover-color: var(--accent);
   --bs-btn-hover-bg: var(--accent-soft);
   --bs-btn-hover-border-color: var(--accent);
-  --bs-btn-active-color: var(--accent-active);
-  --bs-btn-active-bg: #E1E4FD;
+  --bs-btn-active-color: var(--accent);
+  --bs-btn-active-bg: #D5E2E2;
   --bs-btn-active-border-color: var(--accent);
   --bs-btn-disabled-color: var(--accent);
-  --bs-btn-disabled-border-color: #C9CCF8;
-  --bs-btn-focus-shadow-rgb: 79, 70, 229;
+  --bs-btn-disabled-border-color: var(--accent-border);
 }
-/* "Secondary" in the brief = white pill with a subtle border. */
+/* "Secondary" = lavender pill with deep-purple text. */
 .btn-outline-secondary {
-  --bs-btn-color: var(--text);
-  --bs-btn-bg: var(--surface);
-  --bs-btn-border-color: var(--border-strong);
-  --bs-btn-hover-color: var(--text);
-  --bs-btn-hover-bg: var(--neutral-soft);
-  --bs-btn-hover-border-color: var(--border-strong);
-  --bs-btn-active-color: var(--text);
-  --bs-btn-active-bg: #E4E5EC;
-  --bs-btn-active-border-color: var(--border-strong);
-  --bs-btn-disabled-color: var(--text-muted);
-  --bs-btn-disabled-border-color: var(--border);
-  --bs-btn-focus-shadow-rgb: 91, 96, 113;
+  --bs-btn-color: var(--lavender-ink);
+  --bs-btn-bg: var(--lavender-soft);
+  --bs-btn-border-color: var(--lavender-soft);
+  --bs-btn-hover-color: var(--lavender-ink);
+  --bs-btn-hover-bg: var(--lavender);
+  --bs-btn-hover-border-color: var(--lavender);
+  --bs-btn-active-color: var(--lavender-ink);
+  --bs-btn-active-bg: #CBB4F0;
+  --bs-btn-active-border-color: #CBB4F0;
+  --bs-btn-disabled-color: var(--lavender-ink);
+  --bs-btn-disabled-bg: var(--lavender-soft);
+  --bs-btn-disabled-border-color: var(--lavender-soft);
 }
 .btn-outline-danger {
   --bs-btn-color: var(--danger);
-  --bs-btn-border-color: var(--bs-danger-border-subtle);
+  --bs-btn-bg: var(--surface);
+  --bs-btn-border-color: var(--danger-border);
   --bs-btn-hover-color: var(--danger-hover);
   --bs-btn-hover-bg: var(--danger-soft);
   --bs-btn-hover-border-color: var(--danger);
   --bs-btn-active-color: var(--danger-hover);
-  --bs-btn-active-bg: #FAD9DA;
+  --bs-btn-active-bg: #FEE4E2;
   --bs-btn-active-border-color: var(--danger);
-  --bs-btn-focus-shadow-rgb: 194, 39, 45;
 }
 .btn-outline-success {
   --bs-btn-color: var(--success);
-  --bs-btn-border-color: var(--bs-success-border-subtle);
-  --bs-btn-hover-color: #125C37;
+  --bs-btn-bg: var(--surface);
+  --bs-btn-border-color: var(--success-border);
+  --bs-btn-hover-color: var(--success-hover);
   --bs-btn-hover-bg: var(--success-soft);
   --bs-btn-hover-border-color: var(--success);
-  --bs-btn-active-color: #125C37;
-  --bs-btn-active-bg: #D3EFE0;
+  --bs-btn-active-color: var(--success-hover);
+  --bs-btn-active-bg: #D1FADF;
   --bs-btn-active-border-color: var(--success);
-  --bs-btn-focus-shadow-rgb: 23, 114, 69;
 }
 .btn-link {
   --bs-btn-color: var(--accent);
@@ -269,16 +302,15 @@
   --bs-btn-color: var(--accent);
   --bs-btn-bg: transparent;
   --bs-btn-border-color: transparent;
-  --bs-btn-hover-color: var(--accent-hover);
+  --bs-btn-hover-color: var(--accent);
   --bs-btn-hover-bg: var(--accent-soft);
   --bs-btn-hover-border-color: transparent;
   --bs-btn-active-color: var(--accent-active);
-  --bs-btn-active-bg: #E1E4FD;
+  --bs-btn-active-bg: #D5E2E2;
   --bs-btn-active-border-color: transparent;
   --bs-btn-disabled-color: var(--text-muted);
   --bs-btn-disabled-bg: transparent;
   --bs-btn-disabled-border-color: transparent;
-  --bs-btn-focus-shadow-rgb: 79, 70, 229;
 }
 
 /* Cards: white on the near-white ground, soft border + shadow. */
@@ -300,7 +332,7 @@
   --bs-table-bg: transparent;
   --bs-table-color: var(--text);
   --bs-table-border-color: var(--border);
-  --bs-table-hover-bg: rgba(79, 70, 229, 0.035);
+  --bs-table-hover-bg: rgba(27, 75, 79, 0.04);
   --bs-table-hover-color: var(--text);
   --bs-table-striped-bg: rgba(22, 22, 29, 0.02);
 }
@@ -356,7 +388,7 @@
 .form-select:focus {
   background-color: var(--surface);
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+  box-shadow: 0 0 0 3px rgba(255, 105, 180, 0.55);
 }
 .form-control::placeholder { color: #6B7082; }
 .form-control:disabled,
@@ -376,7 +408,7 @@
 }
 .form-check-input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+  box-shadow: 0 0 0 3px rgba(255, 105, 180, 0.55);
 }
 .form-text { color: var(--text-muted); }
 
@@ -386,6 +418,7 @@
   --bs-dropdown-border-color: var(--border);
   --bs-dropdown-border-radius: var(--radius-md);
   --bs-dropdown-link-active-bg: var(--accent);
+  --bs-dropdown-link-active-color: #fff;
   --bs-dropdown-link-hover-bg: var(--accent-soft);
   box-shadow: var(--shadow-md);
 }
@@ -394,6 +427,7 @@
   --bs-list-group-border-color: var(--border);
   --bs-list-group-action-hover-bg: var(--accent-soft);
   --bs-list-group-active-bg: var(--accent);
+  --bs-list-group-active-color: #fff;
   --bs-list-group-active-border-color: var(--accent);
 }
 
@@ -419,11 +453,13 @@ code, .font-monospace { font-family: var(--font-mono); }
 a:focus-visible,
 button:focus-visible,
 summary:focus-visible,
-[tabindex]:focus-visible {
+[tabindex]:focus-visible,
+.btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+  box-shadow: 0 0 0 5px rgba(255, 105, 180, 0.55);
 }
-.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.form-switch .form-check-input:focus { --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%231B4B4F'/%3e%3c/svg%3e"); }
 
 .tnum { font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
 
@@ -441,8 +477,8 @@ summary:focus-visible,
 }
 .ds-amount--sm { font-size: var(--text-sm); }
 .ds-amount--md { font-size: var(--text-base); }
-.ds-amount--lg { font-size: var(--text-amount-lg); line-height: 1.15; letter-spacing: -0.02em; }
-.ds-amount--xl { font-size: var(--text-amount-xl); line-height: 1.1; letter-spacing: -0.025em; }
+.ds-amount--lg { font-size: var(--text-amount-lg); line-height: 1.15; letter-spacing: -0.02em; color: var(--accent); }
+.ds-amount--xl { font-size: var(--text-amount-xl); line-height: 1.1; letter-spacing: -0.025em; color: var(--accent); }
 .ds-amount--negative { color: var(--text); }
 .ds-amount--positive { color: var(--success); }
 
@@ -457,33 +493,39 @@ summary:focus-visible,
     color var(--dur-base) var(--ease-in-out),
     border-color var(--dur-base) var(--ease-in-out);
 }
-.ds-status--success { background-color: var(--success-soft); color: var(--success); border-color: var(--bs-success-border-subtle); }
-.ds-status--warning { background-color: var(--warning-soft); color: var(--warning); border-color: var(--bs-warning-border-subtle); }
-.ds-status--danger  { background-color: var(--danger-soft);  color: var(--danger);  border-color: var(--bs-danger-border-subtle); }
-.ds-status--info    { background-color: var(--info-soft);    color: var(--info);    border-color: var(--bs-info-border-subtle); }
-.ds-status--neutral { background-color: var(--neutral-soft); color: var(--neutral); border-color: var(--border); }
+/* Three tones: tint background, deep text, vivid dot. */
+.ds-status--success { background-color: var(--success-soft); color: var(--success); border-color: var(--success-border); --ds-dot: var(--success-vivid); }
+.ds-status--warning { background-color: var(--warning-soft); color: var(--warning); border-color: var(--warning-border); --ds-dot: var(--warning-vivid); }
+.ds-status--danger  { background-color: var(--danger-soft);  color: var(--danger);  border-color: var(--danger-border);  --ds-dot: var(--danger-vivid); }
+.ds-status--info    { background-color: var(--info-soft);    color: var(--info);    border-color: var(--info-border);    --ds-dot: var(--info-vivid); }
+.ds-status--neutral { background-color: var(--neutral-soft); color: var(--neutral); border-color: var(--border);         --ds-dot: var(--neutral); }
 
-/* Progress bar — filled with scaleX, never width. */
+/* Progress bar — filled with scaleX, never width. Pink on a teal track
+   (pink alone is 2.65:1 on white; on teal it is 3.7:1). Status tones use a
+   vivid bar on a neutral track. The macro always pairs the bar with text. */
 .ds-progress {
   --ds-progress: 0;
   position: relative;
   height: 8px;
   border-radius: var(--radius-pill);
-  background: var(--neutral-soft);
+  background: var(--accent);
   overflow: hidden;
 }
 .ds-progress__bar {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: var(--accent);
+  background: var(--highlight);
   transform: scaleX(var(--ds-progress));
   transform-origin: left center;
   transition: transform var(--dur-slow) var(--ease-out);
 }
-.ds-progress--success .ds-progress__bar { background: var(--success); }
-.ds-progress--warning .ds-progress__bar { background: var(--warning); }
-.ds-progress--danger  .ds-progress__bar { background: var(--danger); }
+.ds-progress--success,
+.ds-progress--warning,
+.ds-progress--danger { background: var(--neutral-soft); }
+.ds-progress--success .ds-progress__bar { background: var(--success-vivid); }
+.ds-progress--warning .ds-progress__bar { background: var(--warning-vivid); }
+.ds-progress--danger  .ds-progress__bar { background: var(--danger-vivid); }
 
 /* Stat tile */
 .ds-stat-tile {
@@ -580,13 +622,13 @@ summary:focus-visible,
 .ds-stepper__step.is-done .ds-stepper__marker {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--highlight);
 }
 .ds-stepper__step.is-current { color: var(--text); font-weight: 600; }
 .ds-stepper__step.is-current .ds-stepper__marker {
+  background: var(--highlight);
   border-color: var(--accent);
-  color: var(--accent);
-  box-shadow: 0 0 0 4px var(--accent-soft);
+  color: var(--highlight-ink);
 }
 .ds-stepper__label a { color: inherit; text-decoration: none; }
 .ds-stepper__label a:hover { color: var(--accent); }
@@ -613,7 +655,7 @@ summary:focus-visible,
   height: 32px;
   border-radius: 50%;
   background: var(--neutral-soft);
-  color: var(--text-muted);
+  color: var(--accent-mid);
   font-size: 0.95rem;
 }
 .ds-breakdown__label {
@@ -633,13 +675,15 @@ summary:focus-visible,
   margin: var(--space-2) 0;
   padding: var(--space-4);
   border-radius: var(--radius-md);
-  background: var(--accent-soft);
+  background: var(--highlight);
+  color: var(--highlight-ink);
   border-top: 0 !important;
 }
 .ds-breakdown__row--hero + .ds-breakdown__row { border-top: 0; }
-.ds-breakdown__row--hero .ds-breakdown__icon { background: var(--surface); color: var(--accent); }
-.ds-breakdown__row--hero .ds-breakdown__label { color: var(--text); font-weight: 600; }
+.ds-breakdown__row--hero .ds-breakdown__icon { background: var(--highlight-ink); color: var(--highlight); }
+.ds-breakdown__row--hero .ds-breakdown__label { color: var(--highlight-ink); font-weight: 600; }
 .ds-breakdown__row--hero .ds-breakdown__value { font-size: var(--text-xl); font-weight: 700; }
+.ds-breakdown__row--hero .ds-amount { color: var(--highlight-ink); }
 /* While a quote request is in flight: dim, never blank. */
 .ds-breakdown.is-loading .ds-breakdown__row { opacity: 0.55; }
 
@@ -705,8 +749,8 @@ body.ds-scroll-lock { overflow: hidden; }
   height: 56px;
   margin-bottom: var(--space-2);
   border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: var(--lavender-soft);
+  color: var(--lavender-ink);
   font-size: 1.5rem;
 }
 .ds-empty-state__title { margin: 0; font-size: var(--text-lg); font-weight: 600; color: var(--text); }
@@ -756,7 +800,6 @@ body.ds-scroll-lock { overflow: hidden; }
 @keyframes ds-shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 @keyframes ds-pulse { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(2.6); opacity: 0; } }
 @keyframes ds-draw { to { stroke-dashoffset: 0; } }
-@keyframes ds-pop { 0% { transform: scale(0.85); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 
 .ds-fade-in { animation: ds-fade-in var(--dur-slow) var(--ease-out) both; }
 .ds-slide-up { animation: ds-slide-up var(--dur-slow) var(--ease-out) both; }
@@ -788,30 +831,37 @@ body.ds-scroll-lock { overflow: hidden; }
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: currentColor;
+  background: var(--ds-dot, currentColor);
 }
 .ds-pulse-dot::after {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: currentColor;
+  background: var(--ds-dot, currentColor);
   animation: ds-pulse 1.6s var(--ease-out) infinite;
 }
 
-/* Check mark that draws itself once. */
-.ds-check-draw { display: inline-block; color: var(--success); }
-.ds-check-draw circle,
+/* Check mark: a pink disc pops in, then a very dark teal tick draws itself (once). */
+.ds-check-draw { display: inline-block; }
+.ds-check-draw circle {
+  fill: var(--highlight);
+  stroke: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(0);
+}
 .ds-check-draw path {
   fill: none;
-  stroke: currentColor;
+  stroke: var(--highlight-ink);
+  stroke-width: 4;
   stroke-linecap: round;
   stroke-linejoin: round;
+  stroke-dasharray: 36;
+  stroke-dashoffset: 36;
 }
-.ds-check-draw circle { stroke-width: 2; stroke-dasharray: 151; stroke-dashoffset: 151; }
-.ds-check-draw path { stroke-width: 3; stroke-dasharray: 36; stroke-dashoffset: 36; }
-.ds-check-draw.is-drawn { animation: ds-pop var(--dur-slow) var(--ease-out) both; }
-.ds-check-draw.is-drawn circle { animation: ds-draw var(--dur-slow) var(--ease-out) forwards; }
+@keyframes ds-disc { to { transform: scale(1); } }
+.ds-check-draw.is-drawn circle { animation: ds-disc var(--dur-slow) var(--ease-out) forwards; }
 .ds-check-draw.is-drawn path { animation: ds-draw var(--dur-slow) var(--ease-out) var(--dur-base) forwards; }
 
 /* Strike — a failed amount; the line animates across. */
