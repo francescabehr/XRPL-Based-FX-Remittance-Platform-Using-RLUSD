@@ -173,7 +173,7 @@ The pulse dot marks only states that are genuinely in progress. Keep any text th
 
 Redesign these screens in order. After each one, run the tests and check it at desktop and phone widths.
 
-### 7.1 Onboarding and KYC (pattern: Uvodo checklist)
+### 7.1 Onboarding and KYC (pattern: Uvodo checklist) — ✅ 4a
 
 **Placement:** On the shared `/dashboard`, until the user is fully set up. The dashboard is **role-aware**: `can_send` users see the onboarding/KYC, limits and send content; `can_receive` users see a wallet-balance section with a **Cash out** button; dual-role users see both.
 
@@ -191,7 +191,9 @@ Redesign these screens in order. After each one, run the tests and check it at d
 - The progress bar fills to its current value on load, using `scaleX` over `--dur-slow`.
 - A step that has just been completed shows `.ds-check-draw` once.
 
-### 7.2 Sender dashboard (pattern: Wise home)
+### 7.2 Sender dashboard (pattern: Wise home) — ✅ 4a
+
+*As built (4a):* `/dashboard` is role-aware. A user with a wallet sees a **Wallet balance** hero (count-up, "available to cash out", Cash out / View wallet) **first** — money already held leads, as in Wise. `can_send` users then see the "Let's get you started" checklist until KYC is approved **and** a recipient exists, and — once KYC is approved — the "Available to send today" hero, "Used today / Used this month" tiles and Recent activity. A recipient-only user sees just the wallet. The top-bar KYC badge is shown only to users who can send (KYC gates sending). Progress bars: pink fill on a light-teal track with a teal hairline edge (a dark track read as "full" at low values); the text beside every bar carries the figures.
 
 - **Top:** A large "Available to send today" figure, derived from the remaining daily limit, and a primary **Send money** button.
 - **Limit tiles:** Daily and monthly limits as stat tiles with progress bars, showing used and remaining amounts in ZAR.

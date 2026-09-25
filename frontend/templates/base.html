@@ -37,7 +37,8 @@
       <h1 class="ds-topbar__title">{% block page_title %}{{ self.title()|replace(" — XRPL Remit", "")|replace(" — Admin", "") }}{% endblock %}</h1>
       <div class="ds-topbar__actions">
         {% block page_actions %}{% endblock %}
-        {%- if not user.is_admin %}
+        {#- KYC gates sending only, so the badge is shown to users who can send. #}
+        {%- if not user.is_admin and user.can_send %}
         <a class="ds-topbar__kyc" href="/kyc"><span class="ds-topbar__kyc-label">Verification<span class="visually-hidden">:</span></span> {{ status_badge(user.kyc_status, "kyc") }}</a>
         {%- endif %}
       </div>

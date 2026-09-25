@@ -500,15 +500,17 @@ summary:focus-visible,
 .ds-status--info    { background-color: var(--info-soft);    color: var(--info);    border-color: var(--info-border);    --ds-dot: var(--info-vivid); }
 .ds-status--neutral { background-color: var(--neutral-soft); color: var(--neutral); border-color: var(--border);         --ds-dot: var(--neutral); }
 
-/* Progress bar — filled with scaleX, never width. Pink on a teal track
-   (pink alone is 2.65:1 on white; on teal it is 3.7:1). Status tones use a
-   vivid bar on a neutral track. The macro always pairs the bar with text. */
+/* Progress bar — filled with scaleX, never width. A pink fill on a light teal
+   track with a teal hairline edge, so an empty bar never reads as full. The
+   macro always pairs the bar with text, so colour is never the only signal.
+   Status tones use a vivid bar on a neutral track. */
 .ds-progress {
   --ds-progress: 0;
   position: relative;
   height: 8px;
   border-radius: var(--radius-pill);
-  background: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent-border);
   overflow: hidden;
 }
 .ds-progress__bar {
@@ -516,6 +518,7 @@ summary:focus-visible,
   inset: 0;
   border-radius: inherit;
   background: var(--highlight);
+  box-shadow: inset 0 0 0 1px rgba(16, 46, 49, 0.28);
   transform: scaleX(var(--ds-progress));
   transform-origin: left center;
   transition: transform var(--dur-slow) var(--ease-out);
@@ -863,6 +866,8 @@ body.ds-scroll-lock { overflow: hidden; }
 @keyframes ds-disc { to { transform: scale(1); } }
 .ds-check-draw.is-drawn circle { animation: ds-disc var(--dur-slow) var(--ease-out) forwards; }
 .ds-check-draw.is-drawn path { animation: ds-draw var(--dur-slow) var(--ease-out) var(--dur-base) forwards; }
+.ds-check-draw.is-static circle { transform: scale(1); }
+.ds-check-draw.is-static path { stroke-dashoffset: 0; }
 
 /* Strike — a failed amount; the line animates across. */
 .ds-strike {
@@ -1229,3 +1234,119 @@ body { background: var(--bg); }
   justify-content: flex-end;
   gap: var(--space-2);
 }
+
+
+/* 8. Demo-path screens (Phase 4) ------------------------------------------- */
+
+/* Hero card — the one figure that matters on a screen (Wise home). */
+.ds-hero .card-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding: var(--space-6);
+}
+.ds-hero__label {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.ds-hero__sub { margin: var(--space-2) 0 0; font-size: var(--text-sm); color: var(--text-muted); }
+.ds-hero__sub .ds-amount { color: var(--text); }
+.ds-hero__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* Section heading inside a card header. */
+.ds-section-title { margin: 0; font-size: var(--text-base); font-weight: 700; }
+
+/* Onboarding checklist (Uvodo pattern). */
+.ds-checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+.ds-checklist__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-6);
+}
+.ds-checklist__item + .ds-checklist__item { border-top: 1px solid var(--border); }
+.ds-checklist__item.is-done { background: var(--bg); }
+.ds-checklist__mark {
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--neutral-soft);
+}
+.ds-checklist__item.is-done .ds-checklist__mark { background: var(--highlight-soft); }
+.ds-checklist__ring {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--border-input);
+}
+.ds-checklist__body { flex: 1 1 0; min-width: 0; }
+.ds-checklist__title { margin: 0; font-weight: 600; }
+.ds-checklist__item.is-done .ds-checklist__title { color: var(--text-muted); }
+.ds-checklist__desc { margin: 2px 0 0; font-size: var(--text-sm); color: var(--text-muted); }
+.ds-checklist__action { flex: 0 0 auto; }
+@media (max-width: 575.98px) {
+  .ds-checklist__item { flex-wrap: wrap; padding: var(--space-4); }
+  .ds-checklist__action { margin-left: calc(40px + var(--space-4)); }
+}
+
+/* Activity list — transfers and cash-outs as tappable rows (Wise / Revolut). */
+.ds-activity { list-style: none; margin: 0; padding: 0; }
+.ds-activity > li + li { border-top: 1px solid var(--border); }
+.ds-activity__row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-areas: "icon main amount" "icon main status";
+  column-gap: var(--space-4);
+  row-gap: 2px;
+  align-items: center;
+  padding: var(--space-3) var(--space-5);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color var(--dur-fast) var(--ease-in-out);
+}
+a.ds-activity__row:hover { background: var(--bg); color: inherit; }
+.ds-activity__icon {
+  grid-area: icon;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-mid);
+  font-size: 1.05rem;
+}
+.ds-activity__icon--out { background: var(--lavender-soft); color: var(--lavender-ink); }
+/* Red marker on failed items (the badge text carries the meaning). */
+.ds-activity__icon.is-failed::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  background: var(--danger-vivid);
+}
+.ds-activity__main { grid-area: main; min-width: 0; }
+.ds-activity__title { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-activity__meta { display: block; font-size: var(--text-sm); color: var(--text-muted); }
+.ds-activity__amount { grid-area: amount; justify-self: end; text-align: right; }
+.ds-activity__amount > * { display: block; }
+.ds-activity__amount > * + .ds-amount { font-size: var(--text-sm); font-weight: 500; color: var(--text-muted); }
+.ds-activity__amount > .ds-strike { display: inline-block; }
+.ds-activity__status { grid-area: status; justify-self: end; }

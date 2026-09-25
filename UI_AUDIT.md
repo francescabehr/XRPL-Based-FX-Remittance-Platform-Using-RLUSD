@@ -226,7 +226,7 @@ Empty states are applied everywhere.
 | 1. No active-page state | **Fixed**: pink active item with `aria-current="page"`. |
 | 2. Nav ignores roles | **Fixed**: send links need `can_send`, wallet links need `can_receive`, admin has its own groups. |
 | 3. `/cashout/history` not in nav | **Fixed**: "My cash-outs" in the Wallet group. |
-| 4. Recipients land on the sender dashboard | **Deferred to Phase 4 §7.2**: the role-aware dashboard is part of that screen's redesign (the nav is already role-aware). |
+| 4. Recipients land on the sender dashboard | **Fixed in 4a**: role-aware dashboard; wallet holders see their balance first, recipient-only users see only the wallet. |
 | 5. Admin nav order | **Fixed**: Overview → Queues (KYC, Cash-in, Settlements, Cash-out) → Monitor → Config; the warning icon is gone. |
 | 6–8. Status wording, colours and hash visibility differ by screen | **Deferred to Phases 4/5**: fixed as each page adopts `status_badge` / `tx_hash`. |
 | 9. "Send Money" disabled link still keyboard-reachable | **Fixed**: a real disabled button, described by the KYC note. |

@@ -97,9 +97,10 @@
 {%- endmacro %}
 
 {#- A check mark that draws itself once (pass drawn=false to trigger later
-    with UI.replay(el, "is-drawn")). -#}
-{% macro check_draw(size=48, drawn=true, label=none) -%}
-<svg class="ds-check-draw{% if drawn %} is-drawn{% endif %}" width="{{ size }}" height="{{ size }}" viewBox="0 0 52 52"
+    with UI.replay(el, "is-drawn")). static=true renders it already drawn,
+    with no animation (steps the viewer has seen before; the no-JS fallback). -#}
+{% macro check_draw(size=48, drawn=true, label=none, static=false) -%}
+<svg class="ds-check-draw{% if drawn %} is-drawn{% endif %}{% if static %} is-static{% endif %}" width="{{ size }}" height="{{ size }}" viewBox="0 0 52 52"
      {%- if label %} role="img" aria-label="{{ label }}"{% else %} aria-hidden="true"{% endif %} focusable="false">
   <circle cx="26" cy="26" r="24"/>
   <path d="M15 27l7 7 15-15"/>

@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_current_user, get_flash
+from app.services import cashout_service, xrpl_service
+from app.services.beneficiary_service import list_beneficiaries
 from app.services.cashin_service import list_for_sender
 from app.services.kyc_service import get_active_kyc
 from app.services.limit_service import get_daily_usage, get_limit_tier, get_monthly_usage
@@ -37,6 +39,10 @@ async def dashboard(
     daily_remaining = max(daily_limit - daily_used, Decimal("0"))
     monthly_remaining = max(monthly_limit - monthly_used, Decimal("0"))
 
+    # Recipient side of the role-aware dashboard (read-only).
+    wallet = await xrpl_service.get_wallet_for_user(db, user.id) if user.can_receive else None
+    available_balance = await cashout_service.available_balance(db, user.id) if wallet else None
+
     def _pct(used: Decimal, limit: Decimal) -> int:
         if limit <= 0:
             return 0
@@ -59,5 +65,8 @@ async def dashboard(
             "daily_pct": _pct(daily_used, daily_limit),
             "monthly_pct": _pct(monthly_used, monthly_limit),
             "recent": await list_for_sender(db, user.id, limit=5),
+            "beneficiary_count": len(await list_beneficiaries(db, user.id)),
+            "wallet": wallet,
+            "available_balance": available_balance,
         },
     )

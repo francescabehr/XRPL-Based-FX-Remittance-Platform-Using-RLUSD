@@ -1,128 +1,209 @@
 {% extends "base.html" %}
+{% from "components/money.html" import amount %}
+{% from "components/status.html" import status_badge, transaction_badge %}
+{% from "components/ui.html" import progress, stat_tile, empty_state, check_draw %}
 {% block title %}Dashboard — XRPL Remit{% endblock %}
+
+{%- set kyc_state = user.kyc_status.value -%}
+{%- set kyc_ok = kyc_state == "approved" -%}
+{%- set has_recipient = beneficiary_count > 0 -%}
+{%- set setup_done = kyc_ok and has_recipient -%}
 
 {% block page_title %}Welcome, {{ user.full_name.split()[0] }}{% endblock %}
 {% block page_actions %}
-  {%- if user.kyc_status.value == 'approved' %}
+  {%- if user.can_send and kyc_ok %}
   <a href="/send" class="btn btn-primary"><i class="bi bi-send me-1" aria-hidden="true"></i>Send Money</a>
-  {%- else %}
+  {%- elif user.can_send %}
   <button type="button" class="btn btn-primary" disabled aria-describedby="kyc-status-note"><i class="bi bi-send me-1" aria-hidden="true"></i>Send Money</button>
+  {%- elif wallet %}
+  <a href="/cashout" class="btn btn-primary"><i class="bi bi-cash-coin me-1" aria-hidden="true"></i>Cash out</a>
   {%- endif %}
 {% endblock %}
 
 {% block content %}
 
-<!-- KYC Status Banner -->
-<div class="card mb-4 border-{{ user.kyc_badge_class }}">
-  <div class="card-body d-flex align-items-center gap-3">
-    <span class="badge bg-{{ user.kyc_badge_class }} fs-6 px-3 py-2">{{ user.kyc_status_label }}</span>
-    <div id="kyc-status-note">
-      {% if user.kyc_status.value == 'not_submitted' %}
-        <strong>Identity verification required.</strong>
-        You must complete KYC before you can send money.
-        <a href="/kyc" class="ms-2 btn btn-sm btn-outline-primary">Start KYC</a>
-      {% elif user.kyc_status.value == 'pending' %}
-        <strong>KYC under review.</strong>
-        An administrator will review your submission shortly. You'll be able to send money once approved.
-      {% elif user.kyc_status.value == 'approved' %}
-        <strong>KYC approved.</strong>
-        You are fully verified and can send money.
-      {% elif user.kyc_status.value == 'rejected' %}
-        <strong>KYC rejected.</strong>
-        {% if kyc and kyc.rejection_reason %}Reason: {{ kyc.rejection_reason }}{% endif %}
-        <a href="/kyc" class="ms-2 btn btn-sm btn-outline-danger">Resubmit KYC</a>
-      {% endif %}
+{#- ── Recipient side: money you already hold comes first (audit §4.4) ── #}
+{% if wallet %}
+<section class="card ds-hero mb-4" aria-labelledby="wallet-balance-label">
+  <div class="card-body">
+    <div>
+      <p class="ds-hero__label" id="wallet-balance-label">Wallet balance</p>
+      {{ amount(wallet.balance_uctusd, "UCTUSD", size="xl", count_up=true) }}
+      <p class="ds-hero__sub">{{ amount(available_balance, "UCTUSD", size="sm") }} available to cash out</p>
+    </div>
+    <div class="ds-hero__actions">
+      <a href="/cashout" class="btn btn-primary btn-lg"><i class="bi bi-cash-coin me-1" aria-hidden="true"></i>Cash out</a>
+      <a href="/wallet" class="btn btn-outline-secondary btn-lg">View wallet</a>
     </div>
   </div>
-</div>
+</section>
+{% endif %}
 
-<div class="row g-4">
-  <!-- Limits card (FR-LIM-01..03) -->
-  <div class="col-md-6">
-    <div class="card h-100">
-      <div class="card-header fw-semibold"><i class="bi bi-bar-chart me-1" aria-hidden="true"></i>Remittance Limits</div>
-      <div class="card-body">
-        {% if user.kyc_status.value != 'approved' %}
-          <p class="text-muted mb-1">Daily limit</p>
-          <div class="progress mb-3" style="height:10px"><div class="progress-bar bg-secondary" style="width:0%"></div></div>
-          <p class="text-muted mb-1">Monthly limit</p>
-          <div class="progress" style="height:10px"><div class="progress-bar bg-secondary" style="width:0%"></div></div>
-          <p class="small text-muted mt-2">Limits are activated after KYC approval.</p>
-        {% elif tier %}
-          <p class="text-muted mb-1">Daily — R{{ "%.0f"|format(daily_used) }} of R{{ "%.0f"|format(daily_limit) }}</p>
-          <div class="progress mb-3" style="height:10px">
-            <div class="progress-bar {% if daily_pct >= 90 %}bg-danger{% elif daily_pct >= 70 %}bg-warning{% endif %}"
-                 style="width:{{ daily_pct }}%"></div>
-          </div>
-          <p class="text-muted mb-1">Monthly — R{{ "%.0f"|format(monthly_used) }} of R{{ "%.0f"|format(monthly_limit) }}</p>
-          <div class="progress" style="height:10px">
-            <div class="progress-bar {% if monthly_pct >= 90 %}bg-danger{% elif monthly_pct >= 70 %}bg-warning{% endif %}"
-                 style="width:{{ monthly_pct }}%"></div>
-          </div>
-          <p class="small text-muted mt-2">
-            R{{ "%.2f"|format(daily_remaining) }} remaining today ·
-            R{{ "%.2f"|format(monthly_remaining) }} remaining this month
-          </p>
-        {% else %}
-          <p class="small text-muted">Limit configuration unavailable. Contact support.</p>
-        {% endif %}
+{% if user.can_send %}
+
+{#- ── Onboarding checklist until the sender is fully set up (§7.1) ── #}
+{% if not setup_done %}
+{%- set steps_done = (1 if kyc_state in ("pending", "approved") else 0) + (1 if kyc_ok else 0) + (1 if has_recipient else 0) -%}
+<section class="card mb-4" aria-labelledby="onboarding-title" data-onboarding="{{ user.id }}">
+  <div class="card-body p-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-1">
+      <h2 class="h5 mb-0" id="onboarding-title">Let's get you started</h2>
+      <span class="small text-muted">{{ steps_done }} of 3 done</span>
+    </div>
+    <p class="text-muted mb-3" id="kyc-status-note">
+      {%- if kyc_state == "not_submitted" -%}
+        Verify your identity to start sending. Sending is disabled until your KYC is approved.
+      {%- elif kyc_state == "pending" -%}
+        Your details are with our team for review. Sending is disabled until your KYC is approved.
+      {%- elif kyc_state == "rejected" -%}
+        Your KYC was not approved{% if kyc and kyc.rejection_reason %}: {{ kyc.rejection_reason }}{% endif %}. Fix the details and resubmit — sending is disabled until it's approved.
+      {%- else -%}
+        You're verified. Add a recipient to send your first transfer.
+      {%- endif -%}
+    </p>
+    {{ progress(steps_done / 3 * 100, "Setup progress") }}
+  </div>
+  <ol class="ds-checklist">
+    {#- 1. Complete KYC -#}
+    {%- set done = kyc_state in ("pending", "approved") %}
+    <li class="ds-checklist__item{% if done %} is-done{% endif %}"{% if done %} data-step-done="kyc-submitted"{% endif %}>
+      <span class="ds-checklist__mark">{% if done %}{{ check_draw(28, drawn=false, static=true) }}{% else %}<span class="ds-checklist__ring" aria-hidden="true"></span>{% endif %}</span>
+      <div class="ds-checklist__body">
+        <p class="ds-checklist__title">Complete KYC{% if done %}<span class="visually-hidden"> (done)</span>{% endif %}</p>
+        <p class="ds-checklist__desc">Personal details, address, contact and source of funds.</p>
       </div>
-    </div>
-  </div>
+      {%- if kyc_state == "not_submitted" %}
+      <a class="btn btn-primary btn-sm ds-checklist__action" href="/kyc">Start KYC</a>
+      {%- elif kyc_state == "rejected" %}
+      <a class="btn btn-primary btn-sm ds-checklist__action" href="/kyc">Resubmit KYC</a>
+      {%- endif %}
+    </li>
+    {#- 2. Admin approval -#}
+    <li class="ds-checklist__item{% if kyc_ok %} is-done{% endif %}"{% if kyc_ok %} data-step-done="kyc-approved"{% endif %}>
+      <span class="ds-checklist__mark">{% if kyc_ok %}{{ check_draw(28, drawn=false, static=true) }}{% else %}<span class="ds-checklist__ring" aria-hidden="true"></span>{% endif %}</span>
+      <div class="ds-checklist__body">
+        <p class="ds-checklist__title">Admin approval{% if kyc_ok %}<span class="visually-hidden"> (done)</span>{% endif %}</p>
+        <p class="ds-checklist__desc">
+          {%- if kyc_ok %}Approved — you can send money.
+          {%- elif kyc_state == "pending" %}We check your details, usually the same day.
+          {%- elif kyc_state == "rejected" %}Not approved yet. Resubmit your KYC to try again.
+          {%- else %}Starts once you submit your KYC.{% endif -%}
+        </p>
+      </div>
+      {%- if kyc_state == "pending" %}<span class="ds-checklist__action">{{ status_badge("pending", "kyc") }}</span>
+      {%- elif kyc_state == "rejected" %}<span class="ds-checklist__action">{{ status_badge("rejected", "kyc") }}</span>{% endif %}
+    </li>
+    {#- 3. First recipient -#}
+    <li class="ds-checklist__item{% if has_recipient %} is-done{% endif %}"{% if has_recipient %} data-step-done="first-recipient"{% endif %}>
+      <span class="ds-checklist__mark">{% if has_recipient %}{{ check_draw(28, drawn=false, static=true) }}{% else %}<span class="ds-checklist__ring" aria-hidden="true"></span>{% endif %}</span>
+      <div class="ds-checklist__body">
+        <p class="ds-checklist__title">Add your first recipient{% if has_recipient %}<span class="visually-hidden"> (done)</span>{% endif %}</p>
+        <p class="ds-checklist__desc">Who you're sending to, and how they're paid out.</p>
+      </div>
+      {%- if not has_recipient %}
+      <a class="btn btn-{{ 'primary' if kyc_ok else 'outline-secondary' }} btn-sm ds-checklist__action" href="/beneficiaries/new">Add recipient</a>
+      {%- endif %}
+    </li>
+  </ol>
+</section>
+{% endif %}
 
-  <!-- Recent transactions (FR-CI-05) -->
-  <div class="col-md-6">
-    <div class="card h-100">
-      <div class="card-header fw-semibold"><i class="bi bi-clock-history me-1" aria-hidden="true"></i>Recent Transactions</div>
-      {% if recent %}
-      <ul class="list-group list-group-flush">
-        {% for t in recent %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-          <a href="/transactions/{{ t.id }}" class="text-decoration-none">
-            <span class="fw-semibold">{{ t.beneficiary.full_name }}</span>
-            <span class="small text-muted d-block">{{ t.created_at|localtime('%d %b %H:%M') }} · R{{ "{:,.2f}".format(t.zar_amount) }}</span>
-          </a>
-          <span class="badge bg-{{ t.status_badge }}">{{ t.status_label }}</span>
-        </li>
-        {% endfor %}
-      </ul>
+{#- ── Sender home (§7.2): once KYC is approved ── #}
+{% if kyc_ok %}
+<section class="card ds-hero mb-4" aria-labelledby="available-label">
+  <div class="card-body">
+    <div>
+      <p class="ds-hero__label" id="available-label">Available to send today</p>
+      {% if tier %}
+        {{ amount(daily_remaining, "ZAR", size="xl", count_up=true) }}
+        <p class="ds-hero__sub">of your {{ amount(daily_limit, "ZAR", size="sm") }} daily limit · {{ amount(monthly_remaining, "ZAR", size="sm") }} left this month</p>
       {% else %}
-      <div class="card-body"><p class="text-muted text-center my-4">No transactions yet.</p></div>
+        <p class="mb-0 text-muted">Limit configuration unavailable. Contact support.</p>
       {% endif %}
-      <div class="card-body text-end pt-2">
-        <a href="/transactions" class="btn btn-sm btn-outline-secondary">View all</a>
-      </div>
+    </div>
+    <div class="ds-hero__actions">
+      <a href="/send" class="btn btn-primary btn-lg"><i class="bi bi-send me-1" aria-hidden="true"></i>Send money</a>
+      <a href="/beneficiaries/new" class="btn btn-outline-secondary btn-lg">Add recipient</a>
     </div>
   </div>
-</div>
+</section>
 
-<!-- Quick actions -->
-<div class="row g-3 mt-2">
-  <div class="col-6 col-md-3">
-    {% if user.kyc_status.value == 'approved' %}
-    <a href="/send" class="btn btn-outline-primary w-100">
-      <i class="bi bi-send d-block fs-4 mb-1" aria-hidden="true"></i>Send Money
-    </a>
-    {% else %}
-    <button type="button" class="btn btn-outline-primary w-100" disabled aria-describedby="kyc-status-note">
-      <i class="bi bi-send d-block fs-4 mb-1" aria-hidden="true"></i>Send Money
-    </button>
-    {% endif %}
+{% if tier %}
+{%- macro _tone(pct) %}{{ "danger" if pct >= 90 else ("warning" if pct >= 70 else "") }}{% endmacro -%}
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    {{ stat_tile("Used today", amount(daily_used, "ZAR"),
+                 amount(daily_remaining, "ZAR", size="sm") ~ " left of " ~ amount(daily_limit, "ZAR", size="sm") ~ " daily limit",
+                 pct=daily_pct, tone=_tone(daily_pct)|trim or none) }}
   </div>
-  <div class="col-6 col-md-3">
-    <a href="/beneficiaries" class="btn btn-outline-secondary w-100">
-      <i class="bi bi-people d-block fs-4 mb-1" aria-hidden="true"></i>Beneficiaries
-    </a>
-  </div>
-  <div class="col-6 col-md-3">
-    <a href="/transactions" class="btn btn-outline-secondary w-100">
-      <i class="bi bi-list-ul d-block fs-4 mb-1" aria-hidden="true"></i>History
-    </a>
-  </div>
-  <div class="col-6 col-md-3">
-    <a href="/kyc" class="btn btn-outline-secondary w-100">
-      <i class="bi bi-card-list d-block fs-4 mb-1" aria-hidden="true"></i>KYC
-    </a>
+  <div class="col-md-6">
+    {{ stat_tile("Used this month", amount(monthly_used, "ZAR"),
+                 amount(monthly_remaining, "ZAR", size="sm") ~ " left of " ~ amount(monthly_limit, "ZAR", size="sm") ~ " monthly limit",
+                 pct=monthly_pct, tone=_tone(monthly_pct)|trim or none) }}
   </div>
 </div>
+{% endif %}
+
+<section class="card" aria-labelledby="activity-title">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h2 class="ds-section-title" id="activity-title">Recent activity</h2>
+    <a href="/transactions" class="btn ds-btn-ghost btn-sm">See all</a>
+  </div>
+  {% if recent %}
+  <ul class="ds-activity">
+    {% for t in recent %}
+    {%- set failed = t.cashin_status.value == "failed" or t.settlement_status.value == "failed" %}
+    <li>
+      <a class="ds-activity__row" href="/transactions/{{ t.id }}">
+        <span class="ds-activity__icon ds-activity__icon--out{% if failed %} is-failed{% endif %}" aria-hidden="true"><i class="bi bi-arrow-up-right"></i></span>
+        <span class="ds-activity__main">
+          <span class="ds-activity__title">{{ t.beneficiary.full_name }}</span>
+          <span class="ds-activity__meta">{{ t.created_at|localtime('%d %b, %H:%M') }}</span>
+        </span>
+        <span class="ds-activity__amount">
+          {%- if failed %}<span class="ds-strike">{{ amount(t.zar_amount, "ZAR") }}</span>{% else %}{{ amount(t.zar_amount, "ZAR") }}{% endif %}
+          {{ amount(t.uctusd_amount, "UCTUSD", size="sm") }}
+        </span>
+        <span class="ds-activity__status">{{ transaction_badge(t) }}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  {{ empty_state("No transfers yet", "Your transfers will show up here with their status.",
+                 {"label": "Send money", "href": "/send", "icon": "send"} if has_recipient else {"label": "Add recipient", "href": "/beneficiaries/new", "icon": "person-plus"},
+                 icon="arrow-left-right") }}
+  {% endif %}
+</section>
+{% endif %}
+
+{% elif not wallet %}
+<section class="card">
+  {{ empty_state("Nothing here yet", "Your wallet is created automatically when someone sends you money. It will show your UCTUSD balance and let you cash out.", none, icon="wallet2") }}
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* A just-completed onboarding step draws its check once; after that it stays
+   static. "Seen" is a per-viewer convenience kept in localStorage. */
+document.addEventListener("DOMContentLoaded", function () {
+  var card = document.querySelector("[data-onboarding]");
+  if (!card || !window.UI) return;
+  var prefix = "xrpl-remit:onboarding:" + card.dataset.onboarding + ":";
+  card.querySelectorAll("[data-step-done]").forEach(function (step) {
+    var key = prefix + step.dataset.stepDone;
+    var seen = false;
+    try { seen = window.localStorage.getItem(key) === "1"; } catch (e) { return; }
+    if (seen) return;
+    var check = step.querySelector(".ds-check-draw");
+    if (check) {
+      check.classList.remove("is-static");
+      UI.replay(check, "is-drawn");
+    }
+    try { window.localStorage.setItem(key, "1"); } catch (e) { /* storage unavailable: fine */ }
+  });
+});
+</script>
 {% endblock %}
