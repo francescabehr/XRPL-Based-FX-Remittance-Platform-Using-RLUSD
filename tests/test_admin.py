@@ -14,6 +14,7 @@ from app.models.transaction import CashInStatus, SettlementStatus
 from app.services import cashin_service, fx_service
 from app.services.auth_service import create_user
 from app.services.beneficiary_service import PayoutCurrency
+from app.services.limit_service import display_tz
 from tests.remit_helpers import approved_sender, logged_in, remittance
 
 pytestmark = pytest.mark.usefixtures("seed_tiers", "seed_fee_config")
@@ -160,10 +161,24 @@ async def test_monitor_filters_by_status(client: AsyncClient, db: AsyncSession):
     assert done_sender.full_name not in awaiting.text
 
 
-async def test_monitor_filters_by_date_range(db: AsyncSession):
-    """Date bounds are UTC days and the end day is inclusive."""
+@pytest.mark.parametrize(
+    "created_at",
+    [
+        None,                                                    # the real clock
+        datetime(2026, 9, 25, 22, 30, tzinfo=timezone.utc),      # 00:30 SAST: UTC is still the day before
+        datetime(2026, 9, 25, 23, 59, tzinfo=timezone.utc),      # 01:59 SAST
+    ],
+    ids=["now", "00:30-SAST", "01:59-SAST"],
+)
+async def test_monitor_filters_by_date_range(db: AsyncSession, created_at):
+    """Date bounds are DISPLAY_TIMEZONE days (the day the admin reads on screen)
+    and the end day is inclusive. Pinned creation times just after local midnight
+    are the case a UTC "today" gets wrong."""
     txn, sender, _ = await remittance(db, "1000")
-    today = datetime.now(timezone.utc).date()
+    if created_at is not None:
+        txn.created_at = created_at
+        await db.commit()
+    today = (created_at or datetime.now(timezone.utc)).astimezone(display_tz()).date()
 
     inside = await cashin_service.list_transactions(db, date_from=today, date_to=today)
     before = await cashin_service.list_transactions(db, date_to=today - timedelta(days=1))
