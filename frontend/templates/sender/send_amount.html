@@ -1,49 +1,211 @@
 {% extends "base.html" %}
-{% from "_macros.html" import send_steps with context %}
+{% from "components/money.html" import amount, breakdown, breakdown_row %}
+{% from "components/ui.html" import SEND_STEPS, stepper, empty_state %}
 {% block title %}Send Money — XRPL Remit{% endblock %}
 
 {% block page_title %}Send money{% endblock %}
 
+{#- A live-quote value slot: skeleton until /quote answers. -#}
+{% macro slot(field, width="6em", attrs="") -%}
+<span class="ds-q" data-q="{{ field }}"{{ attrs|safe }}><span class="ds-skeleton" style="width: {{ width }}"></span></span>
+{%- endmacro %}
+
 {% block content %}
-{{ send_steps(1) }}
+{{ stepper(SEND_STEPS, 1, label="Send money steps") }}
 
 {% if not beneficiaries %}
-<div class="card shadow-sm">
-  <div class="card-body text-center py-5">
-    <i class="bi bi-people fs-1 d-block mb-2 text-muted" aria-hidden="true"></i>
-    <p class="mb-3">Add a beneficiary before sending money.</p>
-    <a href="/beneficiaries/new" class="btn btn-primary"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add beneficiary</a>
-  </div>
+<div class="card">
+  {{ empty_state("Add a recipient first", "Save who you're sending to and how they're paid out, then come back to send.",
+                 {"label": "Add recipient", "href": "/beneficiaries/new", "icon": "person-plus"}, icon="people") }}
 </div>
 {% else %}
-<div class="card shadow-sm" style="max-width: 560px">
-  <div class="card-body p-4">
-    <form method="get" action="/send/review">
-      <div class="mb-3">
-        <label class="form-label fw-semibold" for="beneficiary_id">Send to</label>
-        <select name="beneficiary_id" id="beneficiary_id" class="form-select" required>
-          {% for b in beneficiaries %}
-          <option value="{{ b.id }}" {% if b.id|string == beneficiary_id %}selected{% endif %}>
-            {{ b.full_name }} · {{ b.country }} · paid out in {{ b.payout_currency.value }}
-          </option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="mb-3">
-        <label class="form-label fw-semibold" for="zar_amount">Amount (ZAR)</label>
-        <div class="input-group">
-          <span class="input-group-text">R</span>
-          <input type="number" name="zar_amount" id="zar_amount" class="form-control" min="1" step="0.01"
-                 value="{{ zar_amount }}" placeholder="1000.00" required>
+<form method="get" action="/send/review" id="send-form" data-quote-url="/quote">
+  <div class="row g-4">
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-body p-4">
+          <div class="mb-4">
+            <label class="form-label" for="beneficiary_id">Send to</label>
+            <select name="beneficiary_id" id="beneficiary_id" class="form-select form-select-lg" required>
+              {% for b in beneficiaries %}
+              <option value="{{ b.id }}" {% if b.id|string == beneficiary_id %}selected{% endif %}>
+                {{ b.full_name }} · {{ b.country }} · paid out in {{ b.payout_currency.value }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="zar_amount">You send</label>
+            <div class="input-group ds-amount-input">
+              <span class="input-group-text">R</span>
+              <input type="text" name="zar_amount" id="zar_amount" class="form-control" inputmode="decimal"
+                     value="{{ zar_amount }}" placeholder="1000.00" required autocomplete="off"
+                     pattern="\d{1,9}(\.\d{1,2})?" maxlength="12"
+                     title="Up to 9 digits, with at most 2 decimal places"
+                     aria-describedby="zar-help quote-alert">
+              <span class="input-group-text fs-6">ZAR</span>
+            </div>
+            <div class="form-text" id="zar-help">
+              {{ amount(limit.daily_remaining, "ZAR", size="sm") }} available today ·
+              {{ amount(limit.monthly_remaining, "ZAR", size="sm") }} this month · up to 9 digits and 2 decimals
+            </div>
+            <div id="quote-alert" class="ds-quote-alert" aria-live="polite"></div>
+          </div>
         </div>
-        <div class="form-text">
-          R{{ "{:,.2f}".format(limit.daily_remaining) }} available today ·
-          R{{ "{:,.2f}".format(limit.monthly_remaining) }} this month
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h2 class="ds-section-title">Your quote</h2>
+          <span class="small text-muted" id="quote-hint">Updates as you type</span>
+        </div>
+        <div class="card-body pt-2">
+          {% call breakdown(id="quote-breakdown", live=true) %}
+            {{ breakdown_row("Exchange rate", slot("exchange_rate", "8em"), icon="arrow-left-right",
+                             hint=slot("rate_hint", "11em")) }}
+            {{ breakdown_row("Transaction fee", slot("transaction_fee"), icon="receipt") }}
+            {{ breakdown_row("Amount converted", slot("net_zar_converted"), icon="currency-exchange") }}
+            {{ breakdown_row("Recipient gets", slot("uctusd_amount", "9em", ' data-decimals="6" data-suffix=" UCTUSD"'), icon="person-check", hero=true) }}
+            {{ breakdown_row("Estimated cash-out fee", slot("cashout_fee_estimate"), icon="cash-coin", muted=true) }}
+            {{ breakdown_row("Estimated payout", slot("payout_estimate"), icon="bank", muted=true) }}
+          {% endcall %}
         </div>
       </div>
-      <button type="submit" class="btn btn-primary w-100">Get quote <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i></button>
-    </form>
+      <div class="d-grid mt-3">
+        <button type="submit" class="btn btn-primary btn-lg">Review transfer <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i></button>
+      </div>
+    </div>
   </div>
-</div>
+</form>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* Live quote (UI_REDESIGN.md §7.3). Every figure comes from GET /quote — the page
+   only formats. Debounced 300ms; stale responses are dropped; the breakdown dims
+   while a request is in flight but is never blanked. Without JS the form still
+   submits to /send/review, which prices server-side. */
+document.addEventListener("DOMContentLoaded", function () {
+  var form = document.getElementById("send-form");
+  if (!form || !window.UI) return;
+  var UI = window.UI;
+  var list = document.getElementById("quote-breakdown");
+  var alertBox = document.getElementById("quote-alert");
+  var amountInput = document.getElementById("zar_amount");
+  var benSelect = document.getElementById("beneficiary_id");
+  var seq = 0, timer = null, hasQuote = false;
+
+  // The amount field accepts at most 9 digits before the point and 2 after —
+  // the same cap as its pattern attribute (which covers the no-JS submit).
+  var MAX_INT = 9, MAX_DEC = 2;
+  var CAP = Math.pow(10, MAX_INT) - Math.pow(10, -MAX_DEC);   // 999,999,999.99
+
+  function sanitize(raw) {
+    var s = String(raw).replace(/[^0-9.]/g, "");
+    var dot = s.indexOf(".");
+    var whole = dot === -1 ? s : s.slice(0, dot);
+    var frac = dot === -1 ? null : s.slice(dot + 1).replace(/\./g, "");
+    whole = whole.slice(0, MAX_INT);
+    return frac === null ? whole : whole + "." + frac.slice(0, MAX_DEC);
+  }
+  function capped(value) { return Math.min(Math.max(Number(value) || 0, 0), CAP); }
+
+  var fmt = {
+    ZAR: function (v) { return "R" + UI.formatNumber(v, 2); },
+    USD: function (v) { return "$" + UI.formatNumber(v, 2); },
+    UCTUSD: function (v) { return UI.formatNumber(v, 6) + " UCTUSD"; },
+  };
+
+  function slot(name) { return list.querySelector('[data-q="' + name + '"]'); }
+
+  // Cross-fade a row's text to a new value (the hero row counts instead).
+  function swap(name, text) {
+    var el = slot(name);
+    if (!el || el.textContent === text) return;
+    if (!hasQuote || UI.reducedMotion()) { el.textContent = text; return; }
+    el.classList.add("is-swapping");
+    setTimeout(function () { el.textContent = text; el.classList.remove("is-swapping"); }, 120);
+  }
+
+  function showAlert(html, tone) {
+    alertBox.innerHTML = html ? '<div class="alert alert-' + tone + ' ds-slide-up mb-0" role="alert">' + html + "</div>" : "";
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) { return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]; });
+  }
+
+  // A quote the sender can't use (over a limit, or refused) never replaces the
+  // figures: the last valid quote stays, dimmed; before any, the skeletons stay.
+  function markStale(stale) { list.classList.toggle("is-loading", stale); }
+
+  function limitWarning(q) {
+    // Which limit, and by how much: both figures come from the /quote response,
+    // capped like the input so the warning never shows an absurd figure.
+    var zar = capped(q.zar_amount);
+    var daily = capped(q.daily_remaining), monthly = capped(q.monthly_remaining);
+    var remaining = zar > daily ? daily : monthly;
+    var over = capped(zar - remaining);
+    var extra = over > 0 ? " That's <strong>" + fmt.ZAR(over) + "</strong> over." : "";
+    showAlert(escapeHtml(q.limit_reason || "This amount is over your limit.") + extra, "warning");
+  }
+
+  function render(q) {
+    if (!q.limit_ok) { markStale(true); limitWarning(q); return; }
+    markStale(false);
+    showAlert("");
+    var payout = fmt[q.payout_currency] || fmt.UCTUSD;
+    swap("exchange_rate", "R" + UI.formatNumber(q.exchange_rate, 4) + " per USD");
+    swap("rate_hint", "market R" + UI.formatNumber(q.market_rate, 4) + " + " + UI.formatNumber(q.fx_margin * 100, 2) + "% FX margin");
+    swap("transaction_fee", "− " + fmt.ZAR(q.transaction_fee));
+    swap("net_zar_converted", fmt.ZAR(q.net_zar_converted));
+    swap("cashout_fee_estimate", fmt.UCTUSD(q.cashout_fee_estimate));
+    swap("payout_estimate", payout(q.payout_estimate));
+    var hero = slot("uctusd_amount");
+    if (!hasQuote) hero.textContent = fmt.UCTUSD(0);
+    UI.countUp(hero, Number(q.uctusd_amount), { decimals: 6, suffix: " UCTUSD", duration: 500 });
+    hasQuote = true;
+  }
+
+  function request() {
+    var zar = amountInput.value.trim();
+    if (!zar || !(Number(zar) > 0)) { seq++; showAlert(""); markStale(hasQuote); return; }
+    var mine = ++seq;
+    markStale(true);
+    var url = form.dataset.quoteUrl + "?beneficiary_id=" + encodeURIComponent(benSelect.value) +
+              "&zar_amount=" + encodeURIComponent(zar);
+    fetch(url, { credentials: "same-origin", headers: { Accept: "application/json" } })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (mine !== seq) return;                       // a newer request superseded this one
+        if (res.ok) { render(res.body); return; }
+        markStale(true);
+        var detail = res.body && res.body.detail;
+        if (Array.isArray(detail)) detail = "Enter a valid amount.";
+        showAlert(escapeHtml(detail || "We couldn't get a quote right now."), "danger");
+      })
+      .catch(function () {
+        if (mine !== seq) return;
+        markStale(true);
+        showAlert("We couldn't get a quote right now. You can still continue — the next step prices your transfer.", "danger");
+      });
+  }
+
+  function schedule() { clearTimeout(timer); timer = setTimeout(request, 300); }
+  amountInput.addEventListener("input", function () {
+    var clean = sanitize(amountInput.value);
+    if (clean !== amountInput.value) {
+      // Drop the rejected characters without jumping the caret to the end.
+      var caret = amountInput.selectionStart - (amountInput.value.length - clean.length);
+      amountInput.value = clean;
+      try { amountInput.setSelectionRange(Math.max(caret, 0), Math.max(caret, 0)); } catch (e) { /* ignore */ }
+    }
+    schedule();
+  });
+  benSelect.addEventListener("change", request);
+  if (amountInput.value) request();
+});
+</script>
 {% endblock %}

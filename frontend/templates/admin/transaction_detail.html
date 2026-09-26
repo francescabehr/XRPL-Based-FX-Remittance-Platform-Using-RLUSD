@@ -4,12 +4,12 @@
 
 {% block page_title %}{{ txn.sender.full_name }} → {{ txn.beneficiary.full_name }}{% endblock %}
 {% block page_back %}/admin/transactions{% endblock %}
-{% block page_actions %}
-  <span class="badge bg-{{ txn.status_badge }} fs-6">{{ txn.status_label }}</span>
-  {% if txn.aml_flagged %}<span class="badge bg-danger fs-6"><i class="bi bi-flag-fill me-1" aria-hidden="true"></i>AML review</span>{% endif %}
-{% endblock %}
 
 {% block content %}
+<p class="d-flex flex-wrap gap-2 mb-3">
+  <span class="badge bg-{{ txn.status_badge }} fs-6">{{ txn.status_label }}</span>
+  {% if txn.aml_flagged %}<span class="badge bg-danger fs-6"><i class="bi bi-flag-fill me-1" aria-hidden="true"></i>AML review</span>{% endif %}
+</p>
 
 {% if txn.failure_reason %}
 <div class="alert alert-danger">

@@ -10,15 +10,6 @@
 {%- set setup_done = kyc_ok and has_recipient -%}
 
 {% block page_title %}Welcome, {{ user.full_name.split()[0] }}{% endblock %}
-{% block page_actions %}
-  {%- if user.can_send and kyc_ok %}
-  <a href="/send" class="btn btn-primary"><i class="bi bi-send me-1" aria-hidden="true"></i>Send Money</a>
-  {%- elif user.can_send %}
-  <button type="button" class="btn btn-primary" disabled aria-describedby="kyc-status-note"><i class="bi bi-send me-1" aria-hidden="true"></i>Send Money</button>
-  {%- elif wallet %}
-  <a href="/cashout" class="btn btn-primary"><i class="bi bi-cash-coin me-1" aria-hidden="true"></i>Cash out</a>
-  {%- endif %}
-{% endblock %}
 
 {% block content %}
 

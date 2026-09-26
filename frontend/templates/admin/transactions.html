@@ -3,9 +3,9 @@
 {% block title %}Transaction Monitor — Admin{% endblock %}
 
 {% block page_title %}Transaction monitor{% endblock %}
-{% block page_actions %}<span class="badge bg-secondary-subtle text-secondary-emphasis fs-6">{{ transactions|length }} shown</span>{% endblock %}
 
 {% block content %}
+<p class="mb-3"><span class="badge bg-secondary-subtle text-secondary-emphasis fs-6">{{ transactions|length }} shown</span></p>
 <p class="text-muted small mb-4">
   Remittances (ZAR in from senders, UCTUSD out to recipients). Recipient cash-outs are a separate
   flow — see the <a href="/admin/cashout">cash-out queue</a>. Settlement problems needing action are

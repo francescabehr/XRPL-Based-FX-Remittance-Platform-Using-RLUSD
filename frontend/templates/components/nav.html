@@ -27,6 +27,9 @@
 <li>
   <a class="ds-sidebar__link{% if active %} is-active{% endif %}" href="{{ item.href }}"{% if active %} aria-current="page"{% endif %}>
     <i class="bi bi-{{ item.icon }}" aria-hidden="true"></i><span>{{ item.label }}</span>
+    {%- if item.badge %}
+    <span class="badge ds-status ds-status--{{ item.badge[1] }} ds-sidebar__badge"><span class="visually-hidden">KYC status: </span>{{ item.badge[0] }}</span>
+    {%- endif %}
   </a>
 </li>
 {%- endmacro %}
@@ -60,7 +63,11 @@
       {"label": "My cash-outs", "href": "/cashout/history", "icon": "receipt", "match": ["/cashout/"], "exclude": ["/cashout/preview"]},
     ])] -%}
   {%- endif -%}
-  {%- set groups = groups + [("Account", [{"label": "Verification", "href": "/kyc", "icon": "shield-check"}])] -%}
+  {#- KYC status shows on Verification only when the user has something to do
+      (it gates sending, so only for users who can send). Verified: no badge. -#}
+  {%- set kyc_badge = {"not_submitted": ("Not started", "neutral"), "pending": ("Pending", "warning"),
+                       "rejected": ("Rejected", "danger")}.get(user.kyc_status.value) if user.can_send else none -%}
+  {%- set groups = groups + [("Account", [{"label": "Verification", "href": "/kyc", "icon": "shield-check", "badge": kyc_badge}])] -%}
 {%- endif -%}
 {%- set initials = (user.full_name.split()|map("first")|list)[:2]|join|upper -%}
 <aside class="offcanvas-lg offcanvas-start ds-sidebar" id="ds-sidebar" tabindex="-1" aria-label="Main navigation">

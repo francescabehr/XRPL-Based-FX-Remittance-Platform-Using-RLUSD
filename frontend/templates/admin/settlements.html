@@ -3,9 +3,9 @@
 {% block title %}Settlement Monitor — Admin{% endblock %}
 
 {% block page_title %}Settlement monitor{% endblock %}
-{% block page_actions %}<span class="badge bg-{{ 'danger' if transactions else 'success' }}-subtle text-{{ 'danger' if transactions else 'success' }}-emphasis fs-6">{{ transactions|length }} need attention</span>{% endblock %}
 
 {% block content %}
+<p class="mb-3"><span class="badge bg-{{ 'danger' if transactions else 'success' }}-subtle text-{{ 'danger' if transactions else 'success' }}-emphasis fs-6">{{ transactions|length }} need attention</span></p>
 <p class="text-muted small mb-4">
   Failed XRPL settlements, and any queued or in-progress for over 10 minutes (e.g. the worker stopped).
   Retrying or recovering a signed payment checks the ledger first, so a payment that actually went through is never sent twice.

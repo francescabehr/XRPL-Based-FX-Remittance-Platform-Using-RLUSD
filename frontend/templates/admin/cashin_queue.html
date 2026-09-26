@@ -2,9 +2,9 @@
 {% block title %}Cash-In Queue — Admin{% endblock %}
 
 {% block page_title %}Cash-in queue{% endblock %}
-{% block page_actions %}<span class="badge bg-{{ 'warning' if transactions else 'success' }}-subtle text-{{ 'warning' if transactions else 'success' }}-emphasis fs-6">{{ transactions|length }} pending</span>{% endblock %}
 
 {% block content %}
+<p class="mb-3"><span class="badge bg-{{ 'warning' if transactions else 'success' }}-subtle text-{{ 'warning' if transactions else 'success' }}-emphasis fs-6">{{ transactions|length }} pending</span></p>
 <p class="text-muted small mb-4">Confirm whether each simulated card payment arrived. Confirming queues the XRPL settlement; failing stops the transfer.</p>
 
 {% if transactions %}

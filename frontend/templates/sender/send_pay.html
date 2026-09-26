@@ -1,21 +1,23 @@
 {% extends "base.html" %}
-{% from "_macros.html" import send_steps with context %}
+{% from "components/money.html" import amount %}
+{% from "components/ui.html" import stepper %}
 {% block title %}Pay — XRPL Remit{% endblock %}
 
 {% block page_title %}Send money{% endblock %}
 
 {% block content %}
-{{ send_steps(3) }}
+{%- set query = "beneficiary_id=" ~ beneficiary.id ~ "&zar_amount=" ~ quote.zar_amount %}
+{{ stepper([("Details", "/send?" ~ query), ("Review", "/send/review?" ~ query), "Pay", "Status"], 3, label="Send money steps") }}
 
 <div class="row g-4">
   <div class="col-lg-6">
-    <div class="card shadow-sm">
-      <div class="card-header fw-semibold"><i class="bi bi-credit-card me-1" aria-hidden="true"></i>Card payment (simulated)</div>
+    <section class="card" aria-labelledby="pay-title">
       <div class="card-body p-4">
-        <p class="mb-1 text-muted">Amount due</p>
-        <p class="display-6 fw-bold mb-3">R{{ "{:,.2f}".format(quote.zar_amount) }}</p>
+        <p class="ds-hero__label" id="pay-title">Amount due</p>
+        <div class="mb-1">{{ amount(quote.zar_amount, "ZAR", size="xl") }}</div>
+        <p class="small text-muted mb-4"><i class="bi bi-credit-card me-1" aria-hidden="true"></i>Card payment · simulated for this prototype</p>
 
-        {% if card_error %}<div class="alert alert-danger">{{ card_error }}</div>{% endif %}
+        {% if card_error %}<div class="alert alert-danger" role="alert">{{ card_error }}</div>{% endif %}
 
         <form method="post" action="/remittances" autocomplete="off">
           <input type="hidden" name="beneficiary_id" value="{{ beneficiary.id }}">
@@ -28,40 +30,40 @@
           <input type="hidden" name="uctusd_amount" value="{{ quote.uctusd_amount }}">
 
           <div class="mb-3">
-            <label class="form-label fw-semibold" for="card_name">Name on card</label>
-            <input type="text" name="card_name" id="card_name" class="form-control" value="{{ card_name }}" required>
+            <label class="form-label" for="card_name">Name on card</label>
+            <input type="text" name="card_name" id="card_name" class="form-control" value="{{ card_name }}" required autocomplete="cc-name">
           </div>
           <div class="mb-3">
-            <label class="form-label fw-semibold" for="card_number">Card number</label>
+            <label class="form-label" for="card_number">Card number</label>
             <input type="text" name="card_number" id="card_number" class="form-control" inputmode="numeric"
                    placeholder="4242 4242 4242 4242" required>
           </div>
-          <div class="row g-3 mb-3">
+          <div class="row g-3 mb-4">
             <div class="col-6">
-              <label class="form-label fw-semibold" for="card_expiry">Expiry</label>
+              <label class="form-label" for="card_expiry">Expiry</label>
               <input type="text" name="card_expiry" id="card_expiry" class="form-control" placeholder="MM/YY" required>
             </div>
             <div class="col-6">
-              <label class="form-label fw-semibold" for="card_cvv">CVV</label>
+              <label class="form-label" for="card_cvv">CVV</label>
               <input type="text" name="card_cvv" id="card_cvv" class="form-control" inputmode="numeric" placeholder="123" required>
             </div>
           </div>
-          <button type="submit" class="btn btn-success w-100">
+          <button type="submit" class="btn btn-primary btn-lg w-100">
             <i class="bi bi-lock me-1" aria-hidden="true"></i>Pay R{{ "{:,.2f}".format(quote.zar_amount) }}
           </button>
         </form>
       </div>
       <div class="card-footer small text-muted">
-        Test mode: no card is charged and only the last 4 digits are stored.
+        <i class="bi bi-info-circle me-1" aria-hidden="true"></i>Test mode: no card is charged and only the last 4 digits are stored.
         Use <code>4242 4242 4242 4242</code>; <code>{{ declined_card[:4] }} {{ declined_card[4:8] }} {{ declined_card[8:12] }} {{ declined_card[12:] }}</code> is always declined.
       </div>
-    </div>
+    </section>
   </div>
   <div class="col-lg-6">
-    <div class="card shadow-sm">
-      <div class="card-header fw-semibold">Sending to {{ beneficiary.full_name }}</div>
-      <div class="card-body p-0">{% include "sender/_quote_table.html" %}</div>
-    </div>
+    <section class="card" aria-labelledby="pay-summary-title">
+      <div class="card-header"><h2 class="ds-section-title" id="pay-summary-title">Sending to {{ beneficiary.full_name }}</h2></div>
+      <div class="card-body pt-2">{% include "sender/_quote_table.html" %}</div>
+    </section>
   </div>
 </div>
 {% endblock %}

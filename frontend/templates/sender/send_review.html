@@ -1,34 +1,49 @@
 {% extends "base.html" %}
-{% from "_macros.html" import send_steps with context %}
+{% from "components/money.html" import amount %}
+{% from "components/ui.html" import SEND_STEPS, stepper %}
 {% block title %}Review Quote — XRPL Remit{% endblock %}
 
 {% block page_title %}Send money{% endblock %}
 
 {% block content %}
-{{ send_steps(2) }}
+{%- set details_href = "/send?beneficiary_id=" ~ beneficiary.id ~ "&zar_amount=" ~ quote.zar_amount %}
+{{ stepper([("Details", details_href), "Review", "Pay", "Status"], 2, label="Send money steps") }}
 
-<div class="card shadow-sm" style="max-width: 560px">
-  <div class="card-header fw-semibold">Quote for {{ beneficiary.full_name }}</div>
-  <div class="card-body p-0">{% include "sender/_quote_table.html" %}</div>
-  <div class="card-body border-top">
-    {% if error %}
-      <div class="alert alert-danger mb-3">{{ error }}</div>
-    {% else %}
-      <p class="small text-muted mb-3">
-        R{{ "{:,.2f}".format(limit.daily_remaining) }} of your daily limit remains before this send.
-        The recipient receives UCTUSD in their platform wallet on the XRPL Testnet.
-      </p>
-    {% endif %}
-    <div class="d-flex gap-2">
-      <a href="/send?beneficiary_id={{ beneficiary.id }}&zar_amount={{ quote.zar_amount }}" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Change
-      </a>
-      {% if not error %}
-      <a href="/send/pay?beneficiary_id={{ beneficiary.id }}&zar_amount={{ quote.zar_amount }}" class="btn btn-primary flex-grow-1">
-        Continue to payment <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i>
-      </a>
-      {% endif %}
-    </div>
+<div class="row justify-content-center">
+  <div class="col-lg-8 col-xl-7">
+    <section class="card ds-slide-up" aria-labelledby="review-title">
+      <div class="card-body p-4">
+        <p class="ds-hero__label" id="review-title">Review your transfer</p>
+        <div class="d-flex align-items-center gap-3 mb-3">
+          <span class="ds-avatar" aria-hidden="true">{{ (beneficiary.full_name.split()|map("first")|list)[:2]|join|upper }}</span>
+          <div>
+            <div class="fw-semibold">{{ beneficiary.full_name }}</div>
+            <div class="small text-muted">{{ beneficiary.country }} · paid out in {{ beneficiary.payout_currency.value }} · UCTUSD wallet on the XRPL Testnet</div>
+          </div>
+        </div>
+        {% include "sender/_quote_table.html" %}
+      </div>
+      <div class="card-body border-top p-4">
+        {% if error %}
+          <div class="alert alert-danger mb-3" role="alert">{{ error }}</div>
+        {% else %}
+          <p class="small text-muted mb-3">
+            {{ amount(limit.daily_remaining, "ZAR", size="sm") }} of your daily limit remains before this send.
+            The recipient receives UCTUSD in their platform wallet on the XRPL Testnet.
+          </p>
+        {% endif %}
+        <div class="d-flex flex-wrap gap-2">
+          <a href="{{ details_href }}" class="btn btn-outline-secondary btn-lg">
+            <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Change
+          </a>
+          {% if not error %}
+          <a href="/send/pay?beneficiary_id={{ beneficiary.id }}&zar_amount={{ quote.zar_amount }}" class="btn btn-primary btn-lg flex-grow-1">
+            Continue to payment <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i>
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </section>
   </div>
 </div>
 {% endblock %}

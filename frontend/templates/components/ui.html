@@ -52,6 +52,27 @@
 </ol>
 {%- endmacro %}
 
+{#- A vertical status timeline (transfer progress, cash-out lifecycle).
+    steps: [{"label", "desc" (optional), "state": done|current|failed|upcoming}].
+    The current step pulses; done steps are solid; a failed step is marked. -#}
+{% macro timeline(steps, label="Progress") -%}
+<ol class="ds-timeline" aria-label="{{ label }}">
+  {%- for step in steps %}
+  <li class="ds-timeline__step is-{{ step.state }}"{% if step.state == "current" %} aria-current="step"{% endif %}{% if step.key %} data-step="{{ step.key }}"{% endif %}>
+    <span class="ds-timeline__marker" aria-hidden="true">
+      {%- if step.state == "done" %}<i class="bi bi-check-lg"></i>
+      {%- elif step.state == "failed" %}<i class="bi bi-x-lg"></i>
+      {%- elif step.state == "current" %}<span class="ds-pulse-dot"></span>{% endif -%}
+    </span>
+    <span class="ds-timeline__body">
+      <span class="ds-timeline__label">{{ step.label }}<span class="visually-hidden"> — {{ {"done": "done", "current": "in progress", "failed": "failed", "upcoming": "not started"}[step.state] }}</span></span>
+      {%- if step.desc %}<span class="ds-timeline__desc">{{ step.desc }}</span>{% endif %}
+    </span>
+  </li>
+  {%- endfor %}
+</ol>
+{%- endmacro %}
+
 {#- Every list needs one. `action` = {"label": ..., "href": ..., "icon": optional}. -#}
 {% macro empty_state(title, message=none, action=none, icon="inbox") -%}
 <div class="ds-empty-state">

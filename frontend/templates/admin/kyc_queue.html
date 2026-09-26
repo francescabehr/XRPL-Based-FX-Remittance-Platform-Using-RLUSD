@@ -2,9 +2,9 @@
 {% block title %}KYC Review Queue — Admin{% endblock %}
 
 {% block page_title %}KYC review queue{% endblock %}
-{% block page_actions %}<span class="badge bg-{{ 'warning' if submissions else 'success' }}-subtle text-{{ 'warning' if submissions else 'success' }}-emphasis fs-6">{{ submissions|length }} pending</span>{% endblock %}
 
 {% block content %}
+<p class="mb-3"><span class="badge bg-{{ 'warning' if submissions else 'success' }}-subtle text-{{ 'warning' if submissions else 'success' }}-emphasis fs-6">{{ submissions|length }} pending</span></p>
 
 {% if submissions %}
 <div class="card shadow-sm">

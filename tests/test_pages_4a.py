@@ -22,7 +22,7 @@ async def test_unverified_sender_sees_the_checklist(client: AsyncClient, db: Asy
     assert 'href="/kyc"' in page and "Start KYC" in page
     assert "Sending is disabled until your KYC is approved" in page
     assert "Available to send today" not in page
-    assert 'disabled aria-describedby="kyc-status-note"' in page and 'id="kyc-status-note"' in page
+    assert 'href="/send"' not in page.split('<main')[1]          # no Send button until KYC is approved
 
 
 async def test_pending_kyc_explains_the_wait(client: AsyncClient, db: AsyncSession, seed_tiers):

@@ -1,55 +1,85 @@
 {% extends "base.html" %}
-{% from "_macros.html" import hash_link with context %}
+{% from "components/money.html" import amount, breakdown, breakdown_row %}
+{% from "components/status.html" import transaction_badge %}
+{% from "components/ui.html" import SEND_STEPS, stepper, timeline, check_draw %}
+{% from "components/xrpl.html" import tx_hash %}
 {% block title %}Transaction — XRPL Remit{% endblock %}
 
 {% block page_title %}Transfer to {{ txn.beneficiary.full_name }}{% endblock %}
 {% block page_back %}{{ '/transactions' if is_sender else ('/admin/transactions' if user.is_admin else '/wallet') }}{% endblock %}
-{% block page_actions %}<span class="badge bg-{{ txn.status_badge }} fs-6">{{ txn.status_label }}</span>{% endblock %}
 
 {% block content %}
+{%- set cashin = txn.cashin_status.value -%}
+{%- set settlement = txn.settlement_status.value -%}
+{%- set settled = settlement == "completed" -%}
+{%- set final = cashin == "failed" or settlement in ("completed", "failed") -%}
+
+{% if is_sender %}{{ stepper(SEND_STEPS, 4, label="Send money steps") }}{% endif %}
 
 {% if txn.failure_reason %}
-<div class="alert alert-danger"><strong>Failed:</strong> {{ txn.failure_reason }}{% if txn.cashin_status.value == "failed" %} No money was sent.{% else %} The recipient's balance was not changed.{% endif %}</div>
+<div class="alert alert-danger" role="alert"><strong>Failed:</strong> {{ txn.failure_reason }}{% if cashin == "failed" %} No money was sent.{% else %} The recipient's balance was not changed.{% endif %}</div>
 {% endif %}
 
-<div class="row g-4">
-  <div class="col-lg-6">
-    <div class="card shadow-sm">
-      <div class="card-header fw-semibold">Progress</div>
-      <ul class="list-group list-group-flush">
-        <li class="list-group-item d-flex justify-content-between">
-          <span><i class="bi bi-credit-card me-2" aria-hidden="true"></i>Card payment{% if txn.card_last4 %} (•••• {{ txn.card_last4 }}){% endif %}</span>
-          <span>{{ txn.cashin_status.value|capitalize }}{% if txn.cashin_updated_at %} <span class="text-muted small">· {{ txn.cashin_updated_at|localtime('%d %b %H:%M') }}</span>{% endif %}</span>
-        </li>
-        <li class="list-group-item d-flex justify-content-between">
-          <span><i class="bi bi-hdd-network me-2" aria-hidden="true"></i>XRPL settlement</span>
-          <span>{{ txn.settlement_status.value|replace("_", " ")|capitalize }}{% if txn.settled_at %} <span class="text-muted small">· {{ txn.settled_at|localtime('%d %b %H:%M') }}</span>{% endif %}</span>
-        </li>
-        <li class="list-group-item d-flex justify-content-between">
-          <span><i class="bi bi-link-45deg me-2" aria-hidden="true"></i>XRPL transaction</span>
-          <span>{{ hash_link(txn.xrpl_tx_hash) }}</span>
-        </li>
-      </ul>
-      {% if txn.cashin_status.value == "pending" %}
-      <div class="card-body small text-muted border-top">Waiting for the card payment to be confirmed. The transfer starts automatically afterwards.</div>
-      {% elif txn.settlement_status.value in ("queued", "processing") %}
-      <div class="card-body small text-muted border-top">Sending on the XRPL Testnet. This usually takes under a minute; refresh to update.</div>
-      {% endif %}
+<div data-status-poll="/status?t={{ txn.id }}" data-txn="{{ txn.id }}" data-final="{{ 'true' if final else 'false' }}">
+  <section class="card ds-hero mb-4 ds-slide-up" aria-labelledby="txn-hero-label">
+    <div class="card-body">
+      <div>
+        <p class="ds-hero__label" id="txn-hero-label">{{ "Recipient gets" if is_sender else "Amount" }}</p>
+        {{ amount(txn.uctusd_amount, "UCTUSD", size="xl") }}
+        <p class="ds-hero__sub">
+          {%- if is_sender %}You sent {{ amount(txn.zar_amount, "ZAR", size="sm") }} · {{ txn.created_at|localtime('%d %b %Y, %H:%M') }}
+          {%- else %}From {{ txn.sender.full_name }} · {{ txn.created_at|localtime('%d %b %Y, %H:%M') }}{% endif -%}
+        </p>
+      </div>
+      <div class="d-flex align-items-center gap-3">
+        <span data-check {% if not settled %}hidden{% endif %}>{{ check_draw(40, drawn=false, static=true, label="Settled") }}</span>
+        <span data-badge>{{ transaction_badge(txn, class="fs-6") }}</span>
+      </div>
     </div>
-  </div>
-  <div class="col-lg-6">
-    <div class="card shadow-sm">
-      <div class="card-header fw-semibold">Amounts (fixed when you paid)</div>
-      <table class="table mb-0">
-        <tbody>
-          <tr><th class="fw-normal text-muted">Sent</th><td class="text-end">R{{ "{:,.2f}".format(txn.zar_amount) }}</td></tr>
-          <tr><th class="fw-normal text-muted">Transaction fee</th><td class="text-end">R{{ "{:,.2f}".format(txn.transaction_fee) }}</td></tr>
-          <tr><th class="fw-normal text-muted">Exchange rate</th><td class="text-end">R{{ "%.4f"|format(txn.exchange_rate) }} per USD</td></tr>
-          <tr class="table-light"><th>Recipient gets</th><td class="text-end fw-bold">{{ "{:,.6f}".format(txn.uctusd_amount) }} UCTUSD</td></tr>
-          <tr><th class="fw-normal text-muted">Created</th><td class="text-end small">{{ txn.created_at|localtime('%d %b %Y %H:%M') }}</td></tr>
-          <tr><th class="fw-normal text-muted">Reference</th><td class="text-end font-monospace small">{{ txn.id|string|truncate(13, True, "") }}</td></tr>
-        </tbody>
-      </table>
+  </section>
+
+  <div class="row g-4">
+    <div class="col-lg-6">
+      <section class="card h-100" aria-labelledby="progress-title">
+        <div class="card-header"><h2 class="ds-section-title" id="progress-title">Progress</h2></div>
+        <div class="card-body p-4">
+          {%- set card_desc = ("Card •••• " ~ txn.card_last4 if txn.card_last4 else "Card payment") -%}
+          {{ timeline([
+            {"key": "cashin", "label": "Card payment",
+             "state": {"received": "done", "failed": "failed"}.get(cashin, "current"),
+             "desc": card_desc ~ (" · awaiting confirmation" if cashin == "pending" else (" · " ~ (txn.cashin_updated_at|localtime('%d %b, %H:%M')) if txn.cashin_updated_at else ""))},
+            {"key": "settling", "label": "Settling on XRPL",
+             "state": "upcoming" if cashin != "received" else {"completed": "done", "failed": "failed"}.get(settlement, "current"),
+             "desc": {"queued": "Queued for the XRPL Testnet", "processing": "Submitting to the XRPL Testnet…",
+                      "completed": "Validated on-ledger", "failed": "Not delivered — no UCTUSD moved"}.get(settlement, "Starts once the card payment is confirmed")},
+            {"key": "settled", "label": "Settled on XRPL",
+             "state": "done" if settled else "upcoming",
+             "desc": (txn.settled_at|localtime('%d %b %Y, %H:%M')) if settled and txn.settled_at else "UCTUSD lands in the recipient's wallet"},
+          ], label="Transfer progress") }}
+          {% if cashin == "pending" %}
+          <p class="small text-muted mt-3 mb-0">Waiting for the card payment to be confirmed. The transfer starts automatically afterwards.</p>
+          {% elif settlement in ("not_queued", "queued", "processing") %}
+          <p class="small text-muted mt-3 mb-0">Sending on the XRPL Testnet. This usually takes under a minute.</p>
+          {% endif %}
+        </div>
+      </section>
+    </div>
+    <div class="col-lg-6">
+      <section class="card h-100" aria-labelledby="amounts-title">
+        <div class="card-header"><h2 class="ds-section-title" id="amounts-title">Amounts (fixed when you paid)</h2></div>
+        <div class="card-body pt-2">
+          {%- set ref %}<span class="font-monospace small">{{ txn.id|string|truncate(13, True, "") }}</span>{% endset %}
+          {%- set hash_cell %}<span data-hash>{{ tx_hash(txn.xrpl_tx_hash) }}</span>{% endset %}
+          {% call breakdown() %}
+            {{ breakdown_row("Sent", amount(txn.zar_amount, "ZAR")) }}
+            {{ breakdown_row("Transaction fee", amount(txn.transaction_fee, "ZAR")) }}
+            {{ breakdown_row("Exchange rate", "R" ~ "%.4f"|format(txn.exchange_rate) ~ " per USD") }}
+            {{ breakdown_row("Recipient gets", amount(txn.uctusd_amount, "UCTUSD")) }}
+            {{ breakdown_row("Reference", ref) }}
+            {{ breakdown_row("XRPL transaction", hash_cell) }}
+          {% endcall %}
+        </div>
+      </section>
     </div>
   </div>
 </div>

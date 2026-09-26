@@ -1,7 +1,6 @@
 {#- The flash macro is imported under an alias: a top-level name `flash` would
     shadow the `flash` context variable used below. -#}
 {% from "components/ui.html" import flash as flash_message %}
-{% from "components/status.html" import status_badge %}
 {% from "components/nav.html" import sidebar %}
 <!DOCTYPE html>
 <html lang="en">
@@ -36,11 +35,8 @@
       {%- endif %}
       <h1 class="ds-topbar__title">{% block page_title %}{{ self.title()|replace(" — XRPL Remit", "")|replace(" — Admin", "") }}{% endblock %}</h1>
       <div class="ds-topbar__actions">
+        {#- Top-bar actions only where the page has no other way to do them. #}
         {% block page_actions %}{% endblock %}
-        {#- KYC gates sending only, so the badge is shown to users who can send. #}
-        {%- if not user.is_admin and user.can_send %}
-        <a class="ds-topbar__kyc" href="/kyc"><span class="ds-topbar__kyc-label">Verification<span class="visually-hidden">:</span></span> {{ status_badge(user.kyc_status, "kyc") }}</a>
-        {%- endif %}
       </div>
     </header>
 

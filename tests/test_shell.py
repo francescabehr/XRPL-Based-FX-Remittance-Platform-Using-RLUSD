@@ -7,6 +7,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.transaction import CashInStatus, SettlementStatus
+from app.models.user import KYCStatus
 from app.services import cashin_service, cashout_service
 from app.services.auth_service import create_user
 from app.services.kyc_service import count_pending_submissions, submit_kyc
@@ -131,14 +132,54 @@ async def test_shell_replaces_the_dark_navbar(client: AsyncClient, db: AsyncSess
     assert "navbar-dark" not in page
     assert 'href="#main"' in page and 'id="main"' in page
     assert 'id="ds-sidebar"' in page and 'data-bs-target="#ds-sidebar"' in page
-    assert 'class="ds-topbar__kyc"' in page                   # KYC badge for non-admins
     assert 'class="alert alert- ' not in page
 
 
-async def test_admin_top_bar_has_no_kyc_badge(client: AsyncClient, db: AsyncSession):
+def _topbar(page: str) -> str:
+    return page[page.index('<header class="ds-topbar">'):page.index("</header>", page.index('<header class="ds-topbar">'))]
+
+
+def _kyc_badge(page: str) -> str:
+    """Text of the KYC badge on the sidebar's Verification item ('' if none)."""
+    m = re.search(r'href="/kyc".*?</a>', page, re.S)
+    b = re.search(r'ds-sidebar__badge"><span class="visually-hidden">KYC status: </span>(.*?)</span>', m.group(0)) if m else None
+    return b.group(1) if b else ""
+
+
+async def test_top_bar_is_just_the_title(client: AsyncClient, db: AsyncSession):
+    """No KYC badge and no Send button up there: the dashboard hero has Send money."""
+    with logged_in(await approved_sender(db)):
+        page = (await client.get("/dashboard")).text
+    bar = _topbar(page)
+    assert "ds-topbar__title" in bar
+    assert "Verification" not in bar and "ds-status" not in bar
+    assert 'href="/send"' not in bar
+
+
+async def test_verified_sender_has_no_kyc_badge(client: AsyncClient, db: AsyncSession):
+    with logged_in(await approved_sender(db)):
+        page = (await client.get("/dashboard")).text
+    assert _kyc_badge(page) == ""
+
+
+async def test_kyc_badge_shows_when_action_is_needed(client: AsyncClient, db: AsyncSession):
+    user = await registered_recipient(db)                     # can send, KYC not submitted
+    with logged_in(user):
+        assert _kyc_badge((await client.get("/dashboard")).text) == "Not started"
+    user.kyc_status = KYCStatus.pending
+    await db.commit()
+    with logged_in(user):
+        assert _kyc_badge((await client.get("/dashboard")).text) == "Pending"
+    user.kyc_status = KYCStatus.rejected
+    await db.commit()
+    with logged_in(user):
+        assert _kyc_badge((await client.get("/dashboard")).text) == "Rejected"
+
+
+async def test_admin_has_no_kyc_badge(client: AsyncClient, db: AsyncSession):
     with logged_in(await an_admin(db)):
         page = (await client.get("/admin")).text
-    assert "ds-topbar__kyc" not in page
+    assert "KYC status:" not in page
 
 
 async def test_flash_uses_the_design_system(client: AsyncClient, db: AsyncSession):
