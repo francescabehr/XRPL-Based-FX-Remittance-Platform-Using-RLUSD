@@ -278,10 +278,27 @@ Redesign these screens in order. After each one, run the tests and check it at d
 - The "You receive" figure uses the same `countUp` behaviour as the send flow.
 - In the status timeline, the current step shows `.ds-pulse-dot` and completed steps are solid.
 
-### 7.6 Admin area (pattern: Stripe dashboard)
+### 7.6 Admin area (pattern: Stripe dashboard) — ✅ 4e
+
+*As built (4e):*
+- **Overview:** the Phase 3 tiles, plus a **Failed payments** list (failed settlements and ones stuck for over 10 minutes, the newest five) linking to each transfer's drill-down, with an empty state.
+- **Queues:** clean `.ds-table` tables inside cards with a count badge, `status_badge` / `transaction_badge` / `cashout_badge`, `amount()`, `tx_hash()` and `empty_state()`.
+  - **Cash-in and cash-out keep inline actions** (unchanged forms, `data-confirm`, `#fail-{id}` / `#reject{n}`).
+  - **KYC has none:** each row has a **Review** link, and approve/reject happen only on the KYC detail page, so an admin must open and read a submission first (a test asserts the queue has no approve/reject).
+  - The cash-out queue folds the payout under the UCTUSD amount, and shows the raw failure reason only on the detail page, so the table fits at 1440px.
+  - The settlement monitor links to the admin drill-down.
+- **Detail pages:**
+  - **KYC:** the decision panel appears only while pending; once decided it shows the outcome, the reviewer and the reason.
+  - **Transaction (the cash-in detail):** badges, `tx_hash()`, a ledger range, and the same Received/Failed or Retry/Re-queue/Recover forms as the queues whenever they apply ("stuck" uses the monitor's 10-minute rule).
+  - **Cash-out:** the new read-only `GET /admin/cashout/{id}` (behind `require_admin`) shows the raw failure reason, the burn ledger range, attempts, the worker claim, the idempotency key and the wallet, with Approve/Reject/Reconcile by state.
+- **Config:** tier forms are valid HTML (the `<form>` sits in the last cell and the inputs join it with `form=`). Fees are grouped as Send / Cash-out / Exchange rate, with units in the input groups; names and IDs are unchanged.
+- **Monitor:** light pass to the shared badges, `amount()` and `tx_hash()`. `_macros.html` is gone.
+- **Actions:** there's no row fade-out; after an action the flash message confirms it (a review decision).
+- **Tables:** `.table-responsive` is `position: relative`, so a scrolling table's `.visually-hidden` labels can't widen the page.
+
 
 - **Overview:** A new page at `/admin` (behind `require_admin`) and the admin landing page after login. Stat tiles for pending KYC, cash-ins awaiting confirmation, pending cash-outs, failed settlements and settlements validated today. *(Tiles shipped in Phase 3; Phase 4 adds the "Failed payments"-style list.)*
-- **Queues:** KYC, cash-in and cash-out queues are clean tables. Each row has a status badge and inline Approve / Reject actions.
+- **Queues:** KYC, cash-in and cash-out queues are clean tables. Each row has a status badge. Cash-in and cash-out rows carry inline actions; KYC approve/reject live on the KYC detail page only.
 - **Actions:** Destructive or irreversible actions ask for confirmation. This includes cash-in received/failed, cash-out approve and settlement retry (in-page confirmation, not only native `confirm()`).
 - **Failed settlements:** Listed prominently, like Stripe's "Failed payments".
 - **Config pages:** Fee and limit configuration forms sit in cards with clear labels and units.

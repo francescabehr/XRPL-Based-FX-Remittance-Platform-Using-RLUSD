@@ -228,7 +228,7 @@ Empty states are applied everywhere.
 | 3. `/cashout/history` not in nav | **Fixed**: "My cash-outs" in the Wallet group. |
 | 4. Recipients land on the sender dashboard | **Fixed in 4a**: role-aware dashboard; wallet holders see their balance first, recipient-only users see only the wallet. |
 | 5. Admin nav order | **Fixed**: Overview → Queues (KYC, Cash-in, Settlements, Cash-out) → Monitor → Config; the warning icon is gone. |
-| 6–8. Status wording, colours and hash visibility differ by screen | **In progress**: dashboard (4a), the send flow, Status page and History (4b), and the wallet with its drawer (4c) now use `transaction_badge` / `cashout_badge` / `amount()` / `tx_hash()`, the cash-out flow and My cash-outs (4d). The admin pages (4e) follow. |
+| 6–8. Status wording, colours and hash visibility differ by screen | **Fixed**: dashboard (4a), the send flow, Status page and History (4b), the wallet and its drawer (4c), the cash-out flow and My cash-outs (4d), and every admin page (4e) use `status_badge` / `transaction_badge` / `cashout_badge`, `amount()` and `tx_hash()`. The legacy `_macros.hash_link` is gone. |
 | 9. "Send Money" disabled link still keyboard-reachable | **Fixed**: a real disabled button, described by the KYC note. |
 | 10. Inconsistent confirmation | **Fixed**: shared `data-confirm` dialog on every irreversible admin action; native `confirm()` removed. |
 | 11. Transaction-detail back link for admins | **Fixed**: goes to `/admin/transactions`. |

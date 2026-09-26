@@ -1492,3 +1492,46 @@ a.ds-activity__row:hover { background: var(--bg); color: inherit; }
 }
 .ds-processing > i { flex: 0 0 auto; }
 .ds-processing strong { font-weight: 600; }
+
+/* Admin (4e) ─────────────────────────────────────────────────────────────── */
+
+/* A scrolling table must also contain its absolutely positioned descendants
+   (.visually-hidden labels), or they escape the clip and widen the page. */
+.table-responsive { position: relative; }
+
+/* Work-queue tables: calm, dense, money right-aligned in tabular figures. */
+.ds-table { margin-bottom: 0; }
+.ds-table > :not(caption) > * > * { vertical-align: middle; }
+.ds-table > tbody > tr:last-child > * { border-bottom-width: 0; }
+.ds-table__sub { display: block; font-size: var(--text-sm); color: var(--text-muted); }
+.ds-table__money { text-align: right; white-space: nowrap; }
+.ds-table__actions { text-align: right; white-space: nowrap; }
+.ds-table__actions > * + * { margin-left: var(--space-2); }
+.ds-table__actions form { display: inline; }
+.ds-table .collapse > td { background: var(--bg); }
+@media (max-width: 575.98px) {
+  .ds-table__actions { white-space: normal; }
+  .ds-table__actions > * { margin: 2px 0 2px var(--space-1); }
+}
+
+/* Card header with a title on the left and a count or link on the right. */
+.ds-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* Label/value facts (KYC submission, burn metadata). */
+.ds-facts { display: grid; grid-template-columns: minmax(8rem, 40%) 1fr; gap: var(--space-2) var(--space-4); margin: 0; }
+.ds-facts dt { font-weight: 500; color: var(--text-muted); }
+.ds-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 575.98px) {
+  .ds-facts { grid-template-columns: 1fr; row-gap: 0; }
+  .ds-facts dd { margin-bottom: var(--space-3); }
+}
+
+/* Config form sections. */
+.ds-form-section + .ds-form-section { margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--border); }
+.ds-form-section__title { margin: 0 0 var(--space-3); font-size: var(--text-sm); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }

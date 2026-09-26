@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% from "components/money.html" import amount, breakdown, breakdown_row %}
+{% from "components/status.html" import cashout_badge %}
+{% from "components/xrpl.html" import tx_hash %}
+{% block title %}Cash-out {{ req.id|string|truncate(8, True, "") }} — Admin{% endblock %}
+
+{% block page_title %}Cash-out — {{ req.recipient.full_name }}{% endblock %}
+{% block page_back %}/admin/cashout{% endblock %}
+
+{% block content %}
+{%- set status = req.status.value %}
+{%- set zar = req.target_currency.value == "ZAR" %}
+{%- set when = '%d %b %Y, %H:%M' %}
+
+<section class="card ds-hero mb-4" aria-labelledby="co-label">
+  <div class="card-body">
+    <div>
+      <p class="ds-hero__label" id="co-label">Cash-out of</p>
+      {{ amount(req.uctusd_amount, "UCTUSD", size="lg") }}
+      <p class="ds-hero__sub">Pays out {{ amount(req.net_payout, req.target_currency, size="sm") }} (simulated) · requested {{ req.created_at|localtime(when) }}</p>
+    </div>
+    <div>{{ cashout_badge(req, class="fs-6") }}</div>
+  </div>
+</section>
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <section class="card mb-4" aria-labelledby="burn-title">
+      <div class="card-header"><h2 class="ds-section-title" id="burn-title">Burn &amp; ledger</h2></div>
+      <div class="card-body p-4">
+        <dl class="ds-facts">
+          <dt>Status</dt><dd>{{ cashout_badge(req) }}</dd>
+          <dt>Burn transaction</dt><dd>{{ tx_hash(req.xrpl_burn_tx_hash) }}</dd>
+          <dt>Ledger range</dt>
+          <dd>{% if req.burn_submitted_ledger_index or req.burn_last_ledger_sequence %}{{ req.burn_submitted_ledger_index or "?" }}–{{ req.burn_last_ledger_sequence or "?" }}<span class="ds-table__sub">Submitted ledger – LastLedgerSequence</span>{% else %}—{% endif %}</dd>
+          <dt>Attempts</dt><dd>{{ req.burn_attempts }}</dd>
+          <dt>Worker claimed</dt><dd>{{ req.burn_started_at|localtime(when) or "—" }}</dd>
+          <dt>Failure reason</dt><dd>{% if req.failure_reason %}<span class="{{ 'text-danger' if status == 'failed' else 'text-muted' }}">{{ req.failure_reason }}</span>{% else %}—{% endif %}</dd>
+          <dt>Idempotency key</dt><dd><span class="font-monospace small">{{ req.idempotency_key }}</span></dd>
+        </dl>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="parties-title">
+      <div class="card-header"><h2 class="ds-section-title" id="parties-title">Recipient &amp; review</h2></div>
+      <div class="card-body p-4">
+        <dl class="ds-facts">
+          <dt>Recipient</dt><dd>{{ req.recipient.full_name }}<span class="ds-table__sub">{{ req.recipient.email }}</span></dd>
+          <dt>Wallet</dt>
+          <dd>{% if req.wallet %}<a href="{{ explorer_tx_url|replace("/transactions/", "/accounts/") }}{{ req.wallet.xrpl_address }}" target="_blank" rel="noopener" class="font-monospace small">{{ req.wallet.xrpl_address }}<i class="bi bi-box-arrow-up-right ms-1" aria-hidden="true"></i><span class="visually-hidden"> (opens the XRPL Testnet explorer in a new tab)</span></a>{% else %}—{% endif %}</dd>
+          <dt>Actioned by</dt><dd>{{ req.approver.full_name if req.approver else "—" }}</dd>
+          <dt>Actioned</dt><dd>{{ req.approved_at|localtime(when) or "—" }}</dd>
+          <dt>Completed</dt><dd>{{ req.completed_at|localtime(when) or "—" }}</dd>
+          <dt>Payout reference</dt><dd>{{ req.fiat_payout_reference or "—" }}{% if req.fiat_paid_at %}<span class="ds-table__sub">Paid {{ req.fiat_paid_at|localtime(when) }} (simulated)</span>{% endif %}</dd>
+        </dl>
+      </div>
+    </section>
+  </div>
+
+  <div class="col-lg-6">
+    <section class="card mb-4" aria-labelledby="pricing-title">
+      <div class="card-header"><h2 class="ds-section-title" id="pricing-title">Pricing snapshot (fixed at request)</h2></div>
+      <div class="card-body pt-2">
+        {%- set fee_hint = "{:.2%}".format(req.cashout_fee_percentage) ~ ", minimum $" ~ "{:,.2f}".format(req.cashout_fee_min_usd) %}
+        {% call breakdown() %}
+          {{ breakdown_row("UCTUSD to burn", amount(req.uctusd_amount, "UCTUSD")) }}
+          {{ breakdown_row("Cash-out fee", amount(-req.cashout_fee_usd, "USD"), hint=fee_hint) }}
+          {{ breakdown_row("Exchange rate", ("1 USD = " ~ "{:,.6f}".format(req.market_rate) ~ " ZAR") if zar else "1 UCTUSD = 1 USD") }}
+          {{ breakdown_row("Payout", amount(req.net_payout, req.target_currency), hint="Simulated, in " ~ req.target_currency.value) }}
+        {% endcall %}
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="actions-title">
+      <div class="card-header"><h2 class="ds-section-title" id="actions-title">Actions</h2></div>
+      <div class="card-body p-4">
+        {% if status == "requested" %}
+        <form method="post" action="/admin/cashout/{{ req.id }}/approve" class="mb-4"
+              data-confirm="{{ "{:,.6f}".format(req.uctusd_amount) }} UCTUSD is reserved from {{ req.recipient.full_name }}'s wallet and burned on the XRPL. This can't be undone." data-confirm-title="Approve cash-out?" data-confirm-label="Approve" data-confirm-tone="primary">
+          <p class="small text-muted">Approving reserves the UCTUSD and queues the burn.</p>
+          <button class="btn btn-primary w-100"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>Approve</button>
+        </form>
+        <form method="post" action="/admin/cashout/{{ req.id }}/reject"
+              data-confirm="{{ req.recipient.full_name }}'s request is closed and nothing is burned." data-confirm-title="Reject cash-out?" data-confirm-label="Reject">
+          <label class="form-label" for="co-reject-reason">Reason for rejecting</label>
+          <input type="text" name="reason" id="co-reject-reason" class="form-control mb-2" placeholder="Shown to the recipient">
+          <button class="btn btn-outline-danger w-100">Reject</button>
+        </form>
+        {% elif req.awaiting_ledger_confirmation %}
+        <p class="small text-muted">The burn's outcome was never confirmed. Reconcile checks the XRPL directly and changes nothing unless the outcome can be proven.</p>
+        <form method="post" action="/admin/cashout/{{ req.id }}/reconcile">
+          <button class="btn btn-outline-secondary w-100"><i class="bi bi-search me-1" aria-hidden="true"></i>Reconcile</button>
+        </form>
+        {% elif status == "approved" %}
+        <p class="small text-muted mb-0">Burn in progress… No action needed.</p>
+        {% else %}
+        <p class="small text-muted mb-0">This request is {{ status }}. No further action is possible.</p>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

@@ -63,8 +63,8 @@
   {%- for step in steps %}
   <li class="ds-timeline__step is-{{ step.state }}"{% if step.state == "current" %} aria-current="step"{% endif %}{% if step.key %} data-step="{{ step.key }}"{% endif %}>
     <span class="ds-timeline__marker" aria-hidden="true">
-      {%- if step.state == "done" %}<i class="bi bi-check-lg"></i>
-      {%- elif step.state == "failed" %}<i class="bi bi-x-lg"></i>
+      {%- if step.state == "done" %}<i class="bi bi-check-lg" aria-hidden="true"></i>
+      {%- elif step.state == "failed" %}<i class="bi bi-x-lg" aria-hidden="true"></i>
       {%- elif step.state == "current" %}<span class="ds-pulse-dot"></span>{% endif -%}
     </span>
     <span class="ds-timeline__body">

@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
@@ -35,6 +35,7 @@ async def overview(
     user=Depends(require_admin),
 ):
     today_start = day_start_utc(datetime.now(display_tz()).date())
+    issues = await cashin_service.list_settlement_issues(db)
     return templates.TemplateResponse(
         "admin/overview.html",
         {
@@ -46,6 +47,9 @@ async def overview(
             "cashouts": await cashout_service.count_open(db),
             "failed_settlements": await cashin_service.count_failed_settlements(db),
             "settled_today": await cashin_service.count_settled_since(db, today_start),
+            # "Failed payments" list: the newest few, the monitor has the rest.
+            "issues": issues[:5],
+            "issue_count": len(issues),
         },
     )
 
@@ -390,6 +394,24 @@ async def cashout_queue(
     )
 
 
+@router.get("/cashout/{request_id}", response_class=HTMLResponse)
+async def cashout_detail(
+    request_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_admin),
+):
+    """Read-only drill-down: burn metadata, ledger range and pricing snapshot."""
+    req = await cashout_service.get_request(db, request_id)
+    if not req:
+        set_flash(request, "Cash-out request not found.", "danger")
+        return RedirectResponse(url="/admin/cashout", status_code=302)
+    return templates.TemplateResponse(
+        "admin/cashout_detail.html",
+        {"request": request, "user": user, "flash": get_flash(request), "req": req},
+    )
+
+
 @router.post("/cashout/{request_id}/approve")
 async def cashout_approve(
     request_id: uuid.UUID,
@@ -564,6 +586,12 @@ async def transaction_detail(
         set_flash(request, "Transaction not found.", "danger")
         return RedirectResponse(url="/admin/transactions", status_code=302)
 
+    # Same rule as the settlement monitor's list: queued/processing untouched for
+    # STUCK_AFTER is offered a Re-queue / Recover (the retry route decides safely).
+    stuck = (
+        txn.settlement_status in (SettlementStatus.queued, SettlementStatus.processing)
+        and datetime.now(timezone.utc) - txn.updated_at >= cashin_service.STUCK_AFTER
+    )
     return templates.TemplateResponse(
         "admin/transaction_detail.html",
         {
@@ -571,6 +599,7 @@ async def transaction_detail(
             "user": user,
             "flash": get_flash(request),
             "txn": txn,
+            "stuck": stuck,
         },
     )
 

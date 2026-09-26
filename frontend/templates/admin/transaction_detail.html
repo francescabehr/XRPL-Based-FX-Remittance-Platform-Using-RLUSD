@@ -1,67 +1,121 @@
 {% extends "base.html" %}
-{% from "_macros.html" import hash_link with context %}
+{% from "components/money.html" import amount, breakdown, breakdown_row %}
+{% from "components/status.html" import status_badge, transaction_badge %}
+{% from "components/xrpl.html" import tx_hash %}
 {% block title %}Transaction {{ txn.id|string|truncate(8, True, "") }} — Admin{% endblock %}
 
 {% block page_title %}{{ txn.sender.full_name }} → {{ txn.beneficiary.full_name }}{% endblock %}
 {% block page_back %}/admin/transactions{% endblock %}
 
 {% block content %}
-<p class="d-flex flex-wrap gap-2 mb-3">
-  <span class="badge bg-{{ txn.status_badge }} fs-6">{{ txn.status_label }}</span>
-  {% if txn.aml_flagged %}<span class="badge bg-danger fs-6"><i class="bi bi-flag-fill me-1" aria-hidden="true"></i>AML review</span>{% endif %}
-</p>
+{%- set cashin = txn.cashin_status.value %}
+{%- set settlement = txn.settlement_status.value %}
+{%- set when = '%d %b %Y, %H:%M' %}
+
+<section class="card ds-hero mb-4" aria-labelledby="txn-label">
+  <div class="card-body">
+    <div>
+      <p class="ds-hero__label" id="txn-label">Recipient gets</p>
+      {{ amount(txn.uctusd_amount, "UCTUSD", size="lg") }}
+      <p class="ds-hero__sub">Sender paid {{ amount(txn.zar_amount, "ZAR", size="sm") }} · {{ txn.created_at|localtime(when) }} · <span class="font-monospace">{{ txn.id|string|truncate(13, True, "") }}</span></p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      {{ transaction_badge(txn, class="fs-6") }}
+      {% if txn.aml_flagged %}{{ status_badge("flagged", "aml", class="fs-6") }}{% endif %}
+    </div>
+  </div>
+</section>
 
 {% if txn.failure_reason %}
-<div class="alert alert-danger">
-  <strong>{{ "Cash-in failed" if txn.cashin_status.value == "failed" else "Settlement failed" }}:</strong>
+<div class="alert alert-danger" role="alert">
+  <strong>{{ "Cash-in failed" if cashin == "failed" else "Settlement failed" }}:</strong>
   {{ txn.failure_reason }}
-  {% if txn.settlement_status.value == "failed" %}
-  <div class="small mt-1">No UCTUSD reached the recipient. Retry from the <a href="/admin/settlements">settlement monitor</a>.</div>
+  {% if settlement == "failed" %}
+  <div class="small mt-1">No UCTUSD reached the recipient. Retry below or from the <a href="/admin/settlements">settlement monitor</a>.</div>
   {% endif %}
 </div>
 {% endif %}
 
+{#- Actions available on this transfer right now: the same forms as the queues. -#}
+{% if cashin == "pending" or settlement == "failed" or stuck %}
+<section class="card mb-4" aria-labelledby="actions-title">
+  <div class="card-body p-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
+    <div>
+      <h2 class="ds-section-title mb-1" id="actions-title">{{ "Confirm the card payment" if cashin == "pending" else "Settlement needs attention" }}</h2>
+      <p class="small text-muted mb-0">
+        {%- if cashin == "pending" %}Confirming queues the XRPL settlement; failing stops the transfer.
+        {%- else %}The ledger is checked first, so a payment that already went through is never sent twice.{% endif -%}
+      </p>
+    </div>
+    <div class="ds-table__actions">
+      {% if cashin == "pending" %}
+      <form method="post" action="/admin/cashin/{{ txn.id }}/received"
+            data-confirm="Confirm that R{{ "{:,.2f}".format(txn.zar_amount) }} from {{ txn.sender.full_name }} arrived. This queues the XRPL settlement and can't be undone." data-confirm-title="Confirm cash-in?" data-confirm-label="Confirm received" data-confirm-tone="primary">
+        <button class="btn btn-primary"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>Received</button>
+      </form>
+      <button class="btn btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#fail-{{ txn.id }}" aria-expanded="false" aria-controls="fail-{{ txn.id }}">
+        <i class="bi bi-x-lg me-1" aria-hidden="true"></i>Failed
+      </button>
+      {% else %}
+      {% set label = {"failed": "Retry", "queued": "Re-queue", "processing": "Recover"}[settlement] %}
+      <form method="post" action="/admin/settlements/{{ txn.id }}/retry"
+            data-confirm="The ledger is checked first, so a payment that already went through is never sent twice." data-confirm-title="{{ label }} this settlement?" data-confirm-label="{{ label }}" data-confirm-tone="primary">
+        <button class="btn btn-outline-secondary"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>{{ label }}</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% if cashin == "pending" %}
+  <div class="collapse border-top" id="fail-{{ txn.id }}">
+    <form method="post" action="/admin/cashin/{{ txn.id }}/failed" class="d-flex gap-2 p-3"
+          data-confirm="The transfer to {{ txn.beneficiary.full_name }} stops and no money is sent. This can't be undone." data-confirm-title="Mark cash-in failed?" data-confirm-label="Mark failed">
+      <input type="text" name="reason" class="form-control form-control-sm" placeholder="Reason shown to the sender (optional)" aria-label="Reason shown to the sender (optional)">
+      <button class="btn btn-sm btn-danger text-nowrap">Mark failed</button>
+    </form>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
 <div class="row g-4">
   <div class="col-lg-6">
-    <div class="card shadow-sm mb-4">
-      <div class="card-header fw-semibold">Cash-in (FR-CI)</div>
-      <table class="table mb-0">
-        <tbody>
-          <tr><th class="fw-normal text-muted">Status</th><td class="text-end">
-            <span class="badge bg-{{ {'received': 'success', 'failed': 'danger'}.get(txn.cashin_status.value, 'warning text-dark') }}">{{ txn.cashin_status.value|capitalize }}</span>
-          </td></tr>
-          <tr><th class="fw-normal text-muted">Card</th><td class="text-end">{% if txn.card_last4 %}•••• {{ txn.card_last4 }}{% else %}—{% endif %}</td></tr>
-          <tr><th class="fw-normal text-muted">Updated</th><td class="text-end small">{{ txn.cashin_updated_at|localtime('%d %b %Y %H:%M') or "—" }}</td></tr>
-          <tr><th class="fw-normal text-muted">Reviewed by</th><td class="text-end small font-monospace">{{ txn.cashin_reviewed_by or "—" }}</td></tr>
-          <tr><th class="fw-normal text-muted">Failure reason</th><td class="text-end small text-break">{{ txn.cashin_failure_reason or "—" }}</td></tr>
-        </tbody>
-      </table>
-    </div>
+    <section class="card mb-4" aria-labelledby="cashin-title">
+      <div class="card-header ds-card-head">
+        <h2 class="ds-section-title" id="cashin-title">Cash-in</h2>
+        {{ status_badge(txn.cashin_status, "cashin") }}
+      </div>
+      <div class="card-body p-4">
+        <dl class="ds-facts">
+          <dt>Card</dt><dd>{% if txn.card_last4 %}•••• {{ txn.card_last4 }}{% else %}—{% endif %}</dd>
+          <dt>Updated</dt><dd>{{ txn.cashin_updated_at|localtime(when) or "—" }}</dd>
+          <dt>Reviewed by</dt><dd><span class="font-monospace small">{{ txn.cashin_reviewed_by or "—" }}</span></dd>
+          <dt>Failure reason</dt><dd>{{ txn.cashin_failure_reason or "—" }}</dd>
+        </dl>
+      </div>
+    </section>
 
-    <div class="card shadow-sm">
-      <div class="card-header fw-semibold">Settlement &amp; ledger (FR-MQ, FR-WAL)</div>
-      <table class="table mb-0">
-        <tbody>
-          <tr><th class="fw-normal text-muted">Status</th><td class="text-end">
-            <span class="badge bg-{{ {'completed': 'success', 'failed': 'danger'}.get(txn.settlement_status.value, 'secondary') }}">{{ txn.settlement_status.value|replace("_", " ")|capitalize }}</span>
-          </td></tr>
-          <tr><th class="fw-normal text-muted">Validation result</th><td class="text-end small">
-            {% if txn.settlement_status.value == "completed" %}
-              <span class="text-success">Validated on-ledger (tesSUCCESS)</span>
-            {% elif txn.xrpl_error_reason %}
-              <span class="text-danger text-break">{{ txn.xrpl_error_reason }}</span>
-            {% elif txn.xrpl_tx_hash %}
-              <span class="text-muted">Submitted, awaiting validation</span>
-            {% else %}
-              <span class="text-muted">Not submitted</span>
-            {% endif %}
-          </td></tr>
-          <tr><th class="fw-normal text-muted">XRPL transaction</th><td class="text-end">{{ hash_link(txn.xrpl_tx_hash) }}</td></tr>
-          <tr><th class="fw-normal text-muted">Attempts</th><td class="text-end">{{ txn.settlement_attempts }}</td></tr>
-          <tr><th class="fw-normal text-muted">Settled at</th><td class="text-end small">{{ txn.settled_at|localtime('%d %b %Y %H:%M') or "—" }}</td></tr>
-          <tr><th class="fw-normal text-muted">Idempotency key</th><td class="text-end font-monospace small">{{ txn.idempotency_key }}</td></tr>
-        </tbody>
-      </table>
+    <section class="card" aria-labelledby="settlement-title">
+      <div class="card-header ds-card-head">
+        <h2 class="ds-section-title" id="settlement-title">Settlement &amp; ledger</h2>
+        {{ status_badge(txn.settlement_status, "settlement") }}
+      </div>
+      <div class="card-body p-4">
+        <dl class="ds-facts">
+          <dt>Validation result</dt>
+          <dd>
+            {% if settlement == "completed" %}<span class="text-success">Validated on-ledger (tesSUCCESS)</span>
+            {% elif txn.xrpl_error_reason %}<span class="text-danger">{{ txn.xrpl_error_reason }}</span>
+            {% elif txn.xrpl_tx_hash %}<span class="text-muted">Submitted, awaiting validation</span>
+            {% else %}<span class="text-muted">Not submitted</span>{% endif %}
+          </dd>
+          <dt>XRPL transaction</dt><dd>{{ tx_hash(txn.xrpl_tx_hash) }}</dd>
+          <dt>Ledger range</dt>
+          <dd>{% if txn.settlement_submitted_ledger_index or txn.settlement_last_ledger_sequence %}{{ txn.settlement_submitted_ledger_index or "?" }}–{{ txn.settlement_last_ledger_sequence or "?" }}{% else %}—{% endif %}</dd>
+          <dt>Attempts</dt><dd>{{ txn.settlement_attempts }}{% if stuck %}<span class="ds-table__sub">Stuck over 10 min</span>{% endif %}</dd>
+          <dt>Settled</dt><dd>{{ txn.settled_at|localtime(when) or "—" }}</dd>
+          <dt>Idempotency key</dt><dd><span class="font-monospace small">{{ txn.idempotency_key }}</span></dd>
+        </dl>
+      </div>
       {% if txn.settlement_previous_attempts %}
         {# Attempts retired by an admin retry. Each may still exist on-ledger,
            which is exactly why the hash and its ledger range are kept. #}
@@ -69,7 +123,7 @@
           <div class="fw-semibold mb-2 text-muted">Earlier attempts ({{ txn.settlement_previous_attempts|length }})</div>
           {% for attempt in txn.settlement_previous_attempts %}
             <div class="{% if not loop.last %}mb-2 pb-2 border-bottom{% endif %}">
-              <div>{{ hash_link(attempt.tx_hash) }}</div>
+              <div>{{ tx_hash(attempt.tx_hash) }}</div>
               <div class="text-muted">
                 Ledgers {{ attempt.submitted_ledger_index or "?" }}–{{ attempt.last_ledger_sequence or "?" }}
                 · retired {{ attempt.retired_at or "—" }}
@@ -81,48 +135,48 @@
           {% endfor %}
         </div>
       {% endif %}
-    </div>
+    </section>
   </div>
 
   <div class="col-lg-6">
-    <div class="card shadow-sm mb-4">
-      <div class="card-header fw-semibold">Parties</div>
-      <table class="table mb-0">
-        <tbody>
-          <tr><th class="fw-normal text-muted">Sender</th><td class="text-end">{{ txn.sender.full_name }}<div class="small text-muted">{{ txn.sender.email }}</div></td></tr>
-          <tr><th class="fw-normal text-muted">Beneficiary</th><td class="text-end">{{ txn.beneficiary.full_name }}<div class="small text-muted">{{ txn.beneficiary.email }}</div></td></tr>
-          <tr><th class="fw-normal text-muted">Recipient account</th><td class="text-end">
-            {% if txn.recipient %}{{ txn.recipient.full_name }}<div class="small text-muted">{{ txn.recipient.email }}</div>{% else %}<span class="text-muted">Not linked</span>{% endif %}
-          </td></tr>
-        </tbody>
-      </table>
-    </div>
+    <section class="card mb-4" aria-labelledby="parties-title">
+      <div class="card-header"><h2 class="ds-section-title" id="parties-title">Parties</h2></div>
+      <div class="card-body p-4">
+        <dl class="ds-facts">
+          <dt>Sender</dt><dd>{{ txn.sender.full_name }}<span class="ds-table__sub">{{ txn.sender.email }}</span></dd>
+          <dt>Beneficiary</dt><dd>{{ txn.beneficiary.full_name }}<span class="ds-table__sub">{{ txn.beneficiary.email }}</span></dd>
+          <dt>Recipient account</dt>
+          <dd>{% if txn.recipient %}{{ txn.recipient.full_name }}<span class="ds-table__sub">{{ txn.recipient.email }}</span>{% else %}<span class="text-muted">Not linked</span>{% endif %}</dd>
+        </dl>
+      </div>
+    </section>
 
-    <div class="card shadow-sm mb-4">
-      <div class="card-header fw-semibold">Pricing snapshot (fixed at creation — FR-FX-08)</div>
-      <table class="table mb-0">
-        <tbody>
-          <tr><th class="fw-normal text-muted">Sent</th><td class="text-end">R{{ "{:,.2f}".format(txn.zar_amount) }}</td></tr>
-          <tr><th class="fw-normal text-muted">Transaction fee</th><td class="text-end">R{{ "{:,.2f}".format(txn.transaction_fee) }}</td></tr>
-          <tr><th class="fw-normal text-muted">Net converted</th><td class="text-end">R{{ "{:,.2f}".format(txn.net_zar_converted) }}</td></tr>
-          <tr><th class="fw-normal text-muted">Market rate</th><td class="text-end">R{{ "%.6f"|format(txn.market_rate) }} / USD</td></tr>
-          <tr><th class="fw-normal text-muted">FX margin</th><td class="text-end">{{ "%.4f"|format(txn.fx_margin * 100) }}%</td></tr>
-          <tr><th class="fw-normal text-muted">Effective rate</th><td class="text-end">R{{ "%.6f"|format(txn.exchange_rate) }} / USD</td></tr>
-          <tr class="table-light"><th>Recipient gets</th><td class="text-end fw-bold">{{ "{:,.6f}".format(txn.uctusd_amount) }} UCTUSD</td></tr>
-          <tr><th class="fw-normal text-muted">Created</th><td class="text-end small">{{ txn.created_at|localtime('%d %b %Y %H:%M') }}</td></tr>
-        </tbody>
-      </table>
-    </div>
+    <section class="card mb-4" aria-labelledby="pricing-title">
+      <div class="card-header"><h2 class="ds-section-title" id="pricing-title">Pricing snapshot (fixed at creation)</h2></div>
+      <div class="card-body pt-2">
+        {% call breakdown() %}
+          {{ breakdown_row("Sent", amount(txn.zar_amount, "ZAR")) }}
+          {{ breakdown_row("Transaction fee", amount(txn.transaction_fee, "ZAR")) }}
+          {{ breakdown_row("Net converted", amount(txn.net_zar_converted, "ZAR")) }}
+          {{ breakdown_row("Market rate", "R" ~ "%.6f"|format(txn.market_rate) ~ " / USD") }}
+          {{ breakdown_row("FX margin", "%.4f"|format(txn.fx_margin * 100) ~ "%") }}
+          {{ breakdown_row("Effective rate", "R" ~ "%.6f"|format(txn.exchange_rate) ~ " / USD") }}
+          {{ breakdown_row("Recipient gets", amount(txn.uctusd_amount, "UCTUSD"), hero=true) }}
+        {% endcall %}
+      </div>
+    </section>
 
-    <!-- AML review (FR-ADM-07) -->
-    <div class="card shadow-sm border-{{ 'danger' if txn.aml_flagged else 'light' }}">
-      <div class="card-header fw-semibold"><i class="bi bi-flag me-2" aria-hidden="true"></i>AML review</div>
-      <div class="card-body">
+    <section class="card" aria-labelledby="aml-title">
+      <div class="card-header ds-card-head">
+        <h2 class="ds-section-title" id="aml-title">AML review</h2>
+        {% if txn.aml_flagged %}{{ status_badge("flagged", "aml") }}{% endif %}
+      </div>
+      <div class="card-body p-4">
         {% if txn.aml_flagged %}
           <p class="small text-muted mb-3">This transaction is flagged for AML review. Flagging is a review marker only — it does not stop or reverse any payment.</p>
           <form method="post" action="/admin/transactions/{{ txn.id }}/aml">
             <input type="hidden" name="flagged" value="0">
-            <button class="btn btn-sm btn-outline-success"><i class="bi bi-flag me-1" aria-hidden="true"></i>Clear AML flag</button>
+            <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-flag me-1" aria-hidden="true"></i>Clear AML flag</button>
           </form>
         {% else %}
           <p class="small text-muted mb-3">Not flagged. Raise a flag to mark this transaction for AML review; it stays visible under the monitor's AML filter.</p>
@@ -132,7 +186,7 @@
           </form>
         {% endif %}
       </div>
-    </div>
+    </section>
   </div>
 </div>
 {% endblock %}

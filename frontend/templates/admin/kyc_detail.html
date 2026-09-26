@@ -1,80 +1,84 @@
 {% extends "base.html" %}
+{% from "components/status.html" import status_badge %}
 {% block title %}KYC Review — {{ submission.full_name }}{% endblock %}
 
 {% block page_title %}KYC review — {{ submission.full_name }}{% endblock %}
 {% block page_back %}/admin/kyc{% endblock %}
 
 {% block content %}
-
+{%- set state = submission.status.value %}
 <div class="row g-4">
-  <!-- Submission details -->
   <div class="col-lg-7">
-    <div class="card shadow-sm">
-      <div class="card-header fw-semibold">Submitted Information</div>
-      <div class="card-body">
-        <dl class="row mb-0">
-          <dt class="col-5 text-muted">Full name</dt>
-          <dd class="col-7">{{ submission.full_name }}</dd>
-
-          <dt class="col-5 text-muted">Date of birth</dt>
-          <dd class="col-7">{{ submission.date_of_birth.strftime('%d %B %Y') }}</dd>
-
-          <dt class="col-5 text-muted">Nationality</dt>
-          <dd class="col-7">{{ submission.nationality }}</dd>
-
-          <dt class="col-5 text-muted">ID / Passport</dt>
-          <dd class="col-7"><code>{{ submission.id_number }}</code></dd>
-
-          <dt class="col-5 text-muted">Address</dt>
-          <dd class="col-7">{{ submission.residential_address }}</dd>
-
-          <dt class="col-5 text-muted">Mobile</dt>
-          <dd class="col-7">{{ submission.mobile }}</dd>
-
-          <dt class="col-5 text-muted">Email</dt>
-          <dd class="col-7">{{ submission.email }}</dd>
-
-          <dt class="col-5 text-muted">Source of funds</dt>
-          <dd class="col-7">{{ submission.source_of_funds }}</dd>
-
-          <dt class="col-5 text-muted">Submitted at</dt>
-          <dd class="col-7 text-muted small">{{ submission.submitted_at|localtime('%d %b %Y %H:%M') }}</dd>
+    <section class="card" aria-labelledby="submission-title">
+      <div class="card-header ds-card-head">
+        <h2 class="ds-section-title" id="submission-title">Submitted information</h2>
+        {{ status_badge(submission.status, "kyc_submission") }}
+      </div>
+      <div class="card-body p-4">
+        <dl class="ds-facts">
+          <dt>Full name</dt><dd>{{ submission.full_name }}</dd>
+          <dt>Date of birth</dt><dd>{{ submission.date_of_birth.strftime('%d %B %Y') }}</dd>
+          <dt>Nationality</dt><dd>{{ submission.nationality }}</dd>
+          <dt>ID / passport</dt><dd><span class="font-monospace">{{ submission.id_number }}</span></dd>
+          <dt>Address</dt><dd>{{ submission.residential_address }}</dd>
+          <dt>Mobile</dt><dd>{{ submission.mobile }}</dd>
+          <dt>Email</dt><dd>{{ submission.email }}</dd>
+          <dt>Source of funds</dt><dd>{{ submission.source_of_funds }}</dd>
+          <dt>Submitted</dt><dd>{{ submission.submitted_at|localtime('%d %b %Y, %H:%M') }}</dd>
         </dl>
       </div>
-    </div>
+    </section>
   </div>
 
-  <!-- Decision panel -->
   <div class="col-lg-5">
-    <div class="card shadow-sm border-success mb-3">
-      <div class="card-header fw-semibold text-success">Approve</div>
-      <div class="card-body">
-        <p class="text-muted small">Approving will let this user initiate remittances immediately.</p>
+    {% if state == "pending" %}
+    {#- The only place a KYC decision is made (never inline in the queue). -#}
+    <section class="card mb-3" aria-labelledby="approve-title">
+      <div class="card-header"><h2 class="ds-section-title" id="approve-title">Approve</h2></div>
+      <div class="card-body p-4">
+        <p class="small text-muted">Approving lets this user send money immediately.</p>
         <form method="post" action="/admin/kyc/{{ submission.id }}/approve"
               data-confirm="{{ submission.full_name }} will be able to send money immediately." data-confirm-title="Approve KYC?" data-confirm-label="Approve" data-confirm-tone="primary">
-          <button type="submit" class="btn btn-success w-100">
+          <button type="submit" class="btn btn-primary w-100">
             <i class="bi bi-check-lg me-1" aria-hidden="true"></i>Approve
           </button>
         </form>
       </div>
-    </div>
+    </section>
 
-    <div class="card shadow-sm border-danger">
-      <div class="card-header fw-semibold text-danger">Reject</div>
-      <div class="card-body">
+    <section class="card" aria-labelledby="reject-title">
+      <div class="card-header"><h2 class="ds-section-title" id="reject-title">Reject</h2></div>
+      <div class="card-body p-4">
         <form method="post" action="/admin/kyc/{{ submission.id }}/reject"
               data-confirm="{{ submission.full_name }} will be told the reason and asked to resubmit." data-confirm-title="Reject KYC?" data-confirm-label="Reject">
           <div class="mb-3">
-            <label class="form-label fw-semibold" for="kyc-reject-reason">Reason <span class="text-danger">*</span></label>
+            <label class="form-label" for="kyc-reject-reason">Reason <span class="text-danger" aria-hidden="true">*</span></label>
             <textarea name="reason" class="form-control" rows="3" required id="kyc-reject-reason"
                       placeholder="Explain clearly so the user knows what to fix…"></textarea>
+            <div class="form-text">Shown to the user.</div>
           </div>
           <button type="submit" class="btn btn-danger w-100">
             <i class="bi bi-x-lg me-1" aria-hidden="true"></i>Reject
           </button>
         </form>
       </div>
-    </div>
+    </section>
+    {% else %}
+    <section class="card" aria-labelledby="decision-title">
+      <div class="card-header ds-card-head">
+        <h2 class="ds-section-title" id="decision-title">Decision</h2>
+        {{ status_badge(submission.status, "kyc_submission") }}
+      </div>
+      <div class="card-body p-4">
+        <dl class="ds-facts">
+          <dt>Outcome</dt><dd>{{ "Approved — the user can send money" if state == "approved" else "Rejected — the user was asked to resubmit" }}</dd>
+          <dt>Reviewed by</dt><dd>{{ submission.reviewer.full_name if submission.reviewer else "—" }}</dd>
+          <dt>Reviewed</dt><dd>{{ submission.reviewed_at|localtime('%d %b %Y, %H:%M') or "—" }}</dd>
+          {% if state == "rejected" %}<dt>Reason</dt><dd>{{ submission.rejection_reason or "—" }}</dd>{% endif %}
+        </dl>
+      </div>
+    </section>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

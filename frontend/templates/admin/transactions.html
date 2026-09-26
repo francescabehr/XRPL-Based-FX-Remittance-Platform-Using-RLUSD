@@ -1,5 +1,8 @@
 {% extends "base.html" %}
-{% from "_macros.html" import hash_link with context %}
+{% from "components/money.html" import amount %}
+{% from "components/status.html" import status_badge %}
+{% from "components/ui.html" import empty_state %}
+{% from "components/xrpl.html" import tx_hash %}
 {% block title %}Transaction Monitor — Admin{% endblock %}
 
 {% block page_title %}Transaction monitor{% endblock %}
@@ -68,10 +71,10 @@
 {% endif %}
 
 {% if transactions %}
-<div class="card shadow-sm">
+<div class="card">
   <div class="table-responsive">
-    <table class="table mb-0 align-middle">
-      <thead class="table-light">
+    <table class="table ds-table">
+      <thead>
         <tr>
           <th>Created</th><th>Sender</th><th>Recipient</th><th class="text-end">Amount</th>
           <th>Cash-in</th><th>Settlement</th><th>XRPL</th><th></th>
@@ -83,27 +86,21 @@
           <td class="small text-muted text-nowrap">{{ t.created_at|localtime('%d %b %Y %H:%M') }}</td>
           <td>
             <span class="fw-semibold">{{ t.sender.full_name }}</span>
-            <div class="small text-muted">{{ t.sender.email }}</div>
+            <span class="ds-table__sub">{{ t.sender.email }}</span>
           </td>
           <td>
             {{ t.beneficiary.full_name }}
-            <div class="small text-muted">{{ "{:,.6f}".format(t.uctusd_amount) }} UCTUSD</div>
+            <span class="ds-table__sub">{{ amount(t.uctusd_amount, "UCTUSD", size="sm") }}</span>
           </td>
-          <td class="text-end fw-semibold text-nowrap">R{{ "{:,.2f}".format(t.zar_amount) }}</td>
+          <td class="ds-table__money fw-semibold">{{ amount(t.zar_amount, "ZAR") }}</td>
+          <td>{{ status_badge(t.cashin_status, "cashin") }}</td>
           <td>
-            <span class="badge bg-{{ {'received': 'success', 'failed': 'danger'}.get(t.cashin_status.value, 'warning text-dark') }}">
-              {{ t.cashin_status.value|capitalize }}
-            </span>
+            {{ status_badge(t.settlement_status, "settlement") }}
+            {% if t.aml_flagged %}{{ status_badge("flagged", "aml", class="ms-1") }}{% endif %}
           </td>
-          <td>
-            <span class="badge bg-{{ {'completed': 'success', 'failed': 'danger'}.get(t.settlement_status.value, 'secondary') }}">
-              {{ t.settlement_status.value|replace("_", " ")|capitalize }}
-            </span>
-            {% if t.aml_flagged %}<span class="badge bg-danger ms-1" title="Flagged for AML review"><i class="bi bi-flag-fill" aria-hidden="true"></i> AML</span>{% endif %}
-          </td>
-          <td>{{ hash_link(t.xrpl_tx_hash) }}</td>
-          <td class="text-end">
-            <a href="/admin/transactions/{{ t.id }}" class="btn btn-sm btn-outline-primary text-nowrap">Details</a>
+          <td class="text-nowrap">{{ tx_hash(t.xrpl_tx_hash) }}</td>
+          <td class="ds-table__actions">
+            <a href="/admin/transactions/{{ t.id }}" class="btn btn-sm btn-outline-secondary text-nowrap">Details</a>
           </td>
         </tr>
         {% endfor %}
@@ -112,9 +109,6 @@
   </div>
 </div>
 {% else %}
-<div class="text-center py-5 text-muted">
-  <i class="bi bi-inbox fs-1 d-block mb-2" aria-hidden="true"></i>
-  <strong>No transactions match these filters.</strong>
-</div>
+<div class="card">{{ empty_state("No transactions match these filters", icon="inbox") }}</div>
 {% endif %}
 {% endblock %}

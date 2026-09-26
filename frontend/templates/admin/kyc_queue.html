@@ -1,34 +1,34 @@
 {% extends "base.html" %}
+{% from "components/status.html" import status_badge %}
+{% from "components/ui.html" import empty_state %}
 {% block title %}KYC Review Queue — Admin{% endblock %}
 
 {% block page_title %}KYC review queue{% endblock %}
 
 {% block content %}
-<p class="mb-3"><span class="badge bg-{{ 'warning' if submissions else 'success' }}-subtle text-{{ 'warning' if submissions else 'success' }}-emphasis fs-6">{{ submissions|length }} pending</span></p>
-
-{% if submissions %}
-<div class="card shadow-sm">
+{#- Approve / Reject live on the submission's detail page only: an admin must
+    open and read a submission before deciding it. -#}
+<section class="card" aria-labelledby="kyc-queue-title">
+  <div class="card-header ds-card-head">
+    <h2 class="ds-section-title" id="kyc-queue-title">Submissions awaiting review</h2>
+    <span class="badge ds-status ds-status--{{ 'warning' if submissions else 'success' }}">{{ submissions|length }} pending</span>
+  </div>
+  {% if submissions %}
   <div class="table-responsive">
-    <table class="table table-hover mb-0">
-      <thead class="table-light">
-        <tr>
-          <th>Name</th>
-          <th>Email</th>
-          <th>Submitted</th>
-          <th>Nationality</th>
-          <th></th>
-        </tr>
+    <table class="table ds-table">
+      <thead>
+        <tr><th scope="col">Name</th><th scope="col">Submitted</th><th scope="col">Nationality</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Action</span></th></tr>
       </thead>
       <tbody>
         {% for s in submissions %}
         <tr>
-          <td class="align-middle fw-semibold">{{ s.full_name }}</td>
-          <td class="align-middle text-muted">{{ s.user.email }}</td>
-          <td class="align-middle text-muted small">{{ s.submitted_at|localtime('%d %b %Y %H:%M') }}</td>
-          <td class="align-middle">{{ s.nationality }}</td>
-          <td class="align-middle text-end">
-            <a href="/admin/kyc/{{ s.id }}" class="btn btn-sm btn-outline-primary">
-              <i class="bi bi-eye me-1" aria-hidden="true"></i>Review
+          <td><span class="fw-semibold">{{ s.full_name }}</span><span class="ds-table__sub">{{ s.user.email }}</span></td>
+          <td class="text-muted small text-nowrap">{{ s.submitted_at|localtime('%d %b %Y, %H:%M') }}</td>
+          <td>{{ s.nationality }}</td>
+          <td>{{ status_badge(s.status, "kyc_submission") }}</td>
+          <td class="ds-table__actions">
+            <a href="/admin/kyc/{{ s.id }}" class="btn btn-sm btn-outline-secondary" aria-label="Review {{ s.full_name }}'s submission">
+              Review <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i>
             </a>
           </td>
         </tr>
@@ -36,11 +36,9 @@
       </tbody>
     </table>
   </div>
-</div>
-{% else %}
-<div class="text-center py-5 text-muted">
-  <i class="bi bi-check-circle fs-1 d-block mb-2 text-success" aria-hidden="true"></i>
-  <strong>No pending submissions.</strong> All caught up.
-</div>
-{% endif %}
+  {% else %}
+  {{ empty_state("No pending submissions", "All caught up.", icon="check2-circle") }}
+  {% endif %}
+</section>
+<p class="small text-muted mt-3">Open a submission to approve or reject it.</p>
 {% endblock %}

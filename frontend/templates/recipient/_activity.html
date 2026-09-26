@@ -23,7 +23,7 @@
      {%- if drawer %} data-drawer-open="{{ drawer }}" data-drawer-template="wd-t-{{ x.id }}" data-drawer-title="Transfer from {{ x.sender.full_name }}"{% endif %}
      data-status-item data-status-key="t:{{ x.id }}" data-kind="t" data-id="{{ x.id }}" data-hash-value="{{ x.xrpl_tx_hash or '' }}" data-final="{{ 'true' if final else 'false' }}" data-status-sig="{{ x.cashin_status.value }}/{{ x.settlement_status.value }}">
     <span class="ds-activity__icon ds-activity__icon--in{% if failed %} is-failed{% endif %}" aria-hidden="true" data-icon>
-      <i class="bi bi-arrow-down-left"></i>
+      <i class="bi bi-arrow-down-left" aria-hidden="true"></i>
       <span class="ds-activity__check" data-check hidden>{{ check_draw(40, drawn=false) }}</span>
     </span>
     <span class="ds-activity__main">
@@ -49,7 +49,7 @@
      {%- if drawer %} data-drawer-open="{{ drawer }}" data-drawer-template="wd-c-{{ x.id }}" data-drawer-title="Cash out to {{ x.target_currency.value }}"{% endif %}
      data-status-item data-status-key="c:{{ x.id }}" data-kind="c" data-id="{{ x.id }}" data-hash-value="{{ x.xrpl_burn_tx_hash or '' }}" data-final="{{ 'true' if final else 'false' }}" data-status-sig="{{ x.status.value }}/{{ 'true' if x.awaiting_ledger_confirmation else 'false' }}">
     <span class="ds-activity__icon ds-activity__icon--out{% if failed %} is-failed{% endif %}" aria-hidden="true" data-icon>
-      <i class="bi bi-arrow-up-right"></i>
+      <i class="bi bi-arrow-up-right" aria-hidden="true"></i>
       <span class="ds-activity__check" data-check hidden>{{ check_draw(40, drawn=false) }}</span>
     </span>
     <span class="ds-activity__main">

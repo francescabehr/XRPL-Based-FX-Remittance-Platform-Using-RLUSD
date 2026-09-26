@@ -1,5 +1,7 @@
 {% extends "base.html" %}
-{% from "components/ui.html" import stat_tile %}
+{% from "components/money.html" import amount %}
+{% from "components/status.html" import status_badge %}
+{% from "components/ui.html" import stat_tile, empty_state %}
 {% block title %}Overview — Admin{% endblock %}
 {% block page_title %}Overview{% endblock %}
 
@@ -38,4 +40,35 @@
                  tone="success" if settled_today else none, href="/admin/transactions?settlement=completed") }}
   </div>
 </div>
+
+{#- Stripe-style "Failed payments": what needs a human, newest first. -#}
+<section class="card mt-4" aria-labelledby="issues-title">
+  <div class="card-header ds-card-head">
+    <h2 class="ds-section-title" id="issues-title">Failed payments</h2>
+    {% if issue_count %}<a href="/admin/settlements" class="small">Open the settlement monitor</a>{% endif %}
+  </div>
+  {% if issues %}
+  <ul class="ds-activity">
+    {% for t in issues %}
+    {%- set failed = t.settlement_status.value == "failed" %}
+    <li>
+      <a class="ds-activity__row" href="/admin/transactions/{{ t.id }}">
+        <span class="ds-activity__icon ds-activity__icon--out{% if failed %} is-failed{% endif %}" aria-hidden="true"><i class="bi bi-{{ 'x-lg' if failed else 'hourglass-split' }}" aria-hidden="true"></i></span>
+        <span class="ds-activity__main">
+          <span class="ds-activity__title">{{ t.sender.full_name }} → {{ t.beneficiary.full_name }}</span>
+          <span class="ds-activity__meta">
+            {%- if failed %}{{ (t.xrpl_error_reason or "No reason recorded")|truncate(70) }}{% else %}Stuck for over 10 minutes — the worker may have stopped{% endif %}
+            · {{ t.updated_at|localtime('%d %b, %H:%M') }}
+          </span>
+        </span>
+        <span class="ds-activity__amount">{{ amount(t.uctusd_amount, "UCTUSD") }}</span>
+        <span class="ds-activity__status">{{ status_badge(t.settlement_status, "settlement") }}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  {{ empty_state("No failed payments", "Every settlement is either done or moving normally.", icon="check2-circle") }}
+  {% endif %}
+</section>
 {% endblock %}

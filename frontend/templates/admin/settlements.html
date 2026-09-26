@@ -1,39 +1,49 @@
 {% extends "base.html" %}
-{% from "_macros.html" import hash_link with context %}
+{% from "components/money.html" import amount %}
+{% from "components/status.html" import status_badge %}
+{% from "components/ui.html" import empty_state %}
+{% from "components/xrpl.html" import tx_hash %}
 {% block title %}Settlement Monitor — Admin{% endblock %}
 
 {% block page_title %}Settlement monitor{% endblock %}
 
 {% block content %}
-<p class="mb-3"><span class="badge bg-{{ 'danger' if transactions else 'success' }}-subtle text-{{ 'danger' if transactions else 'success' }}-emphasis fs-6">{{ transactions|length }} need attention</span></p>
-<p class="text-muted small mb-4">
+<p class="text-muted small mb-3">
   Failed XRPL settlements, and any queued or in-progress for over 10 minutes (e.g. the worker stopped).
   Retrying or recovering a signed payment checks the ledger first, so a payment that actually went through is never sent twice.
 </p>
 
-{% if transactions %}
-<div class="card shadow-sm">
+<section class="card" aria-labelledby="settlements-title">
+  <div class="card-header ds-card-head">
+    <h2 class="ds-section-title" id="settlements-title">Settlements needing attention</h2>
+    <span class="badge ds-status ds-status--{{ 'danger' if transactions else 'success' }}">{{ transactions|length }} need attention</span>
+  </div>
+  {% if transactions %}
   <div class="table-responsive">
-    <table class="table mb-0 align-middle">
-      <thead class="table-light">
-        <tr><th>Updated</th><th>Transfer</th><th>Status</th><th>Reason</th><th>XRPL</th><th class="text-end">Action</th></tr>
+    <table class="table ds-table">
+      <thead>
+        <tr><th scope="col">Updated</th><th scope="col">Transfer</th><th scope="col">Status</th><th scope="col">Reason</th><th scope="col">XRPL</th><th scope="col" class="text-end">Action</th></tr>
       </thead>
       <tbody>
         {% for t in transactions %}
+        {%- set state = t.settlement_status.value %}
         <tr>
-          <td class="small text-muted">{{ t.updated_at|localtime('%d %b %H:%M') }}</td>
+          <td class="small text-muted text-nowrap">{{ t.updated_at|localtime('%d %b, %H:%M') }}</td>
           <td>
-            <a href="/transactions/{{ t.id }}" class="fw-semibold text-decoration-none">{{ t.sender.full_name }} → {{ t.beneficiary.full_name }}</a>
-            <div class="small text-muted">{{ "{:,.6f}".format(t.uctusd_amount) }} UCTUSD · {{ t.settlement_attempts }} attempt{{ "s" if t.settlement_attempts != 1 }}</div>
+            <a href="/admin/transactions/{{ t.id }}" class="fw-semibold">{{ t.sender.full_name }} → {{ t.beneficiary.full_name }}</a>
+            <span class="ds-table__sub">{{ amount(t.uctusd_amount, "UCTUSD", size="sm") }} · {{ t.settlement_attempts }} attempt{{ "s" if t.settlement_attempts != 1 }}</span>
           </td>
-          <td><span class="badge bg-{{ 'danger' if t.settlement_status.value == 'failed' else 'warning text-dark' }}">{{ t.settlement_status.value|capitalize }}</span></td>
+          <td>
+            {{ status_badge(t.settlement_status, "settlement") }}
+            {% if state != "failed" %}<span class="ds-table__sub">Stuck over 10 min</span>{% endif %}
+          </td>
           <td class="small text-break" style="max-width: 320px">{{ t.xrpl_error_reason or "—" }}</td>
-          <td>{{ hash_link(t.xrpl_tx_hash) }}</td>
-          <td class="text-end">
-            {% set label = {"failed": "Retry", "queued": "Re-queue", "processing": "Recover"}[t.settlement_status.value] %}
+          <td class="text-nowrap">{{ tx_hash(t.xrpl_tx_hash) }}</td>
+          <td class="ds-table__actions">
+            {% set label = {"failed": "Retry", "queued": "Re-queue", "processing": "Recover"}[state] %}
             <form method="post" action="/admin/settlements/{{ t.id }}/retry"
                   data-confirm="The ledger is checked first, so a payment that already went through is never sent twice." data-confirm-title="{{ label }} this settlement?" data-confirm-label="{{ label }}" data-confirm-tone="primary">
-              <button class="btn btn-sm btn-outline-primary text-nowrap"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>{{ label }}</button>
+              <button class="btn btn-sm btn-outline-secondary text-nowrap"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>{{ label }}</button>
             </form>
           </td>
         </tr>
@@ -41,11 +51,8 @@
       </tbody>
     </table>
   </div>
-</div>
-{% else %}
-<div class="text-center py-5 text-muted">
-  <i class="bi bi-check-circle fs-1 d-block mb-2 text-success" aria-hidden="true"></i>
-  <strong>No settlement problems.</strong>
-</div>
-{% endif %}
+  {% else %}
+  {{ empty_state("No settlement problems", "Every settlement is either done or moving normally.", icon="check2-circle") }}
+  {% endif %}
+</section>
 {% endblock %}
