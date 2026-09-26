@@ -1,0 +1,70 @@
+{#- Recipient activity rows (wallet, My cash-outs). Each row is a real link — the
+    no-JS fallback — and carries the data-status-* hooks ui.js polls /status with.
+    drawer = the id of a drawer to open from the row's <template>, or none.
+
+    Usage:
+      {% from "recipient/_activity.html" import transfer_row, cashout_row %}
+      <ul class="ds-activity ds-activity--stack">{{ cashout_row(req, payout=true) }}</ul>
+-#}
+{% from "components/money.html" import amount %}
+{% from "components/status.html" import transaction_badge, cashout_badge %}
+{% from "components/ui.html" import check_draw %}
+
+{#- Short hash: plain text, because the row itself is a link. -#}
+{% macro short_hash(value) -%}
+<span class="ds-hash-short" data-hash-short{% if not value %} hidden{% endif %}>{% if value %} · {{ value[:8] }}…{% endif %}</span>
+{%- endmacro %}
+
+{% macro transfer_row(x, drawer=none) -%}
+{%- set failed = x.cashin_status.value == "failed" or x.settlement_status.value == "failed" %}
+{%- set final = failed or x.settlement_status.value == "completed" %}
+<li>
+  <a class="ds-activity__row" href="/transactions/{{ x.id }}"
+     {%- if drawer %} data-drawer-open="{{ drawer }}" data-drawer-template="wd-t-{{ x.id }}" data-drawer-title="Transfer from {{ x.sender.full_name }}"{% endif %}
+     data-status-item data-status-key="t:{{ x.id }}" data-kind="t" data-id="{{ x.id }}" data-hash-value="{{ x.xrpl_tx_hash or '' }}" data-final="{{ 'true' if final else 'false' }}" data-status-sig="{{ x.cashin_status.value }}/{{ x.settlement_status.value }}">
+    <span class="ds-activity__icon ds-activity__icon--in{% if failed %} is-failed{% endif %}" aria-hidden="true" data-icon>
+      <i class="bi bi-arrow-down-left"></i>
+      <span class="ds-activity__check" data-check hidden>{{ check_draw(40, drawn=false) }}</span>
+    </span>
+    <span class="ds-activity__main">
+      <span class="ds-activity__title">{{ x.sender.full_name }}</span>
+      <span class="ds-activity__meta">{{ x.created_at|localtime('%d %b, %H:%M') }}{{ short_hash(x.xrpl_tx_hash) }}</span>
+    </span>
+    <span class="ds-activity__foot">
+      <span class="ds-activity__amount">
+        <span data-amount>{% if failed %}<span class="ds-strike">{{ amount(x.uctusd_amount, "UCTUSD", signed=true) }}</span>{% else %}{{ amount(x.uctusd_amount, "UCTUSD", signed=true) }}{% endif %}</span>
+      </span>
+      <span class="ds-activity__status" data-badge>{{ transaction_badge(x) }}</span>
+    </span>
+  </a>
+</li>
+{%- endmacro %}
+
+{#- payout=true adds the (simulated) fiat payout under the UCTUSD amount. -#}
+{% macro cashout_row(x, drawer=none, payout=false) -%}
+{%- set failed = x.status.value == "failed" %}
+{%- set final = failed or x.status.value == "completed" %}
+<li>
+  <a class="ds-activity__row" href="/cashout/{{ x.id }}"
+     {%- if drawer %} data-drawer-open="{{ drawer }}" data-drawer-template="wd-c-{{ x.id }}" data-drawer-title="Cash out to {{ x.target_currency.value }}"{% endif %}
+     data-status-item data-status-key="c:{{ x.id }}" data-kind="c" data-id="{{ x.id }}" data-hash-value="{{ x.xrpl_burn_tx_hash or '' }}" data-final="{{ 'true' if final else 'false' }}" data-status-sig="{{ x.status.value }}/{{ 'true' if x.awaiting_ledger_confirmation else 'false' }}">
+    <span class="ds-activity__icon ds-activity__icon--out{% if failed %} is-failed{% endif %}" aria-hidden="true" data-icon>
+      <i class="bi bi-arrow-up-right"></i>
+      <span class="ds-activity__check" data-check hidden>{{ check_draw(40, drawn=false) }}</span>
+    </span>
+    <span class="ds-activity__main">
+      <span class="ds-activity__title">Cash out to {{ x.target_currency.value }}</span>
+      <span class="ds-activity__meta">{{ x.created_at|localtime('%d %b, %H:%M') }}{{ short_hash(x.xrpl_burn_tx_hash) }}</span>
+    </span>
+    <span class="ds-activity__foot">
+      <span class="ds-activity__amount">
+        <span data-amount>{% if failed %}<span class="ds-strike">{{ amount(-x.uctusd_amount, "UCTUSD") }}</span>{% else %}{{ amount(-x.uctusd_amount, "UCTUSD") }}{% endif %}</span>
+        {%- if payout %}
+        {{ amount(x.net_payout, x.target_currency, size="sm") }}
+        {%- endif %}
+      </span>
+      <span class="ds-activity__status" data-badge>{{ cashout_badge(x) }}</span>
+    </span>
+  </a>
+</li>
+{%- endmacro %}

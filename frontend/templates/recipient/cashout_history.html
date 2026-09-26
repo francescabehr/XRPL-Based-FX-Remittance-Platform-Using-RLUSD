@@ -1,50 +1,27 @@
 {% extends "base.html" %}
-{% from "_macros.html" import hash_link with context %}
+{% from "components/ui.html" import empty_state %}
+{% from "recipient/_activity.html" import cashout_row %}
 {% block title %}My Cash-Outs — XRPL Remit{% endblock %}
 
 {% block page_title %}My cash-outs{% endblock %}
 
 {% block content %}
-
-<div class="card shadow-sm">
-  {% if requests %}
-  <div class="table-responsive">
-    <table class="table table-hover mb-0 align-middle">
-      <thead class="table-light">
-        <tr>
-          <th>Requested</th><th class="text-end">UCTUSD</th><th class="text-end">Payout</th>
-          <th>Status</th><th>Burn transaction</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for r in requests %}
-        <tr>
-          <td class="small text-muted">
-            <a href="/cashout/{{ r.id }}" class="text-decoration-none">{{ r.created_at|localtime('%d %b %Y %H:%M') }}</a>
-          </td>
-          <td class="text-end fw-semibold">−{{ "{:,.6f}".format(r.uctusd_amount) }}</td>
-          <td class="text-end">
-            {% if r.target_currency.value == "ZAR" %}R{{ "{:,.2f}".format(r.net_payout) }}{% else %}${{ "{:,.2f}".format(r.net_payout) }}{% endif %}
-            <span class="small text-muted">{{ r.target_currency.value }}</span>
-          </td>
-          <td>
-            <span class="badge bg-{{ r.status_badge }}">{{ r.status_label }}</span>
-            {% if r.status.value == "failed" and r.failure_reason %}
-            <div class="small text-danger">{{ r.failure_reason }}</div>
-            {% endif %}
-          </td>
-          <td>{{ hash_link(r.xrpl_burn_tx_hash) }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="card-body text-muted text-center py-5">
-    <i class="bi bi-cash-coin fs-1 d-block mb-2" aria-hidden="true"></i>
-    No cash-out requests yet.
-  </div>
-  {% endif %}
+<div data-status-poll="/status">
+  <section class="card" aria-labelledby="cashouts-title">
+    <div class="card-header d-flex justify-content-between align-items-center gap-2">
+      <h2 class="ds-section-title" id="cashouts-title">Cash-outs</h2>
+      <a href="/cashout" class="btn btn-primary btn-sm"><i class="bi bi-cash-coin me-1" aria-hidden="true"></i>Cash out</a>
+    </div>
+    {% if requests %}
+    <ul class="ds-activity ds-activity--stack">
+      {% for r in requests %}{{ cashout_row(r, payout=true) }}{% endfor %}
+    </ul>
+    {% else %}
+    {{ empty_state("No cash-outs yet", "Turn UCTUSD from your wallet into a simulated USD or ZAR payout.",
+                   {"label": "Cash out", "href": "/cashout", "icon": "cash-coin"}, icon="cash-coin") }}
+    {% endif %}
+  </section>
+  <p class="small text-muted mt-3" data-poll-note hidden>Live updates paused — refresh to check again.</p>
 </div>
 <p class="small text-muted mt-3">All fiat payouts shown here are <strong>simulated</strong>.</p>
 {% endblock %}

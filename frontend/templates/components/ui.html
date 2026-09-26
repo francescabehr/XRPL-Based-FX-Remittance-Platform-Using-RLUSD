@@ -1,13 +1,16 @@
 {#- Layout and feedback components (UI_REDESIGN.md §4).
 
     Usage:
-      {% from "components/ui.html" import stat_tile, progress, stepper, SEND_STEPS,
+      {% from "components/ui.html" import stat_tile, progress, stepper, SEND_STEPS, CASHOUT_STEPS,
                                           empty_state, drawer, flash, check_draw %}
 -#}
 
 {#- The send flow as it really is: /send (recipient + amount) → /send/review →
     /send/pay → /transactions/{id}. -#}
 {%- set SEND_STEPS = ["Details", "Review", "Pay", "Status"] -%}
+
+{#- The cash-out flow: /cashout (amount) → POST /cashout/preview → /cashout/{id}. -#}
+{%- set CASHOUT_STEPS = ["Amount", "Review", "Status"] -%}
 
 {#- Progress bar filled with transform: scaleX. The text label keeps colour from
     being the only signal. -#}

@@ -3,14 +3,10 @@
 {% from "components/status.html" import transaction_badge, cashout_badge %}
 {% from "components/ui.html" import drawer, empty_state, check_draw %}
 {% from "components/xrpl.html" import tx_hash %}
+{% from "recipient/_activity.html" import transfer_row, cashout_row %}
 {% block title %}Wallet — XRPL Remit{% endblock %}
 
 {% block page_title %}Wallet{% endblock %}
-
-{#- Short hash for a row: plain text, because the row itself is a link. -#}
-{% macro short_hash(value) -%}
-<span class="ds-hash-short" data-hash-short{% if not value %} hidden{% endif %}>{% if value %} · {{ value[:8] }}…{% endif %}</span>
-{%- endmacro %}
 
 {% block content %}
 <div data-status-poll="/status">
@@ -64,56 +60,7 @@
   {% if activity %}
   <ul class="ds-activity ds-activity--stack">
     {% for entry in activity %}
-    {%- set x = entry.item %}
-    {%- if entry.kind == "in" %}
-      {%- set key = "t:" ~ x.id %}
-      {%- set failed = x.cashin_status.value == "failed" or x.settlement_status.value == "failed" %}
-      {%- set final = failed or x.settlement_status.value == "completed" %}
-    <li>
-      <a class="ds-activity__row" href="/transactions/{{ x.id }}"
-         data-drawer-open="wallet-drawer" data-drawer-template="wd-t-{{ x.id }}" data-drawer-title="Transfer from {{ x.sender.full_name }}"
-         data-status-item data-status-key="{{ key }}" data-kind="t" data-id="{{ x.id }}" data-hash-value="{{ x.xrpl_tx_hash or '' }}" data-final="{{ 'true' if final else 'false' }}">
-        <span class="ds-activity__icon ds-activity__icon--in{% if failed %} is-failed{% endif %}" aria-hidden="true" data-icon>
-          <i class="bi bi-arrow-down-left"></i>
-          <span class="ds-activity__check" data-check hidden>{{ check_draw(40, drawn=false) }}</span>
-        </span>
-        <span class="ds-activity__main">
-          <span class="ds-activity__title">{{ x.sender.full_name }}</span>
-          <span class="ds-activity__meta">{{ x.created_at|localtime('%d %b, %H:%M') }}{{ short_hash(x.xrpl_tx_hash) }}</span>
-        </span>
-        <span class="ds-activity__foot">
-        <span class="ds-activity__amount">
-          <span data-amount>{% if failed %}<span class="ds-strike">{{ amount(x.uctusd_amount, "UCTUSD", signed=true) }}</span>{% else %}{{ amount(x.uctusd_amount, "UCTUSD", signed=true) }}{% endif %}</span>
-        </span>
-        <span class="ds-activity__status" data-badge>{{ transaction_badge(x) }}</span>
-        </span>
-      </a>
-    </li>
-    {%- else %}
-      {%- set key = "c:" ~ x.id %}
-      {%- set failed = x.status.value == "failed" %}
-      {%- set final = failed or x.status.value == "completed" %}
-    <li>
-      <a class="ds-activity__row" href="/cashout/{{ x.id }}"
-         data-drawer-open="wallet-drawer" data-drawer-template="wd-c-{{ x.id }}" data-drawer-title="Cash out to {{ x.target_currency.value }}"
-         data-status-item data-status-key="{{ key }}" data-kind="c" data-id="{{ x.id }}" data-hash-value="{{ x.xrpl_burn_tx_hash or '' }}" data-final="{{ 'true' if final else 'false' }}">
-        <span class="ds-activity__icon ds-activity__icon--out{% if failed %} is-failed{% endif %}" aria-hidden="true" data-icon>
-          <i class="bi bi-arrow-up-right"></i>
-          <span class="ds-activity__check" data-check hidden>{{ check_draw(40, drawn=false) }}</span>
-        </span>
-        <span class="ds-activity__main">
-          <span class="ds-activity__title">Cash out to {{ x.target_currency.value }}</span>
-          <span class="ds-activity__meta">{{ x.created_at|localtime('%d %b, %H:%M') }}{{ short_hash(x.xrpl_burn_tx_hash) }}</span>
-        </span>
-        <span class="ds-activity__foot">
-        <span class="ds-activity__amount">
-          <span data-amount>{% if failed %}<span class="ds-strike">{{ amount(-x.uctusd_amount, "UCTUSD") }}</span>{% else %}{{ amount(-x.uctusd_amount, "UCTUSD") }}{% endif %}</span>
-        </span>
-        <span class="ds-activity__status" data-badge>{{ cashout_badge(x) }}</span>
-        </span>
-      </a>
-    </li>
-    {%- endif %}
+    {% if entry.kind == "in" %}{{ transfer_row(entry.item, drawer="wallet-drawer") }}{% else %}{{ cashout_row(entry.item, drawer="wallet-drawer") }}{% endif %}
     {% endfor %}
   </ul>
   {% else %}

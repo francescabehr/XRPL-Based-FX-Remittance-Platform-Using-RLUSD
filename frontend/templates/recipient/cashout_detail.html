@@ -1,6 +1,7 @@
 {% extends "base.html" %}
+{% from "components/money.html" import amount, breakdown, breakdown_row %}
 {% from "components/status.html" import cashout_badge %}
-{% from "components/ui.html" import check_draw %}
+{% from "components/ui.html" import CASHOUT_STEPS, stepper, timeline, check_draw %}
 {% from "components/xrpl.html" import tx_hash %}
 {% block title %}Cash-Out Detail — XRPL Remit{% endblock %}
 
@@ -8,94 +9,104 @@
 {% block page_back %}/cashout/history{% endblock %}
 
 {% block content %}
-{%- set final = req.status.value in ("completed", "failed") %}
+{%- set status = req.status.value %}
+{%- set awaiting = req.awaiting_ledger_confirmation %}
+{%- set final = status in ("completed", "failed") %}
+{%- set zar = req.target_currency.value == "ZAR" %}
+{%- set when = '%d %b %Y, %H:%M' %}
+
+{{ stepper([("Amount", "/cashout"), "Review", "Status"], 3, label="Cash-out steps") }}
+
 <div data-status-poll="/status?c={{ req.id }}" data-final="{{ 'true' if final else 'false' }}"
-     data-status-item data-status-key="c:{{ req.id }}" data-kind="c" data-id="{{ req.id }}" data-hash-value="{{ req.xrpl_burn_tx_hash or '' }}">
-<div class="row g-4">
-  <div class="col-lg-7">
-    <div class="card shadow-sm">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span class="fw-semibold">Request</span>
-        <span class="d-flex align-items-center gap-2">
-          <span data-check hidden>{{ check_draw(24, drawn=false, label="Completed") }}</span>
-          <span data-badge>{{ cashout_badge(req) }}</span>
-        </span>
-      </div>
-      <table class="table mb-0">
-        <tbody>
-          <tr><td class="text-muted">Requested</td><td class="text-end">{{ req.created_at|localtime('%d %b %Y %H:%M') }}</td></tr>
-          <tr><td class="text-muted">UCTUSD burned</td><td class="text-end fw-semibold">{{ "{:,.6f}".format(req.uctusd_amount) }}</td></tr>
-          <tr>
-            <td class="text-muted">Cash-out fee</td>
-            <td class="text-end text-danger">− ${{ "{:,.2f}".format(req.cashout_fee_usd) }}</td>
-          </tr>
-          <tr>
-            <td class="text-muted">Exchange rate</td>
-            <td class="text-end">
-              {% if req.target_currency.value == "ZAR" %}1 USD = {{ "{:,.6f}".format(req.market_rate) }} ZAR{% else %}1 UCTUSD = 1 USD{% endif %}
-            </td>
-          </tr>
-          <tr class="table-light">
-            <td class="fw-semibold">Payout <span class="small text-muted">(simulated)</span></td>
-            <td class="text-end fw-bold">
-              {% if req.target_currency.value == "ZAR" %}R{{ "{:,.2f}".format(req.net_payout) }}{% else %}${{ "{:,.2f}".format(req.net_payout) }}{% endif %}
-              <span class="small text-muted">{{ req.target_currency.value }}</span>
-            </td>
-          </tr>
-          {% if req.approved_at %}
-          <tr><td class="text-muted">Approved</td><td class="text-end">{{ req.approved_at|localtime('%d %b %Y %H:%M') }}</td></tr>
-          {% endif %}
-          {% if req.completed_at %}
-          <tr><td class="text-muted">Completed</td><td class="text-end">{{ req.completed_at|localtime('%d %b %Y %H:%M') }}</td></tr>
-          {% endif %}
-          {% if req.fiat_payout_reference %}
-          <tr>
-            <td class="text-muted">Simulated payout reference</td>
-            <td class="text-end font-monospace small">{{ req.fiat_payout_reference }}</td>
-          </tr>
-          {% endif %}
-          <tr><td class="text-muted">Burn transaction</td><td class="text-end"><span data-hash>{{ tx_hash(req.xrpl_burn_tx_hash) }}</span></td></tr>
-        </tbody>
-      </table>
-    </div>
+     data-status-item data-status-key="c:{{ req.id }}" data-kind="c" data-id="{{ req.id }}" data-hash-value="{{ req.xrpl_burn_tx_hash or '' }}" data-status-sig="{{ status }}/{{ 'true' if awaiting else 'false' }}">
+  <div class="alert alert-danger" role="alert" data-failure-box{% if status != "failed" %} hidden{% endif %}>
+    <strong>Failed:</strong> <span data-failure>{{ req.failure_reason if status == "failed" else "" }}</span>
+    <div class="mt-1">Any reserved UCTUSD has been returned to your wallet.</div>
   </div>
 
-  <div class="col-lg-5">
-    <p class="alert alert-info small" data-status-changed hidden>Status updated — refresh for the details.</p>
-    <div data-stale-on-change>
-    {% if req.status.value == "requested" %}
-    <div class="alert alert-secondary small">
-      <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>
-      Waiting for an administrator to review this request. Your UCTUSD has not been reserved yet.
+  <section class="card ds-hero mb-4 ds-slide-up" aria-labelledby="payout-label">
+    <div class="card-body">
+      <div>
+        <p class="ds-hero__label" id="payout-label">You receive <span class="text-muted">(simulated)</span></p>
+        <span data-amount>{% if status == "failed" %}<span class="ds-strike">{{ amount(req.net_payout, req.target_currency, size="xl") }}</span>{% else %}{{ amount(req.net_payout, req.target_currency, size="xl") }}{% endif %}</span>
+        <p class="ds-hero__sub">Cash-out of {{ amount(req.uctusd_amount, "UCTUSD", size="sm") }} · {{ req.created_at|localtime(when) }}</p>
+      </div>
+      <div class="d-flex align-items-center gap-3">
+        <span data-check {% if status != "completed" %}hidden{% endif %}>{{ check_draw(40, drawn=false, static=true, label="Completed") }}</span>
+        <span data-badge>{{ cashout_badge(req, class="fs-6") }}</span>
+      </div>
     </div>
-    {% elif req.awaiting_ledger_confirmation %}
-    <div class="alert alert-warning small">
-      <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>
-      <strong>Awaiting ledger confirmation.</strong> The burn was submitted but its outcome has not
-      been confirmed yet. Your UCTUSD stays reserved until it is verified on the XRPL — it will be
-      returned if the burn did not go through.
+  </section>
+
+  <div class="row g-4">
+    <div class="col-lg-6">
+      <section class="card h-100" aria-labelledby="progress-title">
+        <div class="card-header"><h2 class="ds-section-title" id="progress-title">Progress</h2></div>
+        <div class="card-body p-4">
+          {#- A failed cash-out may have been rejected or may have failed after approval,
+              and no column says which (reject also stamps approved_at), so it shows
+              one failed step and the reason in the alert above. -#}
+          {%- if status == "failed" %}
+            {%- set steps = [
+              {"key": "requested", "label": "Requested", "state": "done", "desc": req.created_at|localtime(when)},
+              {"key": "approved", "label": "Cash-out failed", "state": "failed", "desc": "Nothing was paid out"},
+            ] %}
+          {%- else %}
+            {%- if status == "requested" %}
+              {%- set approved_step = ("current", "Waiting for an administrator to review it") %}
+            {%- else %}
+              {%- set approved_step = ("done", "Your UCTUSD was reserved · " ~ (req.approved_at|localtime(when))) %}
+            {%- endif %}
+            {%- if status == "completed" %}
+              {%- set completed_step = ("done", "Burned on-ledger · " ~ (req.completed_at|localtime(when))) %}
+            {%- elif status == "approved" and awaiting %}
+              {%- set completed_step = ("current", "Awaiting ledger confirmation") %}
+            {%- elif status == "approved" %}
+              {%- set completed_step = ("current", "Burning your UCTUSD on the XRPL Testnet…") %}
+            {%- else %}
+              {%- set completed_step = ("upcoming", "Burned on the XRPL Testnet, then paid out") %}
+            {%- endif %}
+            {%- set steps = [
+              {"key": "requested", "label": "Requested", "state": "done", "desc": req.created_at|localtime(when)},
+              {"key": "approved", "label": "Approved", "state": approved_step[0], "desc": approved_step[1]},
+              {"key": "completed", "label": "Completed", "state": completed_step[0], "desc": completed_step[1]},
+            ] %}
+          {%- endif %}
+          {{ timeline(steps, label="Cash-out progress") }}
+          {%- if status == "requested" %}
+            {%- set note = "Waiting for an administrator to review this request. Your UCTUSD has not been reserved yet." %}
+          {%- elif awaiting %}
+            {%- set note = "Awaiting ledger confirmation. The burn was submitted but its outcome has not been confirmed yet. Your UCTUSD stays reserved until it is verified on the XRPL — it will be returned if the burn did not go through." %}
+          {%- elif status == "approved" %}
+            {%- set note = "Your UCTUSD is reserved and the burn is being processed." %}
+          {%- else %}
+            {%- set note = "" %}
+          {%- endif %}
+          <p class="small text-muted mt-3 mb-0" data-progress-note{% if not note %} hidden{% endif %}>{{ note }}</p>
+        </div>
+      </section>
     </div>
-    {% elif req.status.value == "approved" %}
-    <div class="alert alert-info small">
-      <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>
-      Approved. {{ "{:,.6f}".format(req.uctusd_amount) }} UCTUSD is reserved and the burn is being processed.
+    <div class="col-lg-6">
+      <section class="card h-100" aria-labelledby="amounts-title">
+        <div class="card-header"><h2 class="ds-section-title" id="amounts-title">Amounts (fixed when you requested)</h2></div>
+        <div class="card-body pt-2">
+          {%- set fee_hint = "{:.2%}".format(req.cashout_fee_percentage) ~ ", minimum $" ~ "{:,.2f}".format(req.cashout_fee_min_usd) %}
+          {%- set hash_cell %}<span data-hash>{{ tx_hash(req.xrpl_burn_tx_hash) }}</span>{% endset %}
+          {% call breakdown() %}
+            {{ breakdown_row("UCTUSD burned" if status == "completed" else "UCTUSD to burn", amount(req.uctusd_amount, "UCTUSD")) }}
+            {{ breakdown_row("Cash-out fee", amount(-req.cashout_fee_usd, "USD"), hint=fee_hint) }}
+            {{ breakdown_row("Exchange rate", ("1 USD = " ~ "{:,.6f}".format(req.market_rate) ~ " ZAR") if zar else "1 UCTUSD = 1 USD") }}
+            {{ breakdown_row("You receive", amount(req.net_payout, req.target_currency), hint="Simulated payout") }}
+            {% if req.fiat_payout_reference %}{{ breakdown_row("Payout reference", req.fiat_payout_reference) }}{% endif %}
+            {{ breakdown_row("Burn transaction", hash_cell) }}
+          {% endcall %}
+          <div class="d-flex flex-wrap gap-2 mt-3 mb-2">
+            <a href="/wallet" class="btn btn-outline-secondary btn-sm"><i class="bi bi-wallet2 me-1" aria-hidden="true"></i>View wallet</a>
+            <a href="/cashout/history" class="btn btn-outline-secondary btn-sm">My cash-outs</a>
+          </div>
+        </div>
+      </section>
     </div>
-    {% elif req.status.value == "completed" %}
-    <div class="alert alert-success small">
-      <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>
-      Completed. The UCTUSD was burned on the XRPL Testnet and the
-      <strong>simulated</strong> payout was recorded.
-    </div>
-    {% elif req.status.value == "failed" %}
-    <div class="alert alert-danger small">
-      <i class="bi bi-x-circle me-1" aria-hidden="true"></i>
-      <strong>Failed.</strong> {{ req.failure_reason }}
-      <div class="mt-1">Any reserved UCTUSD has been returned to your wallet.</div>
-    </div>
-    {% endif %}
-    </div>
-    <a href="/wallet" class="btn btn-outline-secondary btn-sm"><i class="bi bi-wallet2 me-1" aria-hidden="true"></i>View wallet</a>
   </div>
-</div>
 </div>
 {% endblock %}

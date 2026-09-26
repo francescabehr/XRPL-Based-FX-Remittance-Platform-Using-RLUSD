@@ -387,8 +387,12 @@
     current.replaceChildren.apply(current, Array.prototype.slice.call(next.childNodes));
   }
 
-  function setTimelineStep(li, state, desc) {
+  function setTimelineStep(li, state, desc, label) {
     if (!li) return;
+    if (label) {
+      var labelEl = li.querySelector(".ds-timeline__label");
+      if (labelEl && labelEl.firstChild && labelEl.firstChild.nodeType === 3) labelEl.firstChild.nodeValue = label;
+    }
     li.className = li.className.replace(/\bis-(done|current|failed|upcoming)\b/, "is-" + state);
     if (state === "current") li.setAttribute("aria-current", "step");
     else li.removeAttribute("aria-current");
@@ -425,6 +429,38 @@
     }
   }
 
+  // Mirrors the Jinja in recipient/cashout_detail.html (display only). A failed
+  // cash-out collapses to one failed step: rejected and failed-after-approval
+  // can't be told apart from the data, so the page doesn't guess.
+  function updateCashoutTimeline(copy, s) {
+    if (!copy.querySelector(".ds-timeline")) return;
+    var status = s.status;
+    var approvedLi = copy.querySelector('[data-step="approved"]');
+    var completedLi = copy.querySelector('[data-step="completed"]');
+    if (status === "failed") {
+      setTimelineStep(approvedLi, "failed", "Nothing was paid out", "Cash-out failed");
+      if (completedLi) completedLi.remove(); // hiding would leave its connector line behind
+    } else {
+      setTimelineStep(approvedLi, status === "requested" ? "current" : "done",
+        status === "requested" ? "Waiting for an administrator to review it" : "Your UCTUSD was reserved · just now");
+      setTimelineStep(completedLi,
+        status === "completed" ? "done" : status === "approved" ? "current" : "upcoming",
+        status === "completed" ? "Burned on-ledger · just now"
+          : status === "approved" ? (s.awaiting_ledger ? "Awaiting ledger confirmation" : "Burning your UCTUSD on the XRPL Testnet…")
+          : "Burned on the XRPL Testnet, then paid out");
+    }
+    var note = copy.querySelector("[data-progress-note]");
+    if (note) {
+      var text = status === "requested"
+        ? "Waiting for an administrator to review this request. Your UCTUSD has not been reserved yet."
+        : s.awaiting_ledger
+          ? "Awaiting ledger confirmation. The burn was submitted but its outcome has not been confirmed yet. Your UCTUSD stays reserved until it is verified on the XRPL — it will be returned if the burn did not go through."
+          : status === "approved" ? "Your UCTUSD is reserved and the burn is being processed." : "";
+      note.textContent = text;
+      note.hidden = !text;
+    }
+  }
+
   function outcome(kind, s) {
     if (kind === "t") {
       if (s.cashin_status === "failed" || s.settlement_status === "failed") return "failed";
@@ -440,6 +476,8 @@
     var copies = statusCopies(key);
     var result = s.final ? outcome(kind, s) : null;
     var hashChanged = (s.hash || "") !== (item.dataset.hashValue || "");
+    var sig = kind === "t" ? s.cashin_status + "/" + s.settlement_status : s.status + "/" + !!s.awaiting_ledger;
+    var statusChanged = sig !== item.dataset.statusSig;
 
     copies.forEach(function (copy) {
       var live = doc.contains(copy); // false for <template> content
@@ -447,14 +485,7 @@
 
       var badgeSlot = copy.querySelector("[data-badge]");
       if (badgeSlot) {
-        var before = badgeSlot.textContent.trim();
         morphBadge(badgeSlot, s.badge_html);
-        if (live && badgeSlot.textContent.trim() !== before) {
-          var changed = copy.querySelector("[data-status-changed]");
-          if (changed) changed.hidden = false;
-          var stale = copy.querySelector("[data-stale-on-change]");
-          if (stale) stale.hidden = true;
-        }
       }
 
       if (hashChanged && s.hash) {
@@ -471,10 +502,13 @@
         }
       }
 
-      if (kind === "t") updateTimeline(copy, s);
+      if (statusChanged) {
+        if (kind === "t") updateTimeline(copy, s);
+        else updateCashoutTimeline(copy, s);
+      }
 
       var processing = copy.querySelector("[data-processing]");
-      if (processing) {
+      if (processing && statusChanged) {
         if (s.final) processing.hidden = true;
         else if (kind === "c") processing.innerHTML = CASHOUT_NOTES[s.awaiting_ledger ? "awaiting" : s.status] || processing.innerHTML;
       }
@@ -504,6 +538,11 @@
         }
         var icon = copy.querySelector("[data-icon]");
         if (icon) icon.classList.add("is-failed");
+        var failureBox = copy.querySelector("[data-failure-box]");
+        if (failureBox) {
+          failureBox.hidden = false;
+          if (animate) replay(failureBox, "ds-slide-up");
+        }
         var failure = copy.querySelector("[data-failure]");
         if (failure) {
           failure.textContent = s.failure_reason || "";
@@ -513,6 +552,7 @@
     });
 
     item.dataset.hashValue = s.hash || "";
+    item.dataset.statusSig = sig;
     if (s.final) item.dataset.final = "true";
   }
 

@@ -139,7 +139,8 @@ async def cashout_create(
         f"Cash-out requested: {req.uctusd_amount:,.6f} UCTUSD. An administrator will review it.",
         "success",
     )
-    return RedirectResponse(url="/cashout/history", status_code=302)
+    # Land on the request's Status page, as the send flow does after paying.
+    return RedirectResponse(url=f"/cashout/{req.id}", status_code=302)
 
 
 @router.get("/cashout/history", response_class=HTMLResponse)

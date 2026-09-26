@@ -1,48 +1,29 @@
 {% extends "base.html" %}
+{% from "components/money.html" import amount, breakdown, breakdown_row %}
+{% from "components/ui.html" import CASHOUT_STEPS, stepper, timeline %}
 {% block title %}Review Cash-Out — XRPL Remit{% endblock %}
 
 {% block page_title %}Review your cash-out{% endblock %}
 {% block page_back %}/cashout{% endblock %}
 
 {% block content %}
+{%- set zar = pricing.target_currency.value == "ZAR" %}
+{{ stepper([("Amount", "/cashout"), "Review", "Status"], 2, label="Cash-out steps") }}
 
 <div class="row g-4">
   <div class="col-lg-7">
-    <div class="card shadow-sm">
-      <div class="card-header fw-semibold">Payout breakdown</div>
-      <table class="table mb-0">
-        <tbody>
-          <tr>
-            <td class="text-muted">UCTUSD to burn</td>
-            <td class="text-end fw-semibold">{{ "{:,.6f}".format(pricing.uctusd_amount) }} UCTUSD</td>
-          </tr>
-          <tr>
-            <td class="text-muted">
-              Cash-out fee
-              <span class="small d-block">{{ "{:.2%}".format(pricing.cashout_fee_percentage) }}, minimum ${{ "{:,.2f}".format(pricing.cashout_fee_min_usd) }}</span>
-            </td>
-            <td class="text-end text-danger">− ${{ "{:,.2f}".format(pricing.cashout_fee_usd) }}</td>
-          </tr>
-          <tr>
-            <td class="text-muted">Exchange rate</td>
-            <td class="text-end">
-              {% if pricing.target_currency.value == "ZAR" %}
-                1 USD = {{ "{:,.6f}".format(pricing.market_rate) }} ZAR
-              {% else %}
-                1 UCTUSD = 1 USD
-              {% endif %}
-            </td>
-          </tr>
-          <tr class="table-light">
-            <td class="fw-semibold">You receive</td>
-            <td class="text-end fw-bold fs-5">
-              {% if pricing.target_currency.value == "ZAR" %}R{{ "{:,.2f}".format(pricing.net_payout) }}{% else %}${{ "{:,.2f}".format(pricing.net_payout) }}{% endif %}
-              <span class="fs-6 text-muted">{{ pricing.target_currency.value }}</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <div class="card-body border-top">
+    <section class="card ds-slide-up" aria-labelledby="review-title">
+      <div class="card-body p-4">
+        <p class="ds-hero__label" id="review-title">Payout breakdown</p>
+        {%- set fee_hint = "{:.2%}".format(pricing.cashout_fee_percentage) ~ ", minimum $" ~ "{:,.2f}".format(pricing.cashout_fee_min_usd) %}
+        {% call breakdown() %}
+          {{ breakdown_row("UCTUSD to burn", amount(pricing.uctusd_amount, "UCTUSD"), icon="fire") }}
+          {{ breakdown_row("Cash-out fee", amount(-pricing.cashout_fee_usd, "USD"), icon="receipt", hint=fee_hint) }}
+          {{ breakdown_row("Exchange rate", ("1 USD = " ~ "{:,.6f}".format(pricing.market_rate) ~ " ZAR") if zar else "1 UCTUSD = 1 USD", icon="arrow-left-right") }}
+          {{ breakdown_row("You receive", amount(pricing.net_payout, pricing.target_currency, count_up=true), icon="bank", hint="Simulated payout in " ~ pricing.target_currency.value, hero=true) }}
+        {% endcall %}
+      </div>
+      <div class="card-body border-top p-4">
         <form method="post" action="/cashout">
           {# Echoed back so the server can detect a price change between preview and
              submit. These are compared, never persisted — the row is written from
@@ -52,25 +33,33 @@
           <input type="hidden" name="market_rate" value="{{ pricing.market_rate }}">
           <input type="hidden" name="cashout_fee_usd" value="{{ pricing.cashout_fee_usd }}">
           <input type="hidden" name="net_payout" value="{{ pricing.net_payout }}">
-          <button type="submit" class="btn btn-success">
-            <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Confirm cash-out
-          </button>
-          <a href="/cashout" class="btn btn-link">Change amount</a>
+          <div class="d-flex flex-wrap gap-2">
+            <a href="/cashout" class="btn btn-outline-secondary btn-lg">
+              <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Change amount
+            </a>
+            <button type="submit" class="btn btn-primary btn-lg flex-grow-1">
+              <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Confirm cash-out
+            </button>
+          </div>
         </form>
       </div>
-    </div>
+    </section>
   </div>
 
   <div class="col-lg-5">
-    <div class="alert alert-warning small mb-3">
-      <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
-      Your UCTUSD is reserved when an administrator approves this request, then burned
-      on the XRPL Testnet. If the burn fails, the reserved amount is returned to you.
-    </div>
-    <div class="alert alert-secondary small mb-0">
-      The fiat payout is <strong>simulated</strong> and recorded in this system only.
-      No bank transfer takes place.
-    </div>
+    <section class="card" aria-labelledby="next-title">
+      <div class="card-header"><h2 class="ds-section-title" id="next-title">What happens next</h2></div>
+      <div class="card-body p-4">
+        {{ timeline([
+          {"label": "Requested", "state": "upcoming", "desc": "Nothing leaves your wallet yet"},
+          {"label": "Approved", "state": "upcoming", "desc": "An administrator reviews it and your UCTUSD is reserved"},
+          {"label": "Completed", "state": "upcoming", "desc": "Burned on the XRPL Testnet; if the burn fails, the reserved amount is returned to you"},
+        ], label="Cash-out steps after you confirm") }}
+        <p class="small text-muted mt-3 mb-0">
+          The fiat payout is <strong>simulated</strong> and recorded in this system only. No bank transfer takes place.
+        </p>
+      </div>
+    </section>
   </div>
 </div>
 {% endblock %}

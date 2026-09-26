@@ -1,71 +1,106 @@
 {% extends "base.html" %}
+{% from "components/money.html" import amount %}
+{% from "components/ui.html" import CASHOUT_STEPS, stepper, empty_state %}
 {% block title %}Cash Out — XRPL Remit{% endblock %}
 
 {% block page_title %}Cash out{% endblock %}
 
 {% block content %}
+{{ stepper(CASHOUT_STEPS, 1, label="Cash-out steps") }}
 
-{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+{% if error %}<div class="alert alert-danger ds-slide-up" role="alert">{{ error }}</div>{% endif %}
 
 {% if not wallet %}
-<div class="card shadow-sm">
-  <div class="card-body text-center py-5 text-muted">
-    <i class="bi bi-wallet2 fs-1 d-block mb-2" aria-hidden="true"></i>
-    <strong>No wallet yet.</strong> You can cash out once you have received UCTUSD.
-  </div>
+<div class="card">
+  {{ empty_state("No wallet yet", "You can cash out once you have received UCTUSD.", icon="wallet2") }}
 </div>
 {% else %}
-<div class="row g-4">
-  <div class="col-lg-7">
-    <div class="card shadow-sm">
-      <div class="card-header fw-semibold">Request a cash-out</div>
-      <div class="card-body">
-        <form method="post" action="/cashout/preview">
-          <div class="mb-3">
-            <label class="form-label" for="uctusd_amount">Amount to cash out (UCTUSD)</label>
-            <input type="text" inputmode="decimal" class="form-control" id="uctusd_amount"
-                   name="uctusd_amount" value="{{ amount_value or '' }}" required
-                   placeholder="0.000000" autocomplete="off">
-            <div class="form-text">
-              Available: <strong>{{ "{:,.6f}".format(available) }} UCTUSD</strong>
+<form method="post" action="/cashout/preview" id="cashout-form">
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="card">
+        <div class="card-body p-4">
+          <div class="mb-4">
+            <div class="d-flex justify-content-between align-items-baseline gap-2">
+              <label class="form-label" for="uctusd_amount">Amount to cash out (UCTUSD)</label>
+              <button type="button" class="btn btn-link btn-sm p-0" data-fill-max="{{ available }}"
+                      aria-describedby="available-help"{% if available <= 0 %} disabled{% endif %}>Max</button>
+            </div>
+            <div class="input-group ds-amount-input">
+              <input type="text" inputmode="decimal" class="form-control" id="uctusd_amount"
+                     name="uctusd_amount" value="{{ amount_value or '' }}" required
+                     placeholder="0.000000" autocomplete="off"
+                     pattern="\d{1,9}(\.\d{1,6})?" maxlength="16"
+                     title="Up to 9 digits, with at most 6 decimal places"
+                     aria-describedby="available-help">
+              <span class="input-group-text fs-6">UCTUSD</span>
+            </div>
+            <div class="form-text" id="available-help">
+              Available: <strong>{{ amount(available, "UCTUSD", size="sm") }}</strong> · up to 6 decimals
             </div>
           </div>
-          <div class="mb-3">
+          <div class="mb-4">
             <label class="form-label" for="target_currency">Payout currency</label>
-            <select class="form-select" id="target_currency" name="target_currency">
+            <select class="form-select form-select-lg" id="target_currency" name="target_currency">
               <option value="USD" {% if currency_value == "ZAR" %}{% else %}selected{% endif %}>USD — US Dollar</option>
               <option value="ZAR" {% if currency_value == "ZAR" %}selected{% endif %}>ZAR — South African Rand</option>
             </select>
             <div class="form-text">Cash-out is available in USD and ZAR only.</div>
           </div>
-          <button type="submit" class="btn btn-primary">
-            Preview payout <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i>
+          <button type="submit" class="btn btn-primary btn-lg w-100">
+            Review payout <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i>
           </button>
-          <a href="/cashout/history" class="btn btn-link">View my cash-outs</a>
-        </form>
+        </div>
       </div>
     </div>
-  </div>
 
-  <div class="col-lg-5">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <p class="text-muted mb-1">Wallet balance</p>
-        <p class="h4 fw-bold mb-3">{{ "{:,.6f}".format(wallet.balance_uctusd) }} <span class="fs-6">UCTUSD</span></p>
-        {% if held > 0 %}
-        <p class="small text-muted mb-1">
-          Less {{ "{:,.6f}".format(held) }} UCTUSD held by cash-outs awaiting approval
-        </p>
-        {% endif %}
-        <p class="small mb-0">Available to cash out: <strong>{{ "{:,.6f}".format(available) }} UCTUSD</strong></p>
+    <div class="col-lg-5">
+      <section class="card mb-3" aria-labelledby="balance-label">
+        <div class="card-body p-4">
+          <p class="ds-hero__label" id="balance-label">Wallet balance</p>
+          {{ amount(wallet.balance_uctusd, "UCTUSD", size="lg") }}
+          {% if held > 0 %}
+          <p class="small text-muted mt-2 mb-0">
+            Less {{ amount(held, "UCTUSD", size="sm") }} held by cash-outs awaiting approval
+          </p>
+          {% endif %}
+          <p class="small mt-2 mb-0">Available to cash out: <strong>{{ amount(available, "UCTUSD", size="sm") }}</strong></p>
+        </div>
+      </section>
+      <div class="alert alert-secondary small mb-0">
+        <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+        Cashing out burns your UCTUSD on the XRPL Testnet and records a
+        <strong>simulated</strong> fiat payout. No real money is transferred.
       </div>
-    </div>
-    <div class="alert alert-secondary small mt-3 mb-0">
-      <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
-      Cashing out burns your UCTUSD on the XRPL Testnet and records a
-      <strong>simulated</strong> fiat payout. No real money is transferred.
+      <p class="small mt-3 mb-0"><a href="/cashout/history">View my cash-outs</a></p>
     </div>
   </div>
-</div>
+</form>
+<script>
+(function () {
+  "use strict";
+  // Same cap as the pattern attribute (which covers the no-JS submit):
+  // 9 digits before the point, 6 after. The server still validates everything.
+  var input = document.getElementById("uctusd_amount");
+  var MAX_INT = 9, MAX_DEC = 6;
+  function sanitize(raw) {
+    var s = String(raw).replace(/[^0-9.]/g, "");
+    var dot = s.indexOf(".");
+    var whole = (dot === -1 ? s : s.slice(0, dot)).slice(0, MAX_INT);
+    if (dot === -1) return whole;
+    return whole + "." + s.slice(dot + 1).replace(/\./g, "").slice(0, MAX_DEC);
+  }
+  input.addEventListener("input", function () {
+    var clean = sanitize(input.value);
+    if (clean !== input.value) input.value = clean;
+  });
+  // "Max" copies the server's available figure into the field; no arithmetic here.
+  var max = document.querySelector("[data-fill-max]");
+  if (max) max.addEventListener("click", function () {
+    input.value = max.dataset.fillMax;
+    input.focus();
+  });
+})();
+</script>
 {% endif %}
 {% endblock %}

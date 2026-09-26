@@ -21,7 +21,7 @@
 {% endif %}
 
 <div data-status-poll="/status?t={{ txn.id }}" data-txn="{{ txn.id }}" data-final="{{ 'true' if final else 'false' }}"
-     data-status-item data-status-key="t:{{ txn.id }}" data-kind="t" data-id="{{ txn.id }}" data-hash-value="{{ txn.xrpl_tx_hash or '' }}">
+     data-status-item data-status-key="t:{{ txn.id }}" data-kind="t" data-id="{{ txn.id }}" data-hash-value="{{ txn.xrpl_tx_hash or '' }}" data-status-sig="{{ cashin }}/{{ settlement }}">
   <section class="card ds-hero mb-4 ds-slide-up" aria-labelledby="txn-hero-label">
     <div class="card-body">
       <div>
