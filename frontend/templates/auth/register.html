@@ -1,17 +1,23 @@
 {% extends "base.html" %}
+{% from "components/ui.html" import timeline %}
 {% block title %}Register — XRPL Remit{% endblock %}
 
+{% block public_actions %}
+<span class="ds-public-header__hint">Already registered?</span>
+<a class="btn btn-outline-secondary" href="/login">Log in</a>
+{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-sm-10 col-md-7 col-lg-6">
-    <div class="card shadow-sm mt-4">
-      <div class="card-body p-4">
-        <h1 class="h4 card-title mb-4 fw-bold">
-          <i class="bi bi-person-plus me-2 text-primary" aria-hidden="true"></i>Create Account
-        </h1>
+<div class="ds-auth ds-auth--wide ds-slide-up">
+  <div class="ds-auth__layout">
+    <div class="card ds-auth__card">
+      <div class="card-body">
+        <h1 class="ds-auth__title">Create your account</h1>
+        <p class="ds-auth__lead">It takes a minute. You'll verify your identity next.</p>
 
         {% if errors %}
-        <div class="alert alert-danger py-2">
+        <div class="alert alert-danger ds-auth__error" role="alert">
+          <i class="bi bi-x-circle-fill" aria-hidden="true"></i>
           <ul class="mb-0 ps-3">
             {% for e in errors %}<li>{{ e }}</li>{% endfor %}
           </ul>
@@ -20,37 +26,51 @@
 
         <form method="post" action="/register" novalidate>
           <div class="mb-3">
-            <label class="form-label fw-semibold" for="full_name">Full name</label>
+            <label class="form-label" for="full_name">Full name</label>
             <input type="text" name="full_name" class="form-control" id="full_name" autocomplete="name"
                    value="{{ prefill.full_name if prefill else '' }}" required autofocus>
           </div>
-          <div class="mb-3">
-            <label class="form-label fw-semibold" for="email">Email address</label>
-            <input type="email" name="email" class="form-control" id="email" autocomplete="email"
-                   value="{{ prefill.email if prefill else '' }}" required>
+          <div class="row g-3 mb-3">
+            <div class="col-sm-6">
+              <label class="form-label" for="email">Email address</label>
+              <input type="email" name="email" class="form-control" id="email" autocomplete="email"
+                     value="{{ prefill.email if prefill else '' }}" required>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label" for="mobile">Mobile number</label>
+              <input type="tel" name="mobile" class="form-control" placeholder="+27..." id="mobile" autocomplete="tel"
+                     value="{{ prefill.mobile if prefill else '' }}" required>
+            </div>
           </div>
-          <div class="mb-3">
-            <label class="form-label fw-semibold" for="mobile">Mobile number</label>
-            <input type="tel" name="mobile" class="form-control" placeholder="+27..." id="mobile" autocomplete="tel"
-                   value="{{ prefill.mobile if prefill else '' }}" required>
+          <div class="row g-3 mb-4">
+            <div class="col-sm-6">
+              <label class="form-label" for="password">Password</label>
+              <input type="password" name="password" class="form-control" required minlength="8" id="password" autocomplete="new-password"
+                     aria-describedby="password-help">
+              <div class="form-text" id="password-help">At least 8 characters.</div>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label" for="confirm_password">Confirm password</label>
+              <input type="password" name="confirm_password" class="form-control" required id="confirm_password" autocomplete="new-password">
+            </div>
           </div>
-          <div class="mb-3">
-            <label class="form-label fw-semibold" for="password">Password <span class="text-muted fw-normal">(min 8 characters)</span></label>
-            <input type="password" name="password" class="form-control" required minlength="8" id="password" autocomplete="new-password">
-          </div>
-          <div class="mb-4">
-            <label class="form-label fw-semibold" for="confirm_password">Confirm password</label>
-            <input type="password" name="confirm_password" class="form-control" required id="confirm_password" autocomplete="new-password">
-          </div>
-          <button type="submit" class="btn btn-primary w-100">Create Account</button>
+          <button type="submit" class="btn btn-primary btn-lg w-100">Create Account</button>
         </form>
-
-        <hr class="my-3">
-        <p class="text-center mb-0 text-muted small">
-          Already registered? <a href="/login">Log in</a>
-        </p>
       </div>
     </div>
+
+    <aside class="card ds-auth__aside" aria-labelledby="next-title">
+      <div class="card-body">
+        <h2 class="ds-section-title" id="next-title">What happens next</h2>
+        {{ timeline([
+          {"label": "Create your account", "desc": "Your name, email and mobile.", "state": "upcoming"},
+          {"label": "Verify your identity", "desc": "Submit your KYC details.", "state": "upcoming"},
+          {"label": "Admin approval", "desc": "An admin reviews your details.", "state": "upcoming"},
+          {"label": "Send money", "desc": "Pay in rand; it settles on the XRPL Testnet.", "state": "upcoming"},
+        ], label="What happens next") }}
+      </div>
+    </aside>
   </div>
+  <p class="ds-auth__switch">Already registered? <a href="/login">Log in</a></p>
 </div>
 {% endblock %}

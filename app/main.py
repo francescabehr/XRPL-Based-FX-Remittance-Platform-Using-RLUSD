@@ -2,8 +2,7 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -97,11 +96,3 @@ app.include_router(admin.router)
 # Styleguide and other developer pages exist only when DEBUG=true.
 if settings.debug:
     app.include_router(dev.router)
-
-
-@app.get("/")
-async def root(request: Request):
-    user_id = request.session.get("user_id")
-    if not user_id:
-        return RedirectResponse(url="/login", status_code=302)
-    return RedirectResponse(url="/dashboard", status_code=302)

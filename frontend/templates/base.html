@@ -20,6 +20,8 @@
 <a class="ds-skip-link" href="#main">Skip to content</a>
 {#- Declared here so self.page_back() exists; templates override it with an href. -#}
 {% if false %}{% block page_back %}{% endblock %}{% endif %}
+{#- Same trick for the signed-out header's links (landing, login, register). -#}
+{% if false %}{% block public_actions %}{% endblock %}{% endif %}
 
 {% if user is defined and user %}
 <div class="ds-shell">
@@ -47,15 +49,24 @@
   </div>
 </div>
 {% else %}
-<header class="ds-public-header">
-  <a class="ds-wordmark ds-wordmark--dark" href="/">
-    <span class="ds-wordmark__mark" aria-hidden="true"><i class="bi bi-arrow-left-right" aria-hidden="true"></i></span>XRPL Remit
-  </a>
+{%- set public_actions = self.public_actions()|trim %}
+<header class="ds-public-header{% if public_actions %} ds-public-header--actions{% endif %}">
+  <div class="ds-public-header__inner">
+    <a class="ds-wordmark ds-wordmark--dark" href="/">
+      <span class="ds-wordmark__mark" aria-hidden="true"><i class="bi bi-arrow-left-right" aria-hidden="true"></i></span>XRPL Remit
+    </a>
+    {%- if public_actions %}
+    <nav class="ds-public-header__actions" aria-label="Account">{{ public_actions|safe }}</nav>
+    {%- endif %}
+  </div>
 </header>
-<main id="main" class="ds-public-main" tabindex="-1">
+<main id="main" class="ds-public-main{% block public_main_class %}{% endblock %}" tabindex="-1">
   {% if flash %}{{ flash_message(flash.message, flash.kind) }}{% endif %}
   {{ self.content() }}
 </main>
+<footer class="ds-public-footer">
+  <p>Academic prototype (ECO5040W). Transfers settle on the XRPL <strong>Testnet</strong>; card payments, exchange rates and fiat payouts are simulated. No real money moves.</p>
+</footer>
 {% endif %}
 
 {#- One shared confirmation dialog for forms marked data-confirm (ui.js). -#}

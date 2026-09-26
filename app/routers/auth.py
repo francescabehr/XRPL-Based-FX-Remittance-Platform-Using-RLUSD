@@ -11,6 +11,13 @@ router = APIRouter()
 templates = make_templates()
 
 
+@router.get("/", response_class=HTMLResponse)
+async def landing(request: Request, user=Depends(get_current_user)):
+    if user:
+        return RedirectResponse(url="/dashboard" if not user.is_admin else "/admin", status_code=302)
+    return templates.TemplateResponse("public/landing.html", {"request": request, "flash": get_flash(request)})
+
+
 @router.get("/login", response_class=HTMLResponse)
 async def login_form(request: Request, user=Depends(get_current_user)):
     if user:
