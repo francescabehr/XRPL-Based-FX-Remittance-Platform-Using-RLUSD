@@ -5,86 +5,99 @@
 {% block page_back %}/beneficiaries{% endblock %}
 
 {% block content %}
+<div class="ds-form-narrow">
 
 {% if error %}
-<div class="alert alert-danger">{{ error }}</div>
+<div class="alert alert-danger ds-auth__error" role="alert">
+  <i class="bi bi-x-circle-fill" aria-hidden="true"></i><span>{{ error }}</span>
+</div>
 {% endif %}
 
-<div class="card shadow-sm">
+<div class="card">
   <div class="card-body p-4">
     {% set action = "/beneficiaries/" + ben.id|string + "/edit" if editing else "/beneficiaries/new" %}
     <form method="post" action="{{ action }}" novalidate>
 
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label class="form-label fw-semibold" for="ben-full_name">Full name <span class="text-danger">*</span></label>
-          <input type="text" name="full_name" class="form-control" required id="ben-full_name"
-                 value="{{ ben.full_name if editing else (prefill.full_name if prefill else '') }}">
-        </div>
+      <p class="ds-form-legend"><span class="ds-required" aria-hidden="true">*</span> Required</p>
 
-        <div class="col-md-6">
-          <label class="form-label fw-semibold" for="ben-relationship">Relationship <span class="text-danger">*</span></label>
-          <select name="relationship" class="form-select" required id="ben-relationship">
-            <option value="">— Select —</option>
-            {% for r in relationships %}
-            <option value="{{ r }}"
-              {% if editing and ben.relation_type == r %}selected
-              {% elif prefill and prefill.relation_type == r %}selected{% endif %}>{{ r }}</option>
-            {% endfor %}
-          </select>
-        </div>
+      <div class="ds-form-section"><fieldset>
+        <legend class="ds-form-section__title">Who they are</legend>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="ben-full_name">Full name <span class="ds-required" aria-hidden="true">*</span></label>
+            <input type="text" name="full_name" class="form-control" required id="ben-full_name"
+                   value="{{ ben.full_name if editing else (prefill.full_name if prefill else '') }}">
+          </div>
 
-        <div class="col-md-6">
-          <label class="form-label fw-semibold" for="ben-email">Email</label>
-          <input type="email" name="email" class="form-control" id="ben-email"
-                 value="{{ ben.email if editing else (prefill.email if prefill else '') }}"
-                 placeholder="optional if mobile provided">
+          <div class="col-md-6">
+            <label class="form-label" for="ben-relationship">Relationship <span class="ds-required" aria-hidden="true">*</span></label>
+            <select name="relationship" class="form-select" required id="ben-relationship">
+              <option value="">— Select —</option>
+              {% for r in relationships %}
+              <option value="{{ r }}"
+                {% if editing and ben.relation_type == r %}selected
+                {% elif prefill and prefill.relation_type == r %}selected{% endif %}>{{ r }}</option>
+              {% endfor %}
+            </select>
+          </div>
         </div>
+      </fieldset></div>
 
-        <div class="col-md-6">
-          <label class="form-label fw-semibold" for="ben-mobile">Mobile</label>
-          <input type="tel" name="mobile" class="form-control" id="ben-mobile"
-                 value="{{ ben.mobile if editing else (prefill.mobile if prefill else '') }}"
-                 placeholder="optional if email provided">
+      <div class="ds-form-section"><fieldset>
+        <legend class="ds-form-section__title">How to reach them</legend>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="ben-email">Email</label>
+            <input type="email" name="email" class="form-control" id="ben-email" aria-describedby="ben-contact-help"
+                   value="{{ ben.email if editing else (prefill.email if prefill else '') }}"
+                   placeholder="name@example.com">
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label" for="ben-mobile">Mobile</label>
+            <input type="tel" name="mobile" class="form-control" id="ben-mobile" aria-describedby="ben-contact-help"
+                   value="{{ ben.mobile if editing else (prefill.mobile if prefill else '') }}"
+                   placeholder="+27...">
+          </div>
         </div>
+        <p class="form-text mb-0 mt-2" id="ben-contact-help">
+          Add at least one. If it matches an existing account, we link it automatically.
+        </p>
+      </fieldset></div>
 
-        <div class="col-md-6">
-          <label class="form-label fw-semibold" for="ben-country">Country <span class="text-danger">*</span></label>
-          <select name="country" class="form-select" required id="ben-country">
-            <option value="">— Select —</option>
-            {% for c in countries %}
-            <option value="{{ c }}"
-              {% if editing and ben.country == c %}selected
-              {% elif prefill and prefill.country == c %}selected{% endif %}>{{ c }}</option>
-            {% endfor %}
-          </select>
-        </div>
+      <div class="ds-form-section"><fieldset>
+        <legend class="ds-form-section__title">Where the money goes</legend>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="ben-country">Country <span class="ds-required" aria-hidden="true">*</span></label>
+            <select name="country" class="form-select" required id="ben-country">
+              <option value="">— Select —</option>
+              {% for c in countries %}
+              <option value="{{ c }}"
+                {% if editing and ben.country == c %}selected
+                {% elif prefill and prefill.country == c %}selected{% endif %}>{{ c }}</option>
+              {% endfor %}
+            </select>
+          </div>
 
-        <div class="col-md-6">
-          <span class="form-label fw-semibold d-block" id="ben-payout-label">Payout currency <span class="text-danger">*</span></span>
-          <div class="d-flex gap-3 mt-1" role="radiogroup" aria-labelledby="ben-payout-label">
-            {% for cur in ["USD", "ZAR"] %}
-            <div class="form-check">
-              <input class="form-check-input" type="radio" name="payout_currency"
+          <div class="col-md-6">
+            <span class="form-label d-block" id="ben-payout-label">Payout currency <span class="ds-required" aria-hidden="true">*</span></span>
+            <div class="ds-choice" role="radiogroup" aria-labelledby="ben-payout-label">
+              {% for cur in ["USD", "ZAR"] %}
+              <input class="btn-check" type="radio" name="payout_currency"
                      id="cur_{{ cur }}" value="{{ cur }}"
                      {% if editing and ben.payout_currency.value == cur %}checked
                      {% elif prefill and prefill.payout_currency == cur %}checked
                      {% elif not editing and not prefill and cur == "USD" %}checked{% endif %}
                      required>
-              <label class="form-check-label" for="cur_{{ cur }}">{{ cur }}</label>
+              <label class="btn btn-outline-primary" for="cur_{{ cur }}">{{ cur }}</label>
+              {% endfor %}
             </div>
-            {% endfor %}
           </div>
         </div>
-      </div>
+      </fieldset></div>
 
-      <p class="text-muted small mt-3 mb-0">
-        <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
-        If the email or mobile matches an existing platform account, the beneficiary will be
-        automatically linked to that account (FR-BEN-04).
-      </p>
-
-      <div class="mt-4 d-flex gap-2">
+      <div class="mt-4 d-flex flex-wrap gap-2">
         <button type="submit" class="btn btn-primary px-4">
           {{ "Save Changes" if editing else "Add Beneficiary" }}
         </button>
@@ -92,5 +105,6 @@
       </div>
     </form>
   </div>
+</div>
 </div>
 {% endblock %}
