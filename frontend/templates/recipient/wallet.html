@@ -1,78 +1,212 @@
 {% extends "base.html" %}
-{% from "_macros.html" import hash_link with context %}
+{% from "components/money.html" import amount, breakdown, breakdown_row %}
+{% from "components/status.html" import transaction_badge, cashout_badge %}
+{% from "components/ui.html" import drawer, empty_state, check_draw %}
+{% from "components/xrpl.html" import tx_hash %}
 {% block title %}Wallet — XRPL Remit{% endblock %}
 
 {% block page_title %}Wallet{% endblock %}
 
+{#- Short hash for a row: plain text, because the row itself is a link. -#}
+{% macro short_hash(value) -%}
+<span class="ds-hash-short" data-hash-short{% if not value %} hidden{% endif %}>{% if value %} · {{ value[:8] }}…{% endif %}</span>
+{%- endmacro %}
+
 {% block content %}
+<div data-status-poll="/status">
 
 {% if not wallet %}
-<div class="card shadow-sm">
-  <div class="card-body text-center py-5 text-muted">
-    <i class="bi bi-wallet2 fs-1 d-block mb-2" aria-hidden="true"></i>
-    <strong>No wallet yet.</strong> One is created for you automatically when you first receive money.
-  </div>
+<div class="card mb-4">
+  {{ empty_state("No wallet yet", "One is created for you automatically when you first receive money.", icon="wallet2") }}
 </div>
 {% else %}
 <div class="row g-4 mb-4">
-  <div class="col-md-6">
-    <div class="card shadow-sm h-100">
+  <div class="col-lg-8">
+    <section class="card ds-hero h-100" aria-labelledby="balance-label">
       <div class="card-body">
-        <p class="text-muted mb-1">Balance</p>
-        <p class="display-6 fw-bold mb-1">{{ "{:,.6f}".format(wallet.balance_uctusd) }} <span class="fs-5">UCTUSD</span></p>
-        <p class="small text-muted mb-0">
-          {% if ledger_balance is not none %}
+        <div>
+          <p class="ds-hero__label" id="balance-label">Balance</p>
+          <span data-wallet-balance>{{ amount(wallet.balance_uctusd, "UCTUSD", size="xl", count_up=true) }}</span>
+          <p class="ds-hero__sub">
+            {%- if ledger_balance is not none %}
             On-ledger balance: {{ "{:,.6f}".format(ledger_balance) }} UCTUSD
-            {% if ledger_balance != wallet.balance_uctusd %}<span class="text-warning">(differs from platform record)</span>{% endif %}
-          {% else %}
+            {%- if ledger_balance != wallet.balance_uctusd %} <span class="text-warning">(differs from platform record)</span>{% endif %}
+            {%- else %}
             Ledger balance unavailable right now.
-          {% endif %}
-        </p>
+            {%- endif %}
+          </p>
+        </div>
+        {% if user.can_receive %}
+        <div class="ds-hero__actions">
+          <a href="/cashout" class="btn btn-primary btn-lg"><i class="bi bi-cash-coin me-1" aria-hidden="true"></i>Cash out</a>
+        </div>
+        {% endif %}
       </div>
-    </div>
+    </section>
   </div>
-  <div class="col-md-6">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <p class="text-muted mb-1">XRPL Testnet address</p>
+  <div class="col-lg-4">
+    <section class="card h-100" aria-labelledby="address-title">
+      <div class="card-body p-4">
+        <h2 class="ds-hero__label" id="address-title">XRPL Testnet address</h2>
         <p class="font-monospace small text-break mb-2">{{ wallet.xrpl_address }}</p>
         <a href="{{ explorer_tx_url|replace("/transactions/", "/accounts/") }}{{ wallet.xrpl_address }}" target="_blank" rel="noopener" class="small">
-          View on explorer <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
+          View on explorer <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span class="visually-hidden"> (opens in a new tab)</span>
         </a>
         {% if not wallet.trust_set_complete %}<p class="small text-warning mt-2 mb-0">Trust line setup is still pending.</p>{% endif %}
       </div>
-    </div>
+    </section>
   </div>
 </div>
 {% endif %}
 
-<div class="card shadow-sm">
-  <div class="card-header fw-semibold">Incoming transfers</div>
-  {% if incoming %}
-  <div class="table-responsive">
-    <table class="table table-hover mb-0 align-middle">
-      <thead class="table-light"><tr><th>Date</th><th>From</th><th class="text-end">UCTUSD</th><th>Status</th><th>XRPL transaction</th></tr></thead>
-      <tbody>
-        {% for t in incoming %}
-        <tr>
-          <td class="small text-muted">{{ (t.settled_at or t.created_at)|localtime('%d %b %Y %H:%M') }}</td>
-          <td><a href="/transactions/{{ t.id }}" class="text-decoration-none">{{ t.sender.full_name }}</a></td>
-          <td class="text-end fw-semibold">+{{ "{:,.6f}".format(t.uctusd_amount) }}</td>
-          <td>
-            <span class="badge bg-{{ t.status_badge }}">{{ t.status_label }}</span>
-            {% if t.settlement_status.value == "failed" %}<div class="small text-danger">{{ t.xrpl_error_reason }}</div>{% endif %}
-          </td>
-          <td>{{ hash_link(t.xrpl_tx_hash) }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+<section class="card" aria-labelledby="activity-title">
+  <div class="card-header"><h2 class="ds-section-title" id="activity-title">Activity</h2></div>
+  {% if activity %}
+  <ul class="ds-activity ds-activity--stack">
+    {% for entry in activity %}
+    {%- set x = entry.item %}
+    {%- if entry.kind == "in" %}
+      {%- set key = "t:" ~ x.id %}
+      {%- set failed = x.cashin_status.value == "failed" or x.settlement_status.value == "failed" %}
+      {%- set final = failed or x.settlement_status.value == "completed" %}
+    <li>
+      <a class="ds-activity__row" href="/transactions/{{ x.id }}"
+         data-drawer-open="wallet-drawer" data-drawer-template="wd-t-{{ x.id }}" data-drawer-title="Transfer from {{ x.sender.full_name }}"
+         data-status-item data-status-key="{{ key }}" data-kind="t" data-id="{{ x.id }}" data-hash-value="{{ x.xrpl_tx_hash or '' }}" data-final="{{ 'true' if final else 'false' }}">
+        <span class="ds-activity__icon ds-activity__icon--in{% if failed %} is-failed{% endif %}" aria-hidden="true" data-icon>
+          <i class="bi bi-arrow-down-left"></i>
+          <span class="ds-activity__check" data-check hidden>{{ check_draw(40, drawn=false) }}</span>
+        </span>
+        <span class="ds-activity__main">
+          <span class="ds-activity__title">{{ x.sender.full_name }}</span>
+          <span class="ds-activity__meta">{{ x.created_at|localtime('%d %b, %H:%M') }}{{ short_hash(x.xrpl_tx_hash) }}</span>
+        </span>
+        <span class="ds-activity__foot">
+        <span class="ds-activity__amount">
+          <span data-amount>{% if failed %}<span class="ds-strike">{{ amount(x.uctusd_amount, "UCTUSD", signed=true) }}</span>{% else %}{{ amount(x.uctusd_amount, "UCTUSD", signed=true) }}{% endif %}</span>
+        </span>
+        <span class="ds-activity__status" data-badge>{{ transaction_badge(x) }}</span>
+        </span>
+      </a>
+    </li>
+    {%- else %}
+      {%- set key = "c:" ~ x.id %}
+      {%- set failed = x.status.value == "failed" %}
+      {%- set final = failed or x.status.value == "completed" %}
+    <li>
+      <a class="ds-activity__row" href="/cashout/{{ x.id }}"
+         data-drawer-open="wallet-drawer" data-drawer-template="wd-c-{{ x.id }}" data-drawer-title="Cash out to {{ x.target_currency.value }}"
+         data-status-item data-status-key="{{ key }}" data-kind="c" data-id="{{ x.id }}" data-hash-value="{{ x.xrpl_burn_tx_hash or '' }}" data-final="{{ 'true' if final else 'false' }}">
+        <span class="ds-activity__icon ds-activity__icon--out{% if failed %} is-failed{% endif %}" aria-hidden="true" data-icon>
+          <i class="bi bi-arrow-up-right"></i>
+          <span class="ds-activity__check" data-check hidden>{{ check_draw(40, drawn=false) }}</span>
+        </span>
+        <span class="ds-activity__main">
+          <span class="ds-activity__title">Cash out to {{ x.target_currency.value }}</span>
+          <span class="ds-activity__meta">{{ x.created_at|localtime('%d %b, %H:%M') }}{{ short_hash(x.xrpl_burn_tx_hash) }}</span>
+        </span>
+        <span class="ds-activity__foot">
+        <span class="ds-activity__amount">
+          <span data-amount>{% if failed %}<span class="ds-strike">{{ amount(-x.uctusd_amount, "UCTUSD") }}</span>{% else %}{{ amount(-x.uctusd_amount, "UCTUSD") }}{% endif %}</span>
+        </span>
+        <span class="ds-activity__status" data-badge>{{ cashout_badge(x) }}</span>
+        </span>
+      </a>
+    </li>
+    {%- endif %}
+    {% endfor %}
+  </ul>
   {% else %}
-  <div class="card-body text-muted text-center py-4">No incoming transfers yet.</div>
+  {{ empty_state("No activity yet", "Money you receive and your cash-outs will show up here.", icon="arrow-down-up") }}
   {% endif %}
+</section>
+<p class="small text-muted mt-3" data-poll-note hidden>Live updates paused — refresh to check again.</p>
+
+{#- Drawer detail, one server-rendered <template> per row. The row link is the
+    no-JS fallback; with JS, ui.js clones the template into the shared drawer. -#}
+{% for entry in activity %}
+{%- set x = entry.item %}
+{%- if entry.kind == "in" %}
+{%- set failed = x.cashin_status.value == "failed" or x.settlement_status.value == "failed" %}
+{%- set final = failed or x.settlement_status.value == "completed" %}
+<template id="wd-t-{{ x.id }}">
+  <div class="ds-detail" data-status-key="t:{{ x.id }}">
+    <div class="ds-detail__head">
+      <span data-amount>{% if failed %}<span class="ds-strike">{{ amount(x.uctusd_amount, "UCTUSD", size="lg", signed=true) }}</span>{% else %}{{ amount(x.uctusd_amount, "UCTUSD", size="lg", signed=true) }}{% endif %}</span>
+      <span class="d-flex align-items-center gap-2">
+        <span data-check hidden>{{ check_draw(28, drawn=false, label="Settled") }}</span>
+        <span data-badge>{{ transaction_badge(x) }}</span>
+      </span>
+    </div>
+    {% if not final %}
+    <div class="ds-processing" data-processing>
+      <span class="ds-pulse-dot" aria-hidden="true"></span>
+      <span><strong>Settling on XRPL…</strong> You can close this; the status updates by itself.</span>
+    </div>
+    {% endif %}
+    <p class="ds-detail__failure" data-failure{% if not x.failure_reason %} hidden{% endif %}>{{ x.failure_reason or "" }}</p>
+    {%- set ref %}<span class="font-monospace small">{{ x.id|string|truncate(13, True, "") }}</span>{% endset %}
+    {%- set hash_cell %}<span data-hash>{{ tx_hash(x.xrpl_tx_hash) }}</span>{% endset %}
+    {% call breakdown() %}
+      {{ breakdown_row("From", x.sender.full_name) }}
+      {{ breakdown_row("Sent", amount(x.zar_amount, "ZAR")) }}
+      {{ breakdown_row("Transaction fee", amount(x.transaction_fee, "ZAR")) }}
+      {{ breakdown_row("Exchange rate", "R" ~ "%.4f"|format(x.exchange_rate) ~ " per USD") }}
+      {{ breakdown_row("You receive", amount(x.uctusd_amount, "UCTUSD"), hero=true) }}
+      {{ breakdown_row("Sent on", x.created_at|localtime('%d %b %Y, %H:%M')) }}
+      {% if x.settled_at %}{{ breakdown_row("Settled", x.settled_at|localtime('%d %b %Y, %H:%M')) }}{% endif %}
+      {{ breakdown_row("Reference", ref) }}
+      {{ breakdown_row("XRPL transaction", hash_cell) }}
+    {% endcall %}
+    <a href="/transactions/{{ x.id }}" class="btn btn-outline-secondary btn-sm mt-3">Open full page</a>
+  </div>
+</template>
+{%- else %}
+{%- set failed = x.status.value == "failed" %}
+{%- set final = failed or x.status.value == "completed" %}
+{%- set zar = x.target_currency.value == "ZAR" %}
+<template id="wd-c-{{ x.id }}">
+  <div class="ds-detail" data-status-key="c:{{ x.id }}">
+    <div class="ds-detail__head">
+      <span data-amount>{% if failed %}<span class="ds-strike">{{ amount(-x.uctusd_amount, "UCTUSD", size="lg") }}</span>{% else %}{{ amount(-x.uctusd_amount, "UCTUSD", size="lg") }}{% endif %}</span>
+      <span class="d-flex align-items-center gap-2">
+        <span data-check hidden>{{ check_draw(28, drawn=false, label="Completed") }}</span>
+        <span data-badge>{{ cashout_badge(x) }}</span>
+      </span>
+    </div>
+    {% if not final %}
+    <div class="ds-processing" data-processing>
+      {%- if x.status.value == "requested" %}
+      <i class="bi bi-hourglass-split" aria-hidden="true"></i>
+      <span><strong>Waiting for approval.</strong> Your UCTUSD has not been reserved yet.</span>
+      {%- elif x.awaiting_ledger_confirmation %}
+      <i class="bi bi-hourglass-split" aria-hidden="true"></i>
+      <span><strong>Awaiting ledger confirmation.</strong> Your UCTUSD stays reserved until the burn is verified.</span>
+      {%- else %}
+      <span class="ds-pulse-dot" aria-hidden="true"></span>
+      <span><strong>Burning on XRPL…</strong> You can close this; the status updates by itself.</span>
+      {%- endif %}
+    </div>
+    {% endif %}
+    <p class="ds-detail__failure" data-failure{% if not (failed and x.failure_reason) %} hidden{% endif %}>{{ x.failure_reason if failed else "" }}</p>
+    {%- set hash_cell %}<span data-hash>{{ tx_hash(x.xrpl_burn_tx_hash) }}</span>{% endset %}
+    {% call breakdown() %}
+      {{ breakdown_row("UCTUSD burned", amount(x.uctusd_amount, "UCTUSD")) }}
+      {{ breakdown_row("Cash-out fee", amount(x.cashout_fee_usd, "USD")) }}
+      {{ breakdown_row("Exchange rate", ("1 USD = " ~ "{:,.6f}".format(x.market_rate) ~ " ZAR") if zar else "1 UCTUSD = 1 USD") }}
+      {{ breakdown_row("You receive", amount(x.net_payout, x.target_currency), hint="Simulated payout", hero=true) }}
+      {{ breakdown_row("Requested", x.created_at|localtime('%d %b %Y, %H:%M')) }}
+      {% if x.approved_at %}{{ breakdown_row("Approved", x.approved_at|localtime('%d %b %Y, %H:%M')) }}{% endif %}
+      {% if x.completed_at %}{{ breakdown_row("Completed", x.completed_at|localtime('%d %b %Y, %H:%M')) }}{% endif %}
+      {% if x.fiat_payout_reference %}{{ breakdown_row("Payout reference", x.fiat_payout_reference) }}{% endif %}
+      {{ breakdown_row("Burn transaction", hash_cell) }}
+    {% endcall %}
+    <a href="/cashout/{{ x.id }}" class="btn btn-outline-secondary btn-sm mt-3">Open full page</a>
+  </div>
+</template>
+{%- endif %}
+{% endfor %}
+
+{% call drawer("wallet-drawer", "Details") %}<div data-drawer-content></div>{% endcall %}
 </div>
-<p class="small text-muted mt-3">
-  Cash-outs are listed separately on <a href="/cashout/history">My cash-outs</a>.
-</p>
 {% endblock %}

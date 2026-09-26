@@ -1,4 +1,4 @@
-"""FR-WAL-05  Recipient wallet: UCTUSD balance and incoming transfers with XRPL hashes."""
+"""FR-WAL-05  Recipient wallet: UCTUSD balance, incoming transfers and cash-outs with XRPL hashes."""
 import asyncio
 import logging
 
@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_current_user, get_flash
-from app.services import cashin_service, xrpl_service
+from app.services import cashin_service, cashout_service, xrpl_service
 from app.templating import make_templates
 
 logger = logging.getLogger(__name__)
@@ -40,6 +40,16 @@ async def wallet_page(
         except Exception as exc:  # noqa: BLE001 — the page must render without Testnet
             logger.warning("Ledger balance unavailable for %s: %s", wallet.xrpl_address, type(exc).__name__)
 
+    # One activity list, newest first: transfers in, cash-outs (burns) out.
+    incoming = await cashin_service.list_incoming(db, user.id)
+    cashouts = await cashout_service.list_for_recipient(db, user.id)
+    activity = sorted(
+        [{"kind": "in", "item": t, "at": t.created_at} for t in incoming]
+        + [{"kind": "out", "item": c, "at": c.created_at} for c in cashouts],
+        key=lambda entry: entry["at"],
+        reverse=True,
+    )
+
     return templates.TemplateResponse(
         "recipient/wallet.html",
         {
@@ -48,6 +58,7 @@ async def wallet_page(
             "flash": get_flash(request),
             "wallet": wallet,
             "ledger_balance": ledger_balance,
-            "incoming": await cashin_service.list_incoming(db, user.id),
+            "incoming": incoming,
+            "activity": activity,
         },
     )

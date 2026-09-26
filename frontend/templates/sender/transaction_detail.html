@@ -20,7 +20,8 @@
 <div class="alert alert-danger" role="alert"><strong>Failed:</strong> {{ txn.failure_reason }}{% if cashin == "failed" %} No money was sent.{% else %} The recipient's balance was not changed.{% endif %}</div>
 {% endif %}
 
-<div data-status-poll="/status?t={{ txn.id }}" data-txn="{{ txn.id }}" data-final="{{ 'true' if final else 'false' }}">
+<div data-status-poll="/status?t={{ txn.id }}" data-txn="{{ txn.id }}" data-final="{{ 'true' if final else 'false' }}"
+     data-status-item data-status-key="t:{{ txn.id }}" data-kind="t" data-id="{{ txn.id }}" data-hash-value="{{ txn.xrpl_tx_hash or '' }}">
   <section class="card ds-hero mb-4 ds-slide-up" aria-labelledby="txn-hero-label">
     <div class="card-body">
       <div>
@@ -56,11 +57,9 @@
              "state": "done" if settled else "upcoming",
              "desc": (txn.settled_at|localtime('%d %b %Y, %H:%M')) if settled and txn.settled_at else "UCTUSD lands in the recipient's wallet"},
           ], label="Transfer progress") }}
-          {% if cashin == "pending" %}
-          <p class="small text-muted mt-3 mb-0">Waiting for the card payment to be confirmed. The transfer starts automatically afterwards.</p>
-          {% elif settlement in ("not_queued", "queued", "processing") %}
-          <p class="small text-muted mt-3 mb-0">Sending on the XRPL Testnet. This usually takes under a minute.</p>
-          {% endif %}
+          {%- set note = "Waiting for the card payment to be confirmed. The transfer starts automatically afterwards." if cashin == "pending"
+                    else ("Sending on the XRPL Testnet. This usually takes under a minute." if cashin == "received" and settlement in ("not_queued", "queued", "processing") else "") %}
+          <p class="small text-muted mt-3 mb-0" data-progress-note{% if not note %} hidden{% endif %}>{{ note }}</p>
         </div>
       </section>
     </div>

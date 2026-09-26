@@ -24,7 +24,7 @@
           </td>
           <td class="text-end fw-semibold">−{{ "{:,.6f}".format(r.uctusd_amount) }}</td>
           <td class="text-end">
-            {% if r.target_currency.value == "ZAR" %}R{{ "{:,.2f}".format(r.net_payout) }}{% else %}${{ "{:,.6f}".format(r.net_payout) }}{% endif %}
+            {% if r.target_currency.value == "ZAR" %}R{{ "{:,.2f}".format(r.net_payout) }}{% else %}${{ "{:,.2f}".format(r.net_payout) }}{% endif %}
             <span class="small text-muted">{{ r.target_currency.value }}</span>
           </td>
           <td>

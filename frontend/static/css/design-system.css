@@ -1423,3 +1423,72 @@ a.ds-activity__row:hover { background: var(--bg); color: inherit; }
 .ds-timeline__step.is-upcoming .ds-timeline__label { color: var(--text-muted); font-weight: 500; }
 .ds-timeline__step.is-failed .ds-timeline__label { color: var(--danger); }
 .ds-timeline__desc { font-size: var(--text-sm); color: var(--text-muted); }
+
+/* Wallet (4c) ─────────────────────────────────────────────────────────────── */
+
+/* Short hash in a list row: plain text, since the row is itself a link. */
+.ds-hash-short { font-family: var(--bs-font-monospace); font-size: 0.92em; }
+
+/* On a phone, a stacked row keeps the counterparty readable: name and date
+   across the full width, then status and amount on the line below. */
+/* Amount + status share a wrapper that is invisible to the desktop grid. */
+.ds-activity__foot { display: contents; }
+@media (max-width: 575.98px) {
+  .ds-activity--stack .ds-activity__row {
+    grid-template-columns: 40px minmax(0, 1fr);
+    grid-template-areas: "icon main" "icon foot";
+    row-gap: var(--space-2);
+    padding-inline: var(--space-4);
+  }
+  .ds-activity--stack .ds-activity__foot {
+    grid-area: foot;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-1) var(--space-2);
+  }
+  .ds-activity--stack .ds-activity__amount { text-align: left; }
+}
+
+/* A just-settled row: the check stands in for the icon, then steps aside. */
+.ds-activity__check {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  transition: opacity var(--dur-slow) var(--ease-out);
+}
+.ds-activity__check .ds-check-draw { width: 40px; height: 40px; }
+.ds-activity__check.is-leaving { opacity: 0; }
+
+/* Drawer detail. */
+.ds-detail__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.ds-detail__failure {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--danger);
+}
+
+/* Calm in-progress note (the "Processing — you can close this" pattern). */
+.ds-processing {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: var(--text-sm);
+  --ds-dot: var(--warning-vivid);
+}
+.ds-processing > i { flex: 0 0 auto; }
+.ds-processing strong { font-weight: 600; }

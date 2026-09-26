@@ -76,8 +76,9 @@ def test_status_badge_accepts_enum_members():
 
 
 def test_only_in_progress_states_pulse():
+    # Anything in flight pulses: queued and processing settlements alike.
     assert "ds-pulse-dot" in render('{{ status_badge("processing", "settlement") }}')
-    assert "ds-pulse-dot" not in render('{{ status_badge("queued", "settlement") }}')
+    assert "ds-pulse-dot" in render('{{ status_badge("queued", "settlement") }}')
     assert "ds-pulse-dot" not in render('{{ status_badge("completed", "settlement") }}')
 
 

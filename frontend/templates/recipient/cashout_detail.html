@@ -1,18 +1,25 @@
 {% extends "base.html" %}
-{% from "_macros.html" import hash_link with context %}
+{% from "components/status.html" import cashout_badge %}
+{% from "components/ui.html" import check_draw %}
+{% from "components/xrpl.html" import tx_hash %}
 {% block title %}Cash-Out Detail — XRPL Remit{% endblock %}
 
 {% block page_title %}Cash-out detail{% endblock %}
 {% block page_back %}/cashout/history{% endblock %}
 
 {% block content %}
-
+{%- set final = req.status.value in ("completed", "failed") %}
+<div data-status-poll="/status?c={{ req.id }}" data-final="{{ 'true' if final else 'false' }}"
+     data-status-item data-status-key="c:{{ req.id }}" data-kind="c" data-id="{{ req.id }}" data-hash-value="{{ req.xrpl_burn_tx_hash or '' }}">
 <div class="row g-4">
   <div class="col-lg-7">
     <div class="card shadow-sm">
       <div class="card-header d-flex justify-content-between align-items-center">
         <span class="fw-semibold">Request</span>
-        <span class="badge bg-{{ req.status_badge }}">{{ req.status_label }}</span>
+        <span class="d-flex align-items-center gap-2">
+          <span data-check hidden>{{ check_draw(24, drawn=false, label="Completed") }}</span>
+          <span data-badge>{{ cashout_badge(req) }}</span>
+        </span>
       </div>
       <table class="table mb-0">
         <tbody>
@@ -20,7 +27,7 @@
           <tr><td class="text-muted">UCTUSD burned</td><td class="text-end fw-semibold">{{ "{:,.6f}".format(req.uctusd_amount) }}</td></tr>
           <tr>
             <td class="text-muted">Cash-out fee</td>
-            <td class="text-end text-danger">− {{ "{:,.6f}".format(req.cashout_fee_usd) }} USD</td>
+            <td class="text-end text-danger">− ${{ "{:,.2f}".format(req.cashout_fee_usd) }}</td>
           </tr>
           <tr>
             <td class="text-muted">Exchange rate</td>
@@ -31,7 +38,7 @@
           <tr class="table-light">
             <td class="fw-semibold">Payout <span class="small text-muted">(simulated)</span></td>
             <td class="text-end fw-bold">
-              {% if req.target_currency.value == "ZAR" %}R{{ "{:,.2f}".format(req.net_payout) }}{% else %}${{ "{:,.6f}".format(req.net_payout) }}{% endif %}
+              {% if req.target_currency.value == "ZAR" %}R{{ "{:,.2f}".format(req.net_payout) }}{% else %}${{ "{:,.2f}".format(req.net_payout) }}{% endif %}
               <span class="small text-muted">{{ req.target_currency.value }}</span>
             </td>
           </tr>
@@ -47,13 +54,15 @@
             <td class="text-end font-monospace small">{{ req.fiat_payout_reference }}</td>
           </tr>
           {% endif %}
-          <tr><td class="text-muted">Burn transaction</td><td class="text-end">{{ hash_link(req.xrpl_burn_tx_hash) }}</td></tr>
+          <tr><td class="text-muted">Burn transaction</td><td class="text-end"><span data-hash>{{ tx_hash(req.xrpl_burn_tx_hash) }}</span></td></tr>
         </tbody>
       </table>
     </div>
   </div>
 
   <div class="col-lg-5">
+    <p class="alert alert-info small" data-status-changed hidden>Status updated — refresh for the details.</p>
+    <div data-stale-on-change>
     {% if req.status.value == "requested" %}
     <div class="alert alert-secondary small">
       <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>
@@ -84,7 +93,9 @@
       <div class="mt-1">Any reserved UCTUSD has been returned to your wallet.</div>
     </div>
     {% endif %}
+    </div>
     <a href="/wallet" class="btn btn-outline-secondary btn-sm"><i class="bi bi-wallet2 me-1" aria-hidden="true"></i>View wallet</a>
   </div>
+</div>
 </div>
 {% endblock %}

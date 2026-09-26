@@ -21,7 +21,7 @@
               Cash-out fee
               <span class="small d-block">{{ "{:.2%}".format(pricing.cashout_fee_percentage) }}, minimum ${{ "{:,.2f}".format(pricing.cashout_fee_min_usd) }}</span>
             </td>
-            <td class="text-end text-danger">− {{ "{:,.6f}".format(pricing.cashout_fee_usd) }} USD</td>
+            <td class="text-end text-danger">− ${{ "{:,.2f}".format(pricing.cashout_fee_usd) }}</td>
           </tr>
           <tr>
             <td class="text-muted">Exchange rate</td>
@@ -36,7 +36,7 @@
           <tr class="table-light">
             <td class="fw-semibold">You receive</td>
             <td class="text-end fw-bold fs-5">
-              {% if pricing.target_currency.value == "ZAR" %}R{{ "{:,.2f}".format(pricing.net_payout) }}{% else %}${{ "{:,.6f}".format(pricing.net_payout) }}{% endif %}
+              {% if pricing.target_currency.value == "ZAR" %}R{{ "{:,.2f}".format(pricing.net_payout) }}{% else %}${{ "{:,.2f}".format(pricing.net_payout) }}{% endif %}
               <span class="fs-6 text-muted">{{ pricing.target_currency.value }}</span>
             </td>
           </tr>

@@ -46,7 +46,7 @@ The look should be calm, confident and precise: a trustworthy money app, not a c
   | Neutral | `--neutral`, `--neutral-soft`, `--text`, `--text-muted`, `--border`, `--border-input` | #5B6071, #EFF0F4, #16161D, #5B6071, #E6E6EE, #868B9C | Grey badges, body text, muted text, hairlines, form-control borders (3.4:1). |
 
   Focus rings are a 2px deep-teal outline with a pink halo, so the teal carries the contrast. Semantic colours are reserved for status and carry meaning, not decoration. Every text/background pair is checked for WCAG AA.
-- **Money:** Money is the hero. Amounts are large and semibold, use tabular numerals, and always show the currency code (ZAR, UCTUSD, USD).
+- **Money:** Money is the hero. Amounts are large and semibold, use tabular numerals, and always show the currency code (ZAR, UCTUSD, USD). **Fiat (ZAR, USD) always shows two decimals** on every screen, including the drawer and the cash-out pages; only UCTUSD shows six. Rates keep their own precision, and hidden price-lock inputs keep the raw stored value.
 - **Shape:** Generous whitespace, rounded corners (roughly 12–16px on cards) and pill-shaped buttons.
 - **Font:** One typeface. Use Inter from Google Fonts, with `font-feature-settings: "tnum"` on amounts.
 - **Layout:** Desktop-first, fully usable down to phone width. On desktop, a left sidebar holds the navigation; on mobile it collapses to a top bar with a menu.
@@ -162,13 +162,13 @@ Every status is displayed through the macros in `frontend/templates/components/s
 | KYC (`users.kyc_status`) | not_submitted, pending, approved, rejected | Not started → grey; Awaiting approval → amber; Verified → green; Rejected → red |
 | KYC submission (`kyc_submissions.status`) | pending, approved, rejected | as above |
 | Cash-in (`transactions.cashin_status`) | pending, received, failed | Awaiting payment → amber; Payment received → green; Failed → red |
-| Settlement (`transactions.settlement_status`) | not_queued, queued, processing, completed, failed | Not started → grey; Queued → amber; Settling on XRPL… → amber + pulse; Settled on XRPL → green; Failed → red |
+| Settlement (`transactions.settlement_status`) | not_queued, queued, processing, completed, failed | Not started → grey; Queued → amber + pulse; Settling on XRPL… → amber + pulse; Settled on XRPL → green; Failed → red |
 | Transaction overall | derived: failed cash-in → Failed; pending cash-in → Awaiting payment; otherwise the settlement state | reuses the rows above |
 | Cash-out (`cashout_requests.status`) | requested, approved, completed, failed, plus the derived **Awaiting ledger confirmation** (approved + burn hash + outcome unknown) | Requested → amber; Approved → amber + pulse; Awaiting ledger confirmation → amber; Completed → green; Failed → red |
 | Beneficiary link | linked / not registered | Linked → green; Not registered → grey |
 | AML flag | boolean | AML review → red |
 
-The pulse dot marks only states that are genuinely in progress. Keep any text the tests assert on verbatim (e.g. "Awaiting ledger confirmation").
+The pulse dot marks only states that are genuinely in progress, and everything in flight pulses: Queued, Settling on XRPL… and Approved (burning). Requested (waiting for an admin) and Awaiting ledger confirmation (waiting for an admin reconcile) don't pulse, because nothing is moving until someone acts. Keep any text the tests assert on verbatim (e.g. "Awaiting ledger confirmation").
 
 ## 7. Phase 4: Demo-path screens (highest priority)
 
@@ -227,7 +227,9 @@ Redesign these screens in order. After each one, run the tests and check it at d
 - **Limit error:** The inline error slides down in place. No shaking.
 - **Confirmation:** On the Status page, when the cash-in is confirmed and the settlement validates (seen via polling), show a success state with `.ds-check-draw` and the summary card sliding up.
 
-### 7.4 Recipient wallet (pattern: Revolut list and drawer)
+### 7.4 Recipient wallet (pattern: Revolut list and drawer) — ✅ 4c
+
+*As built (4c):* `/wallet` has a Balance hero (count-up, **Cash out**, the verbatim ledger line "Ledger balance unavailable right now.") beside the address card, then one **Activity** list that merges incoming transfers (`+… UCTUSD`, teal icon) and cash-outs (`−… UCTUSD`, lavender icon), newest first. Rows reuse the dashboard's `.ds-activity`; failed items get the red marker and `.ds-strike`; a row shows a short plain-text hash (a link can't sit inside the row link). On phones (`.ds-activity--stack`) the name and date take the full width, with amount and status on the line below. Every row is a real link (`/transactions/{id}` or `/cashout/{id}`: the no-JS fallback) that, with JS, clones its server-rendered `<template>` into one shared `#wallet-drawer` (status, amounts, fee, rate, dates, the explorer-linked hash with copy, and a calm "Settling on XRPL…" note while in flight). **Live status:** the read-only `GET /status?t=…&c=…` (`app/routers/status.py`; 401 when signed out; at most 50 ids, and invalid ids are ignored; a transfer is visible to its sender, recipient or an admin, a cash-out to its recipient or an admin, and anything else is left out) returns each item's statuses, `final`, `badge_html`/`hash_html` rendered by the existing macros, the hash, `failure_reason` and the user's `wallet_balance`. `ui.js` `watchStatus` polls every 2.5s while anything on the page is non-final (2-minute timeout, paused in hidden tabs), asking only for the items that are still open. It morphs badges in place so the colour transitions, fades a new hash in, draws the check once and counts the balance up on success, and on failure strikes the amount through with no celebration. It patches the row, its template and the open drawer together. The Status page (`/transactions/{id}`) also updates its timeline and note live. The cash-out detail page updates its badge, hash and check and shows "Status updated — refresh for the details" (its full redesign is 4d).
 
 - **Top:** The balance in large type (UCTUSD), with a **Cash out** button.
 - **List:** Merge incoming remittances and **cash-outs (as outgoing)** into one list; the project brief requires the wallet to show outgoing/cash-out transactions. Each item shows an incoming/outgoing icon, a counterparty, a date, a signed amount and a status. Failed items are struck through with a red marker. `/cashout/history` stays, and gets a nav entry.

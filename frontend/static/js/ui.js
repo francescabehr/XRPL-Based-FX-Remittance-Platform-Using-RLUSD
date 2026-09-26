@@ -219,6 +219,20 @@
     if (state.opener && state.opener.focus) state.opener.focus({ preventScroll: true });
   }
 
+  /* One shared drawer, many rows: the opener names a <template> whose content
+   * (server-rendered detail) is cloned into the drawer's [data-drawer-content]. */
+  function fillDrawer(opener) {
+    var drawerRoot = doc.getElementById(opener.dataset.drawerOpen);
+    var tpl = doc.getElementById(opener.dataset.drawerTemplate);
+    if (!drawerRoot || !tpl) return;
+    var slot = drawerRoot.querySelector("[data-drawer-content]");
+    if (!slot) return;
+    slot.replaceChildren(tpl.content.cloneNode(true));
+    var title = drawerRoot.querySelector(".ds-drawer__title");
+    if (title && opener.dataset.drawerTitle) title.textContent = opener.dataset.drawerTitle;
+    wire(slot);
+  }
+
   // ── Flash messages ─────────────────────────────────────────────────────────
 
   var FLASH_MS = 5000;
@@ -317,6 +331,245 @@
     return { stop: stop };
   }
 
+  // ── Live settlement status (GET /status) ───────────────────────────────────
+
+  /* [data-status-poll] marks a page region to keep current. Inside it (or on it),
+   * each [data-status-item] is one transfer (data-kind="t") or cash-out ("c")
+   * with data-id, data-final and data-hash-value. Every copy of an item — the
+   * row, its drawer <template>, the open drawer — carries the same
+   * data-status-key and is patched together. Badge and hash markup come from
+   * the server's own macros; this only decides what to animate. */
+
+  var TIMELINE_LABELS = { done: "done", current: "in progress", failed: "failed", upcoming: "not started" };
+  var TIMELINE_MARKERS = {
+    done: '<i class="bi bi-check-lg"></i>',
+    failed: '<i class="bi bi-x-lg"></i>',
+    current: '<span class="ds-pulse-dot"></span>',
+    upcoming: "",
+  };
+  // Same wording as sender/transaction_detail.html.
+  var SETTLING_DESC = {
+    queued: "Queued for the XRPL Testnet",
+    processing: "Submitting to the XRPL Testnet…",
+    completed: "Validated on-ledger",
+    failed: "Not delivered — no UCTUSD moved",
+  };
+  var CASHOUT_NOTES = {
+    requested: '<i class="bi bi-hourglass-split" aria-hidden="true"></i><span><strong>Waiting for approval.</strong> Your UCTUSD has not been reserved yet.</span>',
+    awaiting: '<i class="bi bi-hourglass-split" aria-hidden="true"></i><span><strong>Awaiting ledger confirmation.</strong> Your UCTUSD stays reserved until the burn is verified.</span>',
+    approved: '<span class="ds-pulse-dot" aria-hidden="true"></span><span><strong>Burning on XRPL…</strong> You can close this; the status updates by itself.</span>',
+  };
+
+  function parseHTML(html) {
+    var tpl = doc.createElement("template");
+    tpl.innerHTML = html;
+    return tpl.content.firstElementChild;
+  }
+
+  function statusCopies(key) {
+    var selector = '[data-status-key="' + key + '"]';
+    var copies = Array.prototype.slice.call(doc.querySelectorAll(selector));
+    doc.querySelectorAll("template").forEach(function (tpl) {
+      var el = tpl.content.querySelector(selector);
+      if (el) copies.push(el);
+    });
+    return copies;
+  }
+
+  // Change a badge in place so its colour transitions instead of popping.
+  function morphBadge(slot, html) {
+    var next = parseHTML(html);
+    var current = slot.querySelector(".ds-status");
+    if (!next) return;
+    if (!current) { slot.replaceChildren(next); return; }
+    current.className = next.className;
+    current.setAttribute("data-status", next.getAttribute("data-status") || "");
+    current.replaceChildren.apply(current, Array.prototype.slice.call(next.childNodes));
+  }
+
+  function setTimelineStep(li, state, desc) {
+    if (!li) return;
+    li.className = li.className.replace(/\bis-(done|current|failed|upcoming)\b/, "is-" + state);
+    if (state === "current") li.setAttribute("aria-current", "step");
+    else li.removeAttribute("aria-current");
+    var marker = li.querySelector(".ds-timeline__marker");
+    if (marker) marker.innerHTML = TIMELINE_MARKERS[state];
+    var hidden = li.querySelector(".ds-timeline__label .visually-hidden");
+    if (hidden) hidden.textContent = " — " + TIMELINE_LABELS[state];
+    if (desc) {
+      var d = li.querySelector(".ds-timeline__desc");
+      if (d) d.textContent = desc;
+    }
+  }
+
+  // Mirrors the Jinja in sender/transaction_detail.html (display only).
+  function updateTimeline(copy, s) {
+    if (!copy.querySelector(".ds-timeline")) return;
+    var cashin = s.cashin_status;
+    var settlement = s.settlement_status;
+    setTimelineStep(copy.querySelector('[data-step="cashin"]'),
+      { received: "done", failed: "failed" }[cashin] || "current");
+    setTimelineStep(copy.querySelector('[data-step="settling"]'),
+      cashin !== "received" ? "upcoming" : ({ completed: "done", failed: "failed" }[settlement] || "current"),
+      cashin === "received" ? SETTLING_DESC[settlement] : null);
+    setTimelineStep(copy.querySelector('[data-step="settled"]'), settlement === "completed" ? "done" : "upcoming",
+      settlement === "completed" ? "Just now" : null);
+    var note = copy.querySelector("[data-progress-note]");
+    if (note) {
+      var text = cashin === "pending"
+        ? "Waiting for the card payment to be confirmed. The transfer starts automatically afterwards."
+        : (cashin === "received" && ["not_queued", "queued", "processing"].indexOf(settlement) !== -1
+          ? "Sending on the XRPL Testnet. This usually takes under a minute." : "");
+      note.textContent = text;
+      note.hidden = !text;
+    }
+  }
+
+  function outcome(kind, s) {
+    if (kind === "t") {
+      if (s.cashin_status === "failed" || s.settlement_status === "failed") return "failed";
+      return s.settlement_status === "completed" ? "success" : null;
+    }
+    if (s.status === "failed") return "failed";
+    return s.status === "completed" ? "success" : null;
+  }
+
+  function applyStatus(item, s) {
+    var kind = item.dataset.kind;
+    var key = item.dataset.statusKey;
+    var copies = statusCopies(key);
+    var result = s.final ? outcome(kind, s) : null;
+    var hashChanged = (s.hash || "") !== (item.dataset.hashValue || "");
+
+    copies.forEach(function (copy) {
+      var live = doc.contains(copy); // false for <template> content
+      var animate = live && !reducedMotion();
+
+      var badgeSlot = copy.querySelector("[data-badge]");
+      if (badgeSlot) {
+        var before = badgeSlot.textContent.trim();
+        morphBadge(badgeSlot, s.badge_html);
+        if (live && badgeSlot.textContent.trim() !== before) {
+          var changed = copy.querySelector("[data-status-changed]");
+          if (changed) changed.hidden = false;
+          var stale = copy.querySelector("[data-stale-on-change]");
+          if (stale) stale.hidden = true;
+        }
+      }
+
+      if (hashChanged && s.hash) {
+        var hashSlot = copy.querySelector("[data-hash]");
+        if (hashSlot) {
+          hashSlot.innerHTML = s.hash_html;
+          if (animate) replay(hashSlot, "ds-fade-in");
+        }
+        var shortSlot = copy.querySelector("[data-hash-short]");
+        if (shortSlot) {
+          shortSlot.textContent = " · " + s.hash.slice(0, 8) + "…";
+          shortSlot.hidden = false;
+          if (animate) replay(shortSlot, "ds-fade-in");
+        }
+      }
+
+      if (kind === "t") updateTimeline(copy, s);
+
+      var processing = copy.querySelector("[data-processing]");
+      if (processing) {
+        if (s.final) processing.hidden = true;
+        else if (kind === "c") processing.innerHTML = CASHOUT_NOTES[s.awaiting_ledger ? "awaiting" : s.status] || processing.innerHTML;
+      }
+
+      if (result === "success") {
+        var check = copy.querySelector("[data-check]");
+        var svg = check && check.querySelector(".ds-check-draw");
+        if (check && svg) {
+          check.hidden = false;
+          svg.classList.remove("is-static");
+          if (!live) svg.classList.add("is-drawn", "is-static");
+          else replay(svg, "is-drawn");
+          // On a list row the check stands in for the icon briefly, then steps aside.
+          if (live && check.classList.contains("ds-activity__check")) {
+            setTimeout(function () { check.classList.add("is-leaving"); }, reducedMotion() ? 0 : 1800);
+          }
+        }
+        var hero = copy.querySelector(".ds-hero");
+        if (hero && animate) replay(hero, "ds-slide-up");
+      } else if (result === "failed") {
+        var amt = copy.querySelector("[data-amount]");
+        if (amt && !amt.querySelector(".ds-strike")) {
+          var strike = doc.createElement("span");
+          strike.className = "ds-strike";
+          while (amt.firstChild) strike.appendChild(amt.firstChild);
+          amt.appendChild(strike);
+        }
+        var icon = copy.querySelector("[data-icon]");
+        if (icon) icon.classList.add("is-failed");
+        var failure = copy.querySelector("[data-failure]");
+        if (failure) {
+          failure.textContent = s.failure_reason || "";
+          failure.hidden = !s.failure_reason;
+        }
+      }
+    });
+
+    item.dataset.hashValue = s.hash || "";
+    if (s.final) item.dataset.final = "true";
+  }
+
+  function updateBalance(value) {
+    if (value == null) return;
+    var el = doc.querySelector("[data-wallet-balance] .ds-amount");
+    if (!el) return;
+    var target = parseFloat(value);
+    var shown = el.dataset.countTo != null ? parseFloat(el.dataset.countTo) : NaN;
+    if (shown === target) return;
+    el.dataset.countTo = String(target);
+    countUp(el, target, { duration: 900 });
+  }
+
+  function watchStatus(root) {
+    if (root._statusWatch) return root._statusWatch;
+    var items = root.matches("[data-status-item]") ? [root]
+      : Array.prototype.slice.call(root.querySelectorAll("[data-status-item]"));
+    function pending() {
+      return items.filter(function (el) { return el.dataset.final !== "true"; });
+    }
+    if (!pending().length) return null;
+
+    var base = (root.dataset.statusPoll || "/status").split("?")[0];
+    var watcher = poll(base, {
+      interval: 2500,
+      timeout: 120000,
+      fetcher: function () {
+        var open = pending();
+        if (!open.length) return Promise.resolve({ transactions: {}, cashouts: {}, wallet_balance: null, all_final: true });
+        var query = open.map(function (el) {
+          return encodeURIComponent(el.dataset.kind) + "=" + encodeURIComponent(el.dataset.id);
+        }).join("&");
+        return fetch(base + "?" + query, { credentials: "same-origin", headers: { Accept: "application/json" } })
+          .then(function (r) {
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            return r.json();
+          });
+      },
+      onUpdate: function (data) {
+        pending().forEach(function (el) {
+          var group = el.dataset.kind === "t" ? data.transactions : data.cashouts;
+          var s = group && group[el.dataset.id];
+          if (s) applyStatus(el, s);
+        });
+        updateBalance(data.wallet_balance);
+      },
+      isDone: function (data) { return data.all_final || !pending().length; },
+      onTimeout: function () {
+        var note = root.querySelector("[data-poll-note]");
+        if (note) note.hidden = false;
+      },
+    });
+    root._statusWatch = watcher;
+    return watcher;
+  }
+
   // ── Confirmation for irreversible actions ──────────────────────────────────
 
   /* form[data-confirm="message"] asks before submitting, in the shared
@@ -381,6 +634,8 @@
     });
 
     scope.querySelectorAll(".ds-flash").forEach(initFlash);
+
+    if (scope === doc) doc.querySelectorAll("[data-status-poll]").forEach(watchStatus);
   }
 
   doc.addEventListener("click", function (event) {
@@ -392,7 +647,10 @@
     }
     var opener = event.target.closest("[data-drawer-open]");
     if (opener) {
-      // A real link underneath: without JS (or if the drawer is missing) it navigates.
+      // A real link underneath: without JS (or if the drawer is missing) it
+      // navigates, and so do modified clicks (new tab / window).
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (opener.dataset.drawerTemplate) fillDrawer(opener);
       if (openDrawer(opener.dataset.drawerOpen, opener)) event.preventDefault();
       return;
     }
@@ -421,6 +679,7 @@
     closeDrawer: closeDrawer,
     dismissFlash: dismissFlash,
     poll: poll,
+    watchStatus: watchStatus,
     wire: wire,
   };
 })();

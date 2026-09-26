@@ -242,14 +242,13 @@
           {{ amount(quote.zar_amount, "ZAR", size="lg") }}
           {{ amount(quote.zar_amount, "ZAR", size="xl") }}
         </div>
-        <p class="sg-label">Formats · ZAR · USD · UCTUSD · signed · cash-out payout at 6dp</p>
+        <p class="sg-label">Formats · ZAR · USD (fiat: 2dp) · UCTUSD (6dp) · signed</p>
         <div class="sg-row">
           {{ amount(quote.zar_amount, "ZAR") }}
           {{ amount(quote.payout_estimate, "USD") }}
           {{ amount(quote.uctusd_amount, "UCTUSD") }}
           {{ amount(quote.uctusd_amount, "UCTUSD", signed=true, class="ds-amount--positive") }}
           {{ amount(-quote.zar_amount, "ZAR") }}
-          {{ amount(166.5, "USD", decimals=6) }}
         </div>
       </div></div>
     </section>
