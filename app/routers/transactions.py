@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_current_user, get_flash, require_admin, set_flash
+from app.models.transaction import CashInStatus, SettlementStatus
 from app.models.user import KYCStatus, User
 from app.schemas.transaction import QuoteResponse
 from app.services import cashin_service
@@ -326,9 +327,22 @@ async def create_remittance(
 
 # ── History (FR-CI-05, FR-MQ-05) ──────────────────────────────────────────────
 
+# History filter groups, derived from the two statuses (display only).
+HISTORY_GROUPS = ("in_progress", "settled", "failed")
+
+
+def _history_group(txn) -> str:
+    if txn.cashin_status == CashInStatus.failed or txn.settlement_status == SettlementStatus.failed:
+        return "failed"
+    if txn.settlement_status == SettlementStatus.completed:
+        return "settled"
+    return "in_progress"
+
+
 @router.get("/transactions", response_class=HTMLResponse)
 async def transaction_history(
     request: Request,
+    status: str = "",
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
@@ -336,13 +350,19 @@ async def transaction_history(
         return RedirectResponse(url="/login", status_code=302)
     if user.is_admin:
         return RedirectResponse(url="/admin/cashin", status_code=302)
+    transactions = await cashin_service.list_for_sender(db, user.id)
+    groups = {txn.id: _history_group(txn) for txn in transactions}
+    selected = status if status in HISTORY_GROUPS else ""  # anything else shows everything
     return templates.TemplateResponse(
         "sender/transactions.html",
         {
             "request": request,
             "user": user,
             "flash": get_flash(request),
-            "transactions": await cashin_service.list_for_sender(db, user.id),
+            "transactions": [t for t in transactions if not selected or groups[t.id] == selected],
+            "total": len(transactions),
+            "counts": {g: sum(1 for v in groups.values() if v == g) for g in HISTORY_GROUPS},
+            "selected": selected,
         },
     )
 

@@ -8,32 +8,65 @@
 {% block page_title %}History{% endblock %}
 
 {% block content %}
+{%- set filters = [("", "All", total), ("in_progress", "In progress", counts.in_progress),
+                   ("settled", "Settled", counts.settled), ("failed", "Failed", counts.failed)] %}
+
+{% if total %}
+<nav class="mb-3" aria-label="Filter transfers">
+  <ul class="nav nav-pills ds-filter">
+    {% for value, label, count in filters %}
+    <li class="nav-item">
+      <a class="nav-link{% if selected == value %} active{% endif %}" href="/transactions{% if value %}?status={{ value }}{% endif %}"
+         {%- if selected == value %} aria-current="page"{% endif %}>
+        {{ label }} <span class="ds-filter__count">{{ count }}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+</nav>
+{% endif %}
+
 <div class="card">
   {% if transactions %}
   <div class="table-responsive">
-    <table class="table table-hover mb-0 align-middle">
-      <caption class="visually-hidden">Your transfers, newest first</caption>
-      <thead class="table-light">
+    <table class="table table-hover ds-table">
+      <caption class="visually-hidden">Your transfers, newest first{% if selected %}: {{ {"in_progress": "in progress", "settled": "settled", "failed": "failed"}[selected] }} only{% endif %}</caption>
+      <thead>
         <tr>
-          <th scope="col">Date</th><th scope="col">To</th><th scope="col" class="text-end">Sent</th>
-          <th scope="col" class="text-end">Recipient gets</th><th scope="col">Status</th><th scope="col">XRPL transaction</th>
+          <th scope="col" class="d-none d-md-table-cell">Date</th>
+          <th scope="col">To</th>
+          <th scope="col" class="text-end">Sent</th>
+          <th scope="col" class="text-end d-none d-md-table-cell">Recipient gets</th>
+          <th scope="col" class="d-none d-md-table-cell">Status</th>
+          <th scope="col" class="d-none d-lg-table-cell">XRPL transaction</th>
         </tr>
       </thead>
       <tbody>
         {% for t in transactions %}
         {%- set failed = t.cashin_status.value == "failed" or t.settlement_status.value == "failed" %}
         <tr>
-          <td class="small text-muted text-nowrap">{{ t.created_at|localtime('%d %b %Y %H:%M') }}</td>
-          <td><a href="/transactions/{{ t.id }}" class="fw-semibold text-decoration-none">{{ t.beneficiary.full_name }}</a></td>
-          <td class="text-end">{% if failed %}<span class="ds-strike">{{ amount(t.zar_amount, "ZAR") }}</span>{% else %}{{ amount(t.zar_amount, "ZAR") }}{% endif %}</td>
-          <td class="text-end">{{ amount(t.uctusd_amount, "UCTUSD") }}</td>
-          <td>{{ transaction_badge(t) }}</td>
-          <td>{{ tx_hash(t.xrpl_tx_hash) }}</td>
+          <td class="small text-muted text-nowrap d-none d-md-table-cell">{{ t.created_at|localtime('%d %b %Y %H:%M') }}</td>
+          <td>
+            <a href="/transactions/{{ t.id }}" class="fw-semibold text-decoration-none">{{ t.beneficiary.full_name }}</a>
+            <span class="ds-table__sub d-md-none">{{ t.created_at|localtime('%d %b, %H:%M') }}</span>
+            <span class="d-md-none d-inline-block mt-1">{{ transaction_badge(t) }}</span>
+          </td>
+          <td class="ds-table__money">
+            {%- if failed %}<span class="ds-strike">{{ amount(t.zar_amount, "ZAR") }}</span>{% else %}{{ amount(t.zar_amount, "ZAR") }}{% endif %}
+            <span class="ds-table__sub d-md-none">{{ amount(t.uctusd_amount, "UCTUSD", size="sm") }}</span>
+          </td>
+          <td class="ds-table__money d-none d-md-table-cell">{{ amount(t.uctusd_amount, "UCTUSD") }}</td>
+          <td class="d-none d-md-table-cell">{{ transaction_badge(t) }}</td>
+          <td class="text-nowrap d-none d-lg-table-cell">{{ tx_hash(t.xrpl_tx_hash) }}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  {% elif total %}
+  {{ empty_state("No " ~ {"in_progress": "transfers in progress", "settled": "settled transfers", "failed": "failed transfers"}[selected],
+                 "Nothing matches this filter right now.",
+                 {"label": "Show all transfers", "href": "/transactions"}, icon="funnel") }}
   {% else %}
   {{ empty_state("No transfers yet", "When you send money, each transfer shows up here with its status and XRPL transaction.",
                  {"label": "Send money", "href": "/send", "icon": "send"}, icon="clock-history") }}

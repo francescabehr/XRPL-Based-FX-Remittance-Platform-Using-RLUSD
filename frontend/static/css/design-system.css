@@ -1870,3 +1870,37 @@ legend.ds-form-section__title { float: none; width: auto; padding: 0; line-heigh
 .ds-choice .btn { min-width: 5.5rem; }
 /* The chosen option is a solid teal pill (white text 9.7:1), not just a tint. */
 .ds-choice .btn-check:checked + .btn { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+
+/* 11. History and monitor (Phase 5c) ---------------------------------------- */
+
+/* Bootstrap's own nav-pills, skinned: teal pill for the active filter (white 9.7:1). */
+.nav-pills {
+  --bs-nav-link-color: var(--accent);
+  --bs-nav-link-hover-color: var(--accent-hover);
+  --bs-nav-link-font-weight: 600;
+  --bs-nav-link-padding-x: 0.875rem;
+  --bs-nav-link-padding-y: 0.375rem;
+  --bs-nav-pills-border-radius: var(--radius-pill);
+  --bs-nav-pills-link-active-color: #fff;
+  --bs-nav-pills-link-active-bg: var(--accent);
+}
+.nav-pills .nav-link { transition: color var(--dur-fast) var(--ease-in-out), background-color var(--dur-fast) var(--ease-in-out); }
+.nav-pills .nav-link:not(.active):hover { background: var(--accent-soft); }
+.nav-pills .nav-link:focus-visible { box-shadow: 0 0 0 4px rgba(255, 105, 180, 0.55); }
+
+/* Filter pills with a count; wraps on phones. */
+.ds-filter { gap: var(--space-2); flex-wrap: wrap; }
+.ds-filter__count {
+  display: inline-block;
+  min-width: 1.5em;
+  margin-left: var(--space-1);
+  padding: 0 0.4em;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);                  /* 8.3:1 on the wash */
+  font-size: var(--text-xs);
+  font-feature-settings: "tnum";
+  text-align: center;
+}
+.nav-pills .nav-link.active .ds-filter__count { background: rgba(255, 255, 255, 0.18); color: #fff; }
