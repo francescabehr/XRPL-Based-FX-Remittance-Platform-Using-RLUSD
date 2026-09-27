@@ -319,6 +319,8 @@ These screens should be consistent with the design system but need less polish:
 - landing page at `/` for signed-out users (new route; lower priority), including a simple hero inspired by the Uvodo and Stripe landing pages;
 - login and register;
 - profile at `/profile` (new route; lower priority);
+  *As built (6b):* `/profile` is read-only (summary, KYC badge, account type, limits, wallet address) with **Edit details** and **Change password** buttons. `/profile/edit` (POST `/profile`): email (the login; the session is keyed by user id, so a change keeps you signed in) and mobile, unique, format-checked only when changed (older-format values don't block editing the other field); full name only while the user has **no KYC submission** (read-only with a "locked because you've submitted identity verification" note afterwards, and always for admins), enforced in `auth_service.update_profile`. `/profile/password` (POST `/profile/password`): current password, then the registration rules (`auth_service.password_problems`); inputs never carry a value; no forgot-password flow. Both use `.ds-form-page`, a Cancel link back to `/profile`, a danger flash (400) on error and a redirect to `/profile` with a success flash. Registration applies the same email/mobile format rules. KYC submission rows are never touched.
+- KYC source of funds (6b): Salary · Business income · Savings · Investments · Pension · Gift or family support · Other. Unknown values are rejected; Other needs a description (≤200 chars) and is stored as `Other: <text>`. The Other box is visible without JS; older free-text values display as stored.
 - beneficiaries list and form;
 - full transaction history;
 - empty states (every list needs one);

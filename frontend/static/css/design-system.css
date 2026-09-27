@@ -1855,14 +1855,6 @@ a.ds-activity__row:hover { background: var(--bg); color: inherit; }
 .ds-profile-head__who { min-width: 0; }
 .ds-profile-head__name { margin: 0; font-size: var(--text-xl); font-weight: 700; overflow-wrap: anywhere; }
 .ds-profile-head__meta { margin: var(--space-1) 0 0; font-size: var(--text-sm); color: var(--text-muted); }
-.ds-profile-note {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: var(--space-5) 0 0;
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-}
 
 /* A full XRPL address with its copy button; wraps on phones instead of overflowing. */
 .ds-address {

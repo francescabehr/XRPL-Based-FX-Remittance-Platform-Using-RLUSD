@@ -20,21 +20,38 @@ NATIONALITIES = [
     "Ghanaian", "American", "British", "Other",
 ]
 
-# Source-of-funds choices for the dropdown. "Other" reveals a text box; the stored
-# value is the chosen label or the typed description (free text, as before).
+# Source-of-funds choices for the dropdown; the template adds "Other", which needs a
+# description. Stored as the chosen label, or "Other: <description>". Submissions made
+# before the dropdown hold free text and still display as-is (it's just a string).
 SOURCES_OF_FUNDS = [
-    "Salary or wages", "Business income", "Savings", "Investments or dividends",
-    "Pension", "Gift or family support", "Sale of property or assets",
+    "Salary", "Business income", "Savings", "Investments", "Pension", "Gift or family support",
 ]
 OTHER_SOURCE = "Other"
+OTHER_MAX_LENGTH = 200
+
+
+def _source_of_funds(choice: str, described: str) -> tuple[str | None, str | None]:
+    """(value to store, error). Only a listed option or Other + a description is accepted."""
+    if not choice:
+        return None, "Please choose your source of funds."
+    if choice in SOURCES_OF_FUNDS:
+        return choice, None
+    if choice != OTHER_SOURCE:
+        return None, "Please choose a source of funds from the list."
+    if not described:
+        return None, "Please describe your source of funds."
+    if len(described) > OTHER_MAX_LENGTH:
+        return None, f"Please keep the description under {OTHER_MAX_LENGTH} characters."
+    return f"{OTHER_SOURCE}: {described}", None
 
 
 def _source_prefill(choice: str, other: str = "") -> dict:
-    """Which option to select and what to put in the 'Other' box when re-rendering."""
-    if choice in SOURCES_OF_FUNDS:
-        return {"source_of_funds_choice": choice, "source_of_funds_other": ""}
-    return {"source_of_funds_choice": OTHER_SOURCE if (choice or other) else "",
-            "source_of_funds_other": other if choice == OTHER_SOURCE else choice}
+    """Which option to select and what to put in the 'Other' box when re-rendering.
+    An unknown (tampered) choice falls back to no selection."""
+    if choice in SOURCES_OF_FUNDS or choice == OTHER_SOURCE:
+        return {"source_of_funds_choice": choice,
+                "source_of_funds_other": other if choice == OTHER_SOURCE else ""}
+    return {"source_of_funds_choice": "", "source_of_funds_other": ""}
 
 
 @router.get("", response_class=HTMLResponse)
@@ -89,15 +106,9 @@ async def kyc_submit(
         set_flash(request, "Your KYC submission is already under review.", "warning")
         return RedirectResponse(url="/kyc", status_code=302)
 
-    # "Other" + a description stores the description; the service is unchanged.
+    # Validated here, against the list; the service stores whatever string it is given.
     choice, described = source_of_funds.strip(), source_of_funds_other.strip()
-    source = described if choice == OTHER_SOURCE else choice
-    if not choice:
-        error = "Please choose your source of funds."
-    elif choice == OTHER_SOURCE and not described:
-        error = "Please describe your source of funds."
-    else:
-        error = None
+    source, error = _source_of_funds(choice, described)
 
     if error is None:
         try:

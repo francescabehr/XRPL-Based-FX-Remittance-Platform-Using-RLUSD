@@ -118,7 +118,8 @@
               <div class="col-md-6" id="kyc-sof-other">
                 <label class="form-label" for="kyc-source_of_funds_other"><span data-other-label>If Other, please describe</span></label>
                 <input type="text" name="source_of_funds_other" class="form-control" id="kyc-source_of_funds_other"
-                       value="{{ sof_other }}" maxlength="200" placeholder="e.g. Freelance design work">
+                       value="{{ sof_other }}" maxlength="200" placeholder="e.g. Freelance design work" aria-describedby="kyc-sof-other-help">
+                <div class="form-text" id="kyc-sof-other-help">Required if you choose Other.</div>
               </div>
             </div>
           </fieldset>

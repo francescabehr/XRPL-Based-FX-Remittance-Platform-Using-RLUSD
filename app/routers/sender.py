@@ -1,12 +1,14 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, Request
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import get_current_user, get_flash
-from app.services import cashout_service, xrpl_service
+from app.dependencies import get_current_user, get_flash, set_flash
+from app.services import auth_service, cashout_service, xrpl_service
 from app.services.beneficiary_service import list_beneficiaries
 from app.services.cashin_service import list_for_sender
 from app.services.kyc_service import get_active_kyc
@@ -82,21 +84,100 @@ async def dashboard(
     )
 
 
-@router.get("/profile", response_class=HTMLResponse)
-async def profile(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
-):
-    """Read-only account summary. Only the wallet's public address is rendered —
-    never its encrypted key or key id."""
-    if not user:
-        return RedirectResponse(url="/login", status_code=302)
-
-    context = {"request": request, "user": user, "flash": get_flash(request)}
+async def _profile_page(request: Request, db: AsyncSession, user, *, flash=None):
+    """Read-only account summary with Edit details / Change password buttons. Only the
+    wallet's public address is rendered — never its encrypted key or key id."""
+    context = {"request": request, "user": user, "flash": flash}
     if not user.is_admin:
         if user.can_send:
             context.update(await _limit_context(db, user))
         if user.can_receive:
             context["wallet"] = await xrpl_service.get_wallet_for_user(db, user.id)
     return templates.TemplateResponse("account/profile.html", context)
+
+
+async def _edit_page(request: Request, db: AsyncSession, user, *, flash=None, details=None, status_code=200):
+    """The details form. `details` re-fills it after an error."""
+    return templates.TemplateResponse("account/profile_edit.html", {
+        "request": request, "user": user, "flash": flash,
+        "name_editable": await auth_service.name_is_editable(db, user),
+        "details": details or {"full_name": user.full_name, "email": user.email, "mobile": user.mobile},
+    }, status_code=status_code)
+
+
+def _password_page(request: Request, user, *, flash=None, status_code=200):
+    """The password form. Its inputs are never re-filled."""
+    return templates.TemplateResponse("account/profile_password.html",
+                                      {"request": request, "user": user, "flash": flash}, status_code=status_code)
+
+
+@router.get("/profile", response_class=HTMLResponse)
+async def profile(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+    return await _profile_page(request, db, user, flash=get_flash(request))
+
+
+@router.get("/profile/edit", response_class=HTMLResponse)
+async def profile_edit(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+    return await _edit_page(request, db, user, flash=get_flash(request))
+
+
+@router.post("/profile")
+async def profile_update(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+    email: str = Form(""),        # blanks fail validation with a flash, not a 422
+    mobile: str = Form(""),
+    full_name: Optional[str] = Form(None),
+):
+    """Email, mobile and (before any KYC submission) name. The service enforces the name lock."""
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+    try:
+        changed = await auth_service.update_profile(db, user, email=email, mobile=mobile, full_name=full_name)
+    except auth_service.ProfileError as exc:
+        details = {"full_name": full_name if full_name is not None else user.full_name, "email": email, "mobile": mobile}
+        return await _edit_page(request, db, user, flash={"message": str(exc), "kind": "danger"},
+                                details=details, status_code=400)
+    set_flash(request, "Your details have been updated." if changed else "No changes to save.",
+              "success" if changed else "info")
+    return RedirectResponse(url="/profile", status_code=302)
+
+
+@router.get("/profile/password", response_class=HTMLResponse)
+async def profile_password_form(request: Request, user=Depends(get_current_user)):
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+    return _password_page(request, user, flash=get_flash(request))
+
+
+@router.post("/profile/password")
+async def profile_password(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+    current_password: str = Form(""),
+    new_password: str = Form(""),
+    confirm_password: str = Form(""),
+):
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+    try:
+        await auth_service.change_password(db, user, current=current_password, new=new_password,
+                                           confirm=confirm_password)
+    except auth_service.ProfileError as exc:
+        return _password_page(request, user, flash={"message": str(exc), "kind": "danger"}, status_code=400)
+    set_flash(request, "Your password has been changed.", "success")
+    return RedirectResponse(url="/profile", status_code=302)

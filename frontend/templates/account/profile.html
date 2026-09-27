@@ -4,8 +4,9 @@
 {% from "components/ui.html" import stat_tile, empty_state %}
 {% block title %}Profile · XRPL Remit{% endblock %}
 
-{#- Read-only. The wallet card renders the public address only — never the
-    encrypted key or its key id. -#}
+{#- Read-only summary. Editing happens on /profile/edit and /profile/password.
+    The wallet card renders the public address only — never the encrypted key or
+    its key id. -#}
 {% block content %}
 {%- set initials = (user.full_name.split()|map("first")|list)[:2]|join|upper -%}
 {%- if user.is_admin -%}
@@ -36,7 +37,10 @@
           <dt>Mobile</dt><dd>{{ user.mobile }}</dd>
           <dt>Account type</dt><dd>{{ account_type }}</dd>
         </dl>
-        <p class="ds-profile-note"><i class="bi bi-info-circle" aria-hidden="true"></i>Details can't be changed in this prototype.</p>
+        <div class="d-flex flex-wrap gap-2 mt-4">
+          <a href="/profile/edit" class="btn btn-primary"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit details</a>
+          <a href="/profile/password" class="btn btn-outline-secondary"><i class="bi bi-key me-1" aria-hidden="true"></i>Change password</a>
+        </div>
       </div>
     </section>
 

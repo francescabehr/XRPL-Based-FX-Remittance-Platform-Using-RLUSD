@@ -4,7 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_current_user, get_flash, set_flash
-from app.services.auth_service import authenticate_user, create_user
+from app.services.auth_service import (
+    EMAIL_INVALID, MOBILE_INVALID, authenticate_user, create_user, email_is_valid, mobile_is_valid, password_problems,
+)
 from app.templating import make_templates
 
 router = APIRouter()
@@ -60,11 +62,14 @@ async def register(
     confirm_password: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
+    # Format rules shared with profile edits (checked here, not in create_user, so
+    # seed scripts are unaffected).
     errors = []
-    if password != confirm_password:
-        errors.append("Passwords do not match.")
-    if len(password) < 8:
-        errors.append("Password must be at least 8 characters.")
+    if not email_is_valid(email.lower().strip()):
+        errors.append(EMAIL_INVALID)
+    if not mobile_is_valid(mobile.strip()):
+        errors.append(MOBILE_INVALID)
+    errors += password_problems(password, confirm_password)
 
     if not errors:
         try:
