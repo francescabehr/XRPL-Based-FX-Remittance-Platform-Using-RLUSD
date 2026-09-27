@@ -3,7 +3,7 @@
 {% from "components/status.html" import cashout_badge %}
 {% from "components/ui.html" import CASHOUT_STEPS, stepper, timeline, check_draw %}
 {% from "components/xrpl.html" import tx_hash %}
-{% block title %}Cash-Out Detail — XRPL Remit{% endblock %}
+{% block title %}Cash-Out Detail · XRPL Remit{% endblock %}
 
 {% block page_title %}Cash-out detail{% endblock %}
 {% block page_back %}/cashout/history{% endblock %}
@@ -76,7 +76,7 @@
           {%- if status == "requested" %}
             {%- set note = "Waiting for an administrator to review this request. Your UCTUSD has not been reserved yet." %}
           {%- elif awaiting %}
-            {%- set note = "Awaiting ledger confirmation. The burn was submitted but its outcome has not been confirmed yet. Your UCTUSD stays reserved until it is verified on the XRPL — it will be returned if the burn did not go through." %}
+            {%- set note = "Awaiting ledger confirmation. The burn was submitted but its outcome has not been confirmed yet. Your UCTUSD stays reserved until it is verified on the XRPL. It will be returned if the burn did not go through." %}
           {%- elif status == "approved" %}
             {%- set note = "Your UCTUSD is reserved and the burn is being processed." %}
           {%- else %}

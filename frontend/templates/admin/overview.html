@@ -2,7 +2,7 @@
 {% from "components/money.html" import amount %}
 {% from "components/status.html" import status_badge %}
 {% from "components/ui.html" import stat_tile, empty_state %}
-{% block title %}Overview — Admin{% endblock %}
+{% block title %}Overview · Admin{% endblock %}
 {% block page_title %}Overview{% endblock %}
 
 {% macro count(n) -%}
@@ -57,7 +57,7 @@
         <span class="ds-activity__main">
           <span class="ds-activity__title">{{ t.sender.full_name }} → {{ t.beneficiary.full_name }}</span>
           <span class="ds-activity__meta">
-            {%- if failed %}{{ (t.xrpl_error_reason or "No reason recorded")|truncate(70) }}{% else %}Stuck for over 10 minutes — the worker may have stopped{% endif %}
+            {%- if failed %}{{ (t.xrpl_error_reason or "No reason recorded")|truncate(70) }}{% else %}Stuck for over 10 minutes. The worker may have stopped{% endif %}
             · {{ t.updated_at|localtime('%d %b, %H:%M') }}
           </span>
         </span>

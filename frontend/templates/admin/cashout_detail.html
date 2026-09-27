@@ -2,9 +2,9 @@
 {% from "components/money.html" import amount, breakdown, breakdown_row %}
 {% from "components/status.html" import cashout_badge %}
 {% from "components/xrpl.html" import tx_hash %}
-{% block title %}Cash-out {{ req.id|string|truncate(8, True, "") }} — Admin{% endblock %}
+{% block title %}Cash-out {{ req.id|string|truncate(8, True, "") }} · Admin{% endblock %}
 
-{% block page_title %}Cash-out — {{ req.recipient.full_name }}{% endblock %}
+{% block page_title %}Cash-out: {{ req.recipient.full_name }}{% endblock %}
 {% block page_back %}/admin/cashout{% endblock %}
 
 {% block content %}

@@ -112,7 +112,7 @@ async def get_market_rate(db: AsyncSession, fee_config: Optional[FeeConfig] = No
         if fee_config is None:
             fee_config = await get_active_fee_config(db)
         if fee_config is None:
-            raise FXConfigError("No active fee_config row — cannot determine a market rate.")
+            raise FXConfigError("No active fee_config row, so no market rate can be determined.")
         return _q(Decimal(fee_config.market_rate_zar_per_usd), QUANT_RATE)
 
     if source == "static":
@@ -229,7 +229,7 @@ async def quote_for(
     """Load the active config + market rate and produce a quote."""
     fee_config = await get_active_fee_config(db)
     if fee_config is None:
-        raise FXConfigError("No active fee_config row — the platform cannot issue quotes.")
+        raise FXConfigError("No active fee_config row, so the platform cannot issue quotes.")
 
     minimum = _q(Decimal(fee_config.min_send_zar), QUANT_ZAR)
     if _q(Decimal(zar_send), QUANT_ZAR) < minimum:

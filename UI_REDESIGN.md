@@ -102,6 +102,7 @@ Motion must explain what is happening or confirm that something worked. It is ne
 - Animate only `transform` and `opacity`. Colour transitions are also fine on badges and buttons. Never animate `width`, `height`, `top` or `left`; use `transform: scaleX()` for progress bars.
 - Nothing may delay an action. Forms submit immediately, and animations play alongside navigation, not before it.
 - Loops (the pulse and the shimmer) are allowed only on things that are genuinely in progress.
+  **One exception, by team decision:** the landing-page hero globe (`frontend/static/js/globe.js`) rotates slowly with dotted continents and redraws its payment routes on a loop. It pauses when the tab is hidden or the globe is off-screen, and under reduced motion it is a single static frame. Without JS the static SVG globe is shown.
 - Everything is built in plain CSS (`transition` and `@keyframes`) plus small vanilla JS. Add no animation libraries.
 - **Reduced motion is mandatory.** Wrap motion so that under `@media (prefers-reduced-motion: reduce)`:
   - all transition and animation durations drop to ~0ms;

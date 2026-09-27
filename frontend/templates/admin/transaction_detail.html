@@ -2,7 +2,7 @@
 {% from "components/money.html" import amount, breakdown, breakdown_row %}
 {% from "components/status.html" import status_badge, transaction_badge %}
 {% from "components/xrpl.html" import tx_hash %}
-{% block title %}Transaction {{ txn.id|string|truncate(8, True, "") }} — Admin{% endblock %}
+{% block title %}Transaction {{ txn.id|string|truncate(8, True, "") }} · Admin{% endblock %}
 
 {% block page_title %}{{ txn.sender.full_name }} → {{ txn.beneficiary.full_name }}{% endblock %}
 {% block page_back %}/admin/transactions{% endblock %}
@@ -173,7 +173,7 @@
       </div>
       <div class="card-body p-4">
         {% if txn.aml_flagged %}
-          <p class="small text-muted mb-3">This transaction is flagged for AML review. Flagging is a review marker only — it does not stop or reverse any payment.</p>
+          <p class="small text-muted mb-3">This transaction is flagged for AML review. Flagging is a review marker only: it does not stop or reverse any payment.</p>
           <form method="post" action="/admin/transactions/{{ txn.id }}/aml">
             <input type="hidden" name="flagged" value="0">
             <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-flag me-1" aria-hidden="true"></i>Clear AML flag</button>

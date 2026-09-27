@@ -2,7 +2,7 @@
 {% from "components/money.html" import amount %}
 {% from "components/status.html" import status_badge %}
 {% from "components/ui.html" import check_draw %}
-{% block title %}XRPL Remit — Send rand, settle on the XRPL Testnet{% endblock %}
+{% block title %}XRPL Remit · Send rand, settle on the XRPL Testnet{% endblock %}
 {% block public_main_class %} ds-public-main--wide{% endblock %}
 
 {% block public_actions %}
@@ -29,7 +29,9 @@
     </div>
   </div>
 
-  <figure class="ds-landing-cards">
+  <div class="ds-landing-visual">
+  {% include "public/_globe.html" %}
+  <figure class="ds-landing-cards ds-landing-cards--float">
     <div class="card ds-landing-card ds-landing-card--send ds-slide-up">
       <div class="card-body">
         <p class="ds-landing-card__label">You send</p>
@@ -63,11 +65,12 @@
         </div>
       </div>
     </div>
-    <figcaption class="visually-hidden">Illustration of a transfer: R1,000.00 sent, settling on the XRPL, settled, then cashed out.</figcaption>
+    <figcaption class="visually-hidden">Illustration of a transfer from South Africa: R1,000.00 sent, settling on the XRPL, settled, then cashed out.</figcaption>
   </figure>
+  </div>
 </section>
 
-<section class="ds-landing-section" aria-labelledby="how-title">
+<section class="ds-landing-section ds-landing-section--band" aria-labelledby="how-title">
   <h2 class="ds-landing-section__title" id="how-title">How it works</h2>
   <ol class="ds-how">
     <li class="card ds-how-step">
@@ -134,4 +137,9 @@
   <p class="ds-cta-band__text">Create an account, get verified, and follow your first transfer onto the ledger.</p>
   <a class="btn ds-btn-highlight btn-lg" href="/register">Create account</a>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ static_url('js/globe-land.js') }}" defer></script>
+<script src="{{ static_url('js/globe.js') }}" defer></script>
 {% endblock %}

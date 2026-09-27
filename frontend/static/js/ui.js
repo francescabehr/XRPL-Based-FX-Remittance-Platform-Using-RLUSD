@@ -352,7 +352,7 @@
     queued: "Queued for the XRPL Testnet",
     processing: "Submitting to the XRPL Testnet…",
     completed: "Validated on-ledger",
-    failed: "Not delivered — no UCTUSD moved",
+    failed: "Not delivered. No UCTUSD moved",
   };
   var CASHOUT_NOTES = {
     requested: '<i class="bi bi-hourglass-split" aria-hidden="true"></i><span><strong>Waiting for approval.</strong> Your UCTUSD has not been reserved yet.</span>',
@@ -399,7 +399,7 @@
     var marker = li.querySelector(".ds-timeline__marker");
     if (marker) marker.innerHTML = TIMELINE_MARKERS[state];
     var hidden = li.querySelector(".ds-timeline__label .visually-hidden");
-    if (hidden) hidden.textContent = " — " + TIMELINE_LABELS[state];
+    if (hidden) hidden.textContent = ", " + TIMELINE_LABELS[state];
     if (desc) {
       var d = li.querySelector(".ds-timeline__desc");
       if (d) d.textContent = desc;
@@ -454,7 +454,7 @@
       var text = status === "requested"
         ? "Waiting for an administrator to review this request. Your UCTUSD has not been reserved yet."
         : s.awaiting_ledger
-          ? "Awaiting ledger confirmation. The burn was submitted but its outcome has not been confirmed yet. Your UCTUSD stays reserved until it is verified on the XRPL — it will be returned if the burn did not go through."
+          ? "Awaiting ledger confirmation. The burn was submitted but its outcome has not been confirmed yet. Your UCTUSD stays reserved until it is verified on the XRPL. It will be returned if the burn did not go through."
           : status === "approved" ? "Your UCTUSD is reserved and the burn is being processed." : "";
       note.textContent = text;
       note.hidden = !text;

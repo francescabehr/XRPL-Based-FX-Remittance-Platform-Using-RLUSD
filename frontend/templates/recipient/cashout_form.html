@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "components/money.html" import amount %}
 {% from "components/ui.html" import CASHOUT_STEPS, stepper, empty_state %}
-{% block title %}Cash Out — XRPL Remit{% endblock %}
+{% block title %}Cash Out · XRPL Remit{% endblock %}
 
 {% block page_title %}Cash out{% endblock %}
 
@@ -42,8 +42,8 @@
           <div class="mb-4">
             <label class="form-label" for="target_currency">Payout currency</label>
             <select class="form-select form-select-lg" id="target_currency" name="target_currency">
-              <option value="USD" {% if currency_value == "ZAR" %}{% else %}selected{% endif %}>USD — US Dollar</option>
-              <option value="ZAR" {% if currency_value == "ZAR" %}selected{% endif %}>ZAR — South African Rand</option>
+              <option value="USD" {% if currency_value == "ZAR" %}{% else %}selected{% endif %}>USD (US Dollar)</option>
+              <option value="ZAR" {% if currency_value == "ZAR" %}selected{% endif %}>ZAR (South African Rand)</option>
             </select>
             <div class="form-text">Cash-out is available in USD and ZAR only.</div>
           </div>

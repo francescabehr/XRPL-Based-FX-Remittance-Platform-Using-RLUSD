@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "components/money.html" import amount, breakdown, breakdown_row %}
 {% from "components/ui.html" import SEND_STEPS, stepper, empty_state %}
-{% block title %}Send Money — XRPL Remit{% endblock %}
+{% block title %}Send Money · XRPL Remit{% endblock %}
 
 {% block page_title %}Send money{% endblock %}
 
@@ -189,7 +189,7 @@ document.addEventListener("DOMContentLoaded", function () {
       .catch(function () {
         if (mine !== seq) return;
         markStale(true);
-        showAlert("We couldn't get a quote right now. You can still continue — the next step prices your transfer.", "danger");
+        showAlert("We couldn't get a quote right now. You can still continue: the next step prices your transfer.", "danger");
       });
   }
 

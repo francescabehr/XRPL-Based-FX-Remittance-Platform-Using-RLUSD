@@ -4,7 +4,7 @@
 {% from "components/ui.html" import drawer, empty_state, check_draw %}
 {% from "components/xrpl.html" import tx_hash %}
 {% from "recipient/_activity.html" import transfer_row, cashout_row %}
-{% block title %}Wallet — XRPL Remit{% endblock %}
+{% block title %}Wallet · XRPL Remit{% endblock %}
 
 {% block page_title %}Wallet{% endblock %}
 
@@ -67,7 +67,7 @@
   {{ empty_state("No activity yet", "Money you receive and your cash-outs will show up here.", icon="arrow-down-up") }}
   {% endif %}
 </section>
-<p class="small text-muted mt-3" data-poll-note hidden>Live updates paused — refresh to check again.</p>
+<p class="small text-muted mt-3" data-poll-note hidden>Live updates paused. Refresh to check again.</p>
 
 {#- Drawer detail, one server-rendered <template> per row. The row link is the
     no-JS fallback; with JS, ui.js clones the template into the shared drawer. -#}

@@ -70,7 +70,7 @@ async def register(
         try:
             user = await create_user(db, full_name=full_name, email=email, mobile=mobile, password=password)
             request.session["user_id"] = str(user.id)
-            set_flash(request, "Account created — welcome! Please complete your KYC to send money.", "success")
+            set_flash(request, "Account created. Welcome! Complete your KYC to start sending money.", "success")
             return RedirectResponse(url="/dashboard", status_code=302)
         except ValueError as exc:
             errors.append(str(exc))

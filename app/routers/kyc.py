@@ -20,6 +20,22 @@ NATIONALITIES = [
     "Ghanaian", "American", "British", "Other",
 ]
 
+# Source-of-funds choices for the dropdown. "Other" reveals a text box; the stored
+# value is the chosen label or the typed description (free text, as before).
+SOURCES_OF_FUNDS = [
+    "Salary or wages", "Business income", "Savings", "Investments or dividends",
+    "Pension", "Gift or family support", "Sale of property or assets",
+]
+OTHER_SOURCE = "Other"
+
+
+def _source_prefill(choice: str, other: str = "") -> dict:
+    """Which option to select and what to put in the 'Other' box when re-rendering."""
+    if choice in SOURCES_OF_FUNDS:
+        return {"source_of_funds_choice": choice, "source_of_funds_other": ""}
+    return {"source_of_funds_choice": OTHER_SOURCE if (choice or other) else "",
+            "source_of_funds_other": other if choice == OTHER_SOURCE else choice}
+
 
 @router.get("", response_class=HTMLResponse)
 async def kyc_form(
@@ -41,6 +57,7 @@ async def kyc_form(
             "user": user,
             "kyc": kyc,
             "nationalities": NATIONALITIES,
+            "sources_of_funds": SOURCES_OF_FUNDS,
             "flash": get_flash(request),
         },
     )
@@ -59,6 +76,7 @@ async def kyc_submit(
     mobile: str = Form(...),
     email: str = Form(...),
     source_of_funds: str = Form(...),
+    source_of_funds_other: str = Form(""),
 ):
     if not user:
         return RedirectResponse(url="/login", status_code=302)
@@ -71,20 +89,34 @@ async def kyc_submit(
         set_flash(request, "Your KYC submission is already under review.", "warning")
         return RedirectResponse(url="/kyc", status_code=302)
 
-    try:
-        await submit_kyc(
-            db,
-            user,
-            full_name=full_name,
-            date_of_birth=date_of_birth,
-            nationality=nationality,
-            id_number=id_number,
-            residential_address=residential_address,
-            mobile=mobile,
-            email=email,
-            source_of_funds=source_of_funds,
-        )
-    except ValueError as exc:
+    # "Other" + a description stores the description; the service is unchanged.
+    choice, described = source_of_funds.strip(), source_of_funds_other.strip()
+    source = described if choice == OTHER_SOURCE else choice
+    if not choice:
+        error = "Please choose your source of funds."
+    elif choice == OTHER_SOURCE and not described:
+        error = "Please describe your source of funds."
+    else:
+        error = None
+
+    if error is None:
+        try:
+            await submit_kyc(
+                db,
+                user,
+                full_name=full_name,
+                date_of_birth=date_of_birth,
+                nationality=nationality,
+                id_number=id_number,
+                residential_address=residential_address,
+                mobile=mobile,
+                email=email,
+                source_of_funds=source,
+            )
+        except ValueError as exc:
+            error = str(exc)
+
+    if error is not None:
         kyc = await get_active_kyc(db, user.id)
         return templates.TemplateResponse(
             "sender/kyc_form.html",
@@ -93,7 +125,8 @@ async def kyc_submit(
                 "user": user,
                 "kyc": kyc,
                 "nationalities": NATIONALITIES,
-                "error": str(exc),
+                "sources_of_funds": SOURCES_OF_FUNDS,
+                "error": error,
                 "prefill": {
                     "full_name": full_name,
                     "date_of_birth": date_of_birth,
@@ -102,7 +135,7 @@ async def kyc_submit(
                     "residential_address": residential_address,
                     "mobile": mobile,
                     "email": email,
-                    "source_of_funds": source_of_funds,
+                    **_source_prefill(choice, described),
                 },
             },
             status_code=400,

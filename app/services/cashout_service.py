@@ -280,7 +280,7 @@ async def approve(
     amount = Decimal(req.uctusd_amount)
     if Decimal(wallet.balance_uctusd) < amount:
         raise CashOutError(
-            f"Balance is only {Decimal(wallet.balance_uctusd):,.6f} UCTUSD — not enough to "
+            f"Balance is only {Decimal(wallet.balance_uctusd):,.6f} UCTUSD, not enough to "
             f"reserve {amount:,.6f}. The recipient may have cashed out since this was requested."
         )
 

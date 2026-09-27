@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "components/ui.html" import empty_state %}
 {% from "recipient/_activity.html" import cashout_row %}
-{% block title %}My Cash-Outs — XRPL Remit{% endblock %}
+{% block title %}My Cash-Outs · XRPL Remit{% endblock %}
 
 {% block page_title %}My cash-outs{% endblock %}
 
@@ -21,7 +21,7 @@
                    {"label": "Cash out", "href": "/cashout", "icon": "cash-coin"}, icon="cash-coin") }}
     {% endif %}
   </section>
-  <p class="small text-muted mt-3" data-poll-note hidden>Live updates paused — refresh to check again.</p>
+  <p class="small text-muted mt-3" data-poll-note hidden>Live updates paused. Refresh to check again.</p>
 </div>
 <p class="small text-muted mt-3">All fiat payouts shown here are <strong>simulated</strong>.</p>
 {% endblock %}

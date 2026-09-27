@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% from "components/status.html" import status_badge %}
-{% block title %}KYC Review — {{ submission.full_name }}{% endblock %}
+{% block title %}KYC Review: {{ submission.full_name }} · Admin{% endblock %}
 
-{% block page_title %}KYC review — {{ submission.full_name }}{% endblock %}
+{% block page_title %}KYC review: {{ submission.full_name }}{% endblock %}
 {% block page_back %}/admin/kyc{% endblock %}
 
 {% block content %}
@@ -71,7 +71,7 @@
       </div>
       <div class="card-body p-4">
         <dl class="ds-facts">
-          <dt>Outcome</dt><dd>{{ "Approved — the user can send money" if state == "approved" else "Rejected — the user was asked to resubmit" }}</dd>
+          <dt>Outcome</dt><dd>{{ "Approved: the user can send money" if state == "approved" else "Rejected: the user was asked to resubmit" }}</dd>
           <dt>Reviewed by</dt><dd>{{ submission.reviewer.full_name if submission.reviewer else "—" }}</dd>
           <dt>Reviewed</dt><dd>{{ submission.reviewed_at|localtime('%d %b %Y, %H:%M') or "—" }}</dd>
           {% if state == "rejected" %}<dt>Reason</dt><dd>{{ submission.rejection_reason or "—" }}</dd>{% endif %}

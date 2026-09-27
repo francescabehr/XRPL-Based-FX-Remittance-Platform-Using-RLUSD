@@ -2,7 +2,7 @@
 {% from "components/money.html" import amount %}
 {% from "components/status.html" import status_badge, transaction_badge %}
 {% from "components/ui.html" import progress, stat_tile, empty_state, check_draw %}
-{% block title %}Dashboard — XRPL Remit{% endblock %}
+{% block title %}Dashboard · XRPL Remit{% endblock %}
 
 {%- set kyc_state = user.kyc_status.value -%}
 {%- set kyc_ok = kyc_state == "approved" -%}
@@ -47,7 +47,7 @@
       {%- elif kyc_state == "pending" -%}
         Your details are with our team for review. Sending is disabled until your KYC is approved.
       {%- elif kyc_state == "rejected" -%}
-        Your KYC was not approved{% if kyc and kyc.rejection_reason %}: {{ kyc.rejection_reason }}{% endif %}. Fix the details and resubmit — sending is disabled until it's approved.
+        Your KYC was not approved{% if kyc and kyc.rejection_reason %}: {{ kyc.rejection_reason }}{% endif %}. Fix the details and resubmit. Sending is disabled until it's approved.
       {%- else -%}
         You're verified. Add a recipient to send your first transfer.
       {%- endif -%}
@@ -75,7 +75,7 @@
       <div class="ds-checklist__body">
         <p class="ds-checklist__title">Admin approval{% if kyc_ok %}<span class="visually-hidden"> (done)</span>{% endif %}</p>
         <p class="ds-checklist__desc">
-          {%- if kyc_ok %}Approved — you can send money.
+          {%- if kyc_ok %}Approved. You can send money.
           {%- elif kyc_state == "pending" %}We check your details, usually the same day.
           {%- elif kyc_state == "rejected" %}Not approved yet. Resubmit your KYC to try again.
           {%- else %}Starts once you submit your KYC.{% endif -%}

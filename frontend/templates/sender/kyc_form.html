@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "components/status.html" import status_badge %}
-{% block title %}KYC Verification — XRPL Remit{% endblock %}
+{% block title %}KYC Verification · XRPL Remit{% endblock %}
 
 {% block page_title %}Identity verification{% endblock %}
 
@@ -102,9 +102,26 @@
         <div class="card-body p-4">
           <fieldset>
             <legend class="h6 fw-bold mb-3">Source of funds</legend>
-            <label class="form-label" for="kyc-source_of_funds">Where does the money you send come from?</label>
-            <textarea name="source_of_funds" class="form-control" rows="2" id="kyc-source_of_funds"
-                      placeholder="e.g. Salary, business income, savings…" required>{{ prefill.source_of_funds if prefill else '' }}</textarea>
+            {%- set sof_choice = prefill.source_of_funds_choice if prefill else "" %}
+            {%- set sof_other = prefill.source_of_funds_other if prefill else "" %}
+            <div class="row g-3 align-items-end">
+              <div class="col-md-6">
+                <label class="form-label" for="kyc-source_of_funds">Where does the money you send come from?</label>
+                <select name="source_of_funds" class="form-select" id="kyc-source_of_funds" required data-other-toggle="kyc-sof-other">
+                  <option value="">— Select —</option>
+                  {% for option in sources_of_funds %}
+                  <option value="{{ option }}" {% if sof_choice == option %}selected{% endif %}>{{ option }}</option>
+                  {% endfor %}
+                  <option value="Other" {% if sof_choice == "Other" %}selected{% endif %}>Other</option>
+                </select>
+              </div>
+              {#- Shown only while "Other" is chosen (script below). Without JS it stays visible. -#}
+              <div class="col-md-6" id="kyc-sof-other">
+                <label class="form-label" for="kyc-source_of_funds_other"><span data-other-label>If Other, please describe</span></label>
+                <input type="text" name="source_of_funds_other" class="form-control" id="kyc-source_of_funds_other"
+                       value="{{ sof_other }}" maxlength="200" placeholder="e.g. Freelance design work">
+              </div>
+            </div>
           </fieldset>
         </div>
       </div>
@@ -119,4 +136,30 @@
     {% endif %}
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* Source of funds: the "Other" box shows (and becomes required) only while
+   "Other" is selected. Without JS it simply stays visible. */
+document.addEventListener("DOMContentLoaded", function () {
+  var select = document.querySelector("[data-other-toggle]");
+  if (!select) return;
+  var wrap = document.getElementById(select.getAttribute("data-other-toggle"));
+  var input = wrap && wrap.querySelector("input");
+  var label = wrap && wrap.querySelector("[data-other-label]");
+  if (!input) return;
+  if (label) label.textContent = "Please describe";
+  function sync() {
+    var other = select.value === "Other";
+    wrap.hidden = !other;
+    input.required = other;
+  }
+  select.addEventListener("change", function () {
+    sync();
+    if (select.value === "Other") input.focus();
+  });
+  sync();
+});
+</script>
 {% endblock %}

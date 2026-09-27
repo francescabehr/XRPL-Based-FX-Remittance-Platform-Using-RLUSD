@@ -68,7 +68,7 @@
       {%- elif step.state == "current" %}<span class="ds-pulse-dot"></span>{% endif -%}
     </span>
     <span class="ds-timeline__body">
-      <span class="ds-timeline__label">{{ step.label }}<span class="visually-hidden"> — {{ {"done": "done", "current": "in progress", "failed": "failed", "upcoming": "not started"}[step.state] }}</span></span>
+      <span class="ds-timeline__label">{{ step.label }}<span class="visually-hidden">, {{ {"done": "done", "current": "in progress", "failed": "failed", "upcoming": "not started"}[step.state] }}</span></span>
       {%- if step.desc %}<span class="ds-timeline__desc">{{ step.desc }}</span>{% endif %}
     </span>
   </li>
