@@ -8,6 +8,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import settings
 from app.database import AsyncSessionLocal, engine
+from app.errors import register_error_handlers
 from app.services import cashin_service, cashout_service
 from app.routers import admin, auth, beneficiaries, cashout, dev, kyc, sender, status, transactions, wallet
 
@@ -79,6 +80,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="XRPL Remittance Platform", lifespan=lifespan)
+register_error_handlers(app)
 
 app.add_middleware(SessionMiddleware, secret_key=settings.secret_key, max_age=3600 * 8)
 

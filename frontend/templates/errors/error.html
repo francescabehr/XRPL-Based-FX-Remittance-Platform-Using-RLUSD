@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% from "components/ui.html" import empty_state %}
+{#- 403 / 404 for browser page loads (app/errors.py). Never shows the internal
+    error detail. Signed-in users get the app shell; everyone else the public layout. -#}
+{%- set pages = {
+  404: ("Page not found", "The page you're looking for doesn't exist or has moved.", "signpost-split"),
+  403: ("You don't have access to this page", "Your account isn't allowed to open it. If you think that's wrong, contact an administrator.", "shield-lock"),
+} -%}
+{%- set page = pages[status_code] -%}
+{%- set home_label = "Go to the overview" if home == "/admin" else ("Go to your dashboard" if home == "/dashboard" else "Go to the home page") -%}
+
+{% block title %}{{ page[0] }} · XRPL Remit{% endblock %}
+{% block page_title %}{{ page[0] }}{% endblock %}
+
+{% block content %}
+<div class="ds-error{% if not user %} ds-error--public{% endif %}">
+  <div class="card">
+    <p class="ds-error__code">Error {{ status_code }}</p>
+    {%- if user %}
+    {#- In the shell the top bar already carries the page's <h1>. -#}
+    {{ empty_state(page[0], page[1], {"label": home_label, "href": home, "icon": "house"}, icon=page[2]) }}
+    {%- else %}
+    <div class="ds-empty-state">
+      <span class="ds-empty-state__icon" aria-hidden="true"><i class="bi bi-{{ page[2] }}" aria-hidden="true"></i></span>
+      <h1 class="ds-empty-state__title">{{ page[0] }}</h1>
+      <p class="ds-empty-state__message">{{ page[1] }}</p>
+      <div class="d-flex flex-wrap justify-content-center gap-2 mt-3">
+        <a href="{{ home }}" class="btn btn-primary"><i class="bi bi-house me-1" aria-hidden="true"></i>{{ home_label }}</a>
+        <a href="/login" class="btn btn-outline-secondary">Log in</a>
+      </div>
+    </div>
+    {%- endif %}
+  </div>
+</div>
+{% endblock %}

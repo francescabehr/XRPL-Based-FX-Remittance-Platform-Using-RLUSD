@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Fee & Limit Configuration — Admin{% endblock %}
+{% from "components/ui.html" import empty_state %}
+{% block title %}Fee & Limit Configuration · Admin{% endblock %}
 
 {% block page_title %}Fees &amp; limits{% endblock %}
 
@@ -23,6 +24,7 @@
 <!-- Limit tiers (FR-LIM-05) -->
 <section class="card mb-4" aria-labelledby="limits-title">
   <div class="card-header"><h2 class="ds-section-title" id="limits-title">Remittance limits by KYC tier</h2></div>
+  {% if tiers %}
   <div class="table-responsive">
     <table class="table ds-table">
       <thead>
@@ -67,6 +69,9 @@
       </tbody>
     </table>
   </div>
+  {% else %}
+  {{ empty_state("No limit tiers configured", "Limit tiers are created by the database migrations. Run them before anyone can send money.", icon="sliders") }}
+  {% endif %}
 </section>
 
 <!-- Fee configuration (FR-ADM-06, FR-FX-08) -->
@@ -79,15 +84,15 @@
         <h3 class="ds-form-section__title">Send</h3>
         <div class="row g-3">
           {{ field("fixed_fee_zar", "Fixed fee per remittance", fee_config.fixed_fee_zar, "0.01", "Flat ZAR charge added to every send.", prefix="R") }}
-          {{ field("percentage_fee", "Percentage fee", fee_config.percentage_fee, "0.000001", "Fraction of the send amount — 0.015 = 1.5%.", suffix="fraction") }}
-          {{ field("fx_margin", "FX margin", fee_config.fx_margin, "0.000001", "Added to the market rate — 0.02 = 2%.", suffix="fraction") }}
+          {{ field("percentage_fee", "Percentage fee", fee_config.percentage_fee, "0.000001", "Fraction of the send amount, e.g. 0.015 = 1.5%.", suffix="fraction") }}
+          {{ field("fx_margin", "FX margin", fee_config.fx_margin, "0.000001", "Added to the market rate, e.g. 0.02 = 2%.", suffix="fraction") }}
           {{ field("min_send_zar", "Minimum send amount", fee_config.min_send_zar, "0.01", "Smallest remittance accepted. Must exceed the fixed fee.", prefix="R") }}
         </div>
       </div>
       <div class="ds-form-section">
         <h3 class="ds-form-section__title">Cash-out</h3>
         <div class="row g-3">
-          {{ field("cashout_fee_percentage", "Cash-out fee", fee_config.cashout_fee_percentage, "0.000001", "Fraction of the UCTUSD cashed out — 0.01 = 1%.", suffix="fraction") }}
+          {{ field("cashout_fee_percentage", "Cash-out fee", fee_config.cashout_fee_percentage, "0.000001", "Fraction of the UCTUSD cashed out, e.g. 0.01 = 1%.", suffix="fraction") }}
           {{ field("cashout_fee_min_usd", "Minimum cash-out fee", fee_config.cashout_fee_min_usd, "0.000001", "Floor applied when the percentage is smaller.", prefix="$") }}
         </div>
       </div>
@@ -109,9 +114,7 @@
     </form>
   </div>
   {% else %}
-  <div class="card-body text-muted">
-    No active fee configuration row exists. Seed one before quotes can be generated.
-  </div>
+  {{ empty_state("No fee configuration", "No active fee configuration row exists. Seed one before quotes can be generated.", icon="percent") }}
   {% endif %}
 </section>
 {% endblock %}
