@@ -1654,12 +1654,14 @@ a.ds-activity__row:hover { background: var(--bg); color: inherit; }
 }
 
 /* Info pages (about, contact, help, legal): readable prose in the public layout. */
-.ds-prose { max-width: 72ch; }
+/* The article spans the full public width (like the landing page) so headings,
+   the note box and the related-links row line up with the header and footer;
+   only running text is capped, to keep lines readable on wide screens. */
 .ds-prose h1 { margin: var(--space-4) 0 var(--space-3); font-size: var(--text-2xl); font-weight: 700; letter-spacing: -0.02em; }
 .ds-prose__lead { margin: 0 0 var(--space-6); font-size: var(--text-lg); color: var(--text-muted); }
 .ds-prose h2 { margin: var(--space-6) 0 var(--space-2); font-size: var(--text-lg); font-weight: 700; scroll-margin-top: var(--space-6); }
-.ds-prose p, .ds-prose ul { margin: 0 0 var(--space-3); line-height: 1.6; }
-.ds-prose ul { padding-left: 1.25rem; }
+.ds-prose p, .ds-prose ul, .ds-prose ol { margin: 0 0 var(--space-3); line-height: 1.6; max-width: 75ch; }
+.ds-prose ul, .ds-prose ol { padding-left: 1.25rem; }
 .ds-prose li + li { margin-top: var(--space-1); }
 .ds-prose__note {
   display: flex;
@@ -1671,8 +1673,9 @@ a.ds-activity__row:hover { background: var(--bg); color: inherit; }
   font-size: var(--text-sm);
   color: var(--text);
 }
+.ds-prose .ds-prose__note { max-width: none; }
 .ds-prose__related { margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--border); font-size: var(--text-sm); }
-.ds-prose__related ul { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); padding: 0; list-style: none; }
+.ds-prose__related ul { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); padding: 0; list-style: none; max-width: none; }
 .ds-prose__related li + li { margin-top: 0; }
 .ds-prose__related a[aria-current="page"] { color: var(--text); font-weight: 600; text-decoration: none; }
 

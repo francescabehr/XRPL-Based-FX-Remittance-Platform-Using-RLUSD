@@ -33,17 +33,21 @@ async def get_beneficiary(
 async def _resolve_recipient(
     db: AsyncSession, email: Optional[str], mobile: Optional[str], sender_id: uuid.UUID
 ) -> Optional[uuid.UUID]:
-    """FR-BEN-04: link to an existing platform user by email then mobile."""
+    """FR-BEN-04: link to an existing platform user by email then mobile.
+
+    Admins are never linked: settlement would give them a wallet they cannot
+    open (admins are redirected away from /wallet and /cashout), stranding the funds.
+    """
     if email:
         result = await db.execute(
-            select(User).where(User.email == email.lower().strip())
+            select(User).where(User.email == email.lower().strip(), User.is_admin.is_(False))
         )
         match = result.scalar_one_or_none()
         if match and match.id != sender_id:
             return match.id
     if mobile:
         result = await db.execute(
-            select(User).where(User.mobile == mobile.strip())
+            select(User).where(User.mobile == mobile.strip(), User.is_admin.is_(False))
         )
         match = result.scalar_one_or_none()
         if match and match.id != sender_id:

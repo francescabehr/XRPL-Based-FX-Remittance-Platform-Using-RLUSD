@@ -3,25 +3,48 @@
 {% block lead %}How to get started, and answers to the questions people ask most.{% endblock %}
 {% block body %}
 <h2 id="getting-started">Getting started</h2>
-<ul>
+<ol>
   <li><a href="/register">Create an account</a> with your email and mobile number.</li>
   <li>Verify your identity. An admin reviews your details before you can send.</li>
   <li>Add a recipient, enter an amount in rand and review the quote.</li>
   <li>Pay with the simulated card, then follow the transfer on its status page.</li>
-</ul>
+</ol>
 
 <h2 id="faqs">FAQs</h2>
+
 <h3 class="h6 fw-bold mt-3">Is this real money?</h3>
-<p>No. Card payments, exchange rates and fiat payouts are simulated, and UCTUSD is a test token on the XRPL Testnet with no real value.</p>
-<h3 class="h6 fw-bold mt-3">How long does a transfer take?</h3>
-<p>Once an admin confirms your payment, settlement on the XRPL Testnet usually takes a few seconds. The status page updates on its own.</p>
+<p>No. Card payments, exchange rates and fiat payouts are simulated, and UCTUSD is a test token on the XRPL Testnet with
+  no real value. Please don't enter real card details.</p>
+
+<h3 class="h6 fw-bold mt-3">How long does verification take?</h3>
+<p>An admin reviews each submission by hand, usually within a working day. You can check its status under Verification
+  after you log in.</p>
+
 <h3 class="h6 fw-bold mt-3">Why can't I send money yet?</h3>
-<p>Sending is switched on once your identity verification is approved. You can check its status under Verification after you log in.</p>
+<p>Sending is switched on once your identity verification is approved. If it's still pending, it hasn't been reviewed
+  yet; if it was declined, the Verification page shows what to do next.</p>
+
+<h3 class="h6 fw-bold mt-3">Is there a limit on how much I can send?</h3>
+<p>Yes. Sending limits apply to every account, as they would with a real remittance service. If a transfer goes over
+  your limit, the quote page will tell you before you pay.</p>
+
+<h3 class="h6 fw-bold mt-3">How long does a transfer take?</h3>
+<p>Once an admin confirms your payment, settlement on the XRPL Testnet usually takes a few seconds. The status page
+  updates on its own.</p>
+
+<h3 class="h6 fw-bold mt-3">How can I check a transfer on the ledger?</h3>
+<p>Each completed transfer shows a transaction hash on its status page. Paste it into the public XRPL Testnet explorer
+  to see the payment, its amount and the wallets involved.</p>
+
 <h3 class="h6 fw-bold mt-3">How do I cash out?</h3>
-<p>Recipients choose Cash out in their wallet, enter an amount and pick USD or ZAR. The UCTUSD is burned on the ledger and the payout is simulated.</p>
+<p>Recipients choose Cash out in their wallet, enter an amount and pick USD or ZAR. The UCTUSD is burned on the ledger
+  and the payout is simulated.</p>
+
 <h3 class="h6 fw-bold mt-3">I forgot my password</h3>
-<p>Password resets aren't available in this prototype. <a href="/contact">Contact us</a> and we'll help.</p>
+<p>Password resets aren't available in this prototype yet. <a href="/contact">Contact us</a> from the email on your
+  account and we'll help.</p>
 
 <h2>Still stuck?</h2>
-<p><a href="/contact">Contact us</a> and we'll get back to you.</p>
+<p><a href="/contact">Contact us</a> with your transfer reference if you have one, and we'll get back to you within two
+  working days.</p>
 {% endblock %}

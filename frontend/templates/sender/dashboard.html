@@ -2,7 +2,7 @@
 {% from "components/money.html" import amount %}
 {% from "components/status.html" import status_badge, transaction_badge %}
 {% from "components/ui.html" import progress, stat_tile, empty_state, check_draw %}
-{% block title %}Dashboard · XRPL Remit{% endblock %}
+{% block title %}Dashboard · Orbyt{% endblock %}
 
 {%- set kyc_state = user.kyc_status.value -%}
 {%- set kyc_ok = kyc_state == "approved" -%}

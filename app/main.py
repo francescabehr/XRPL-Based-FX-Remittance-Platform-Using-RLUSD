@@ -79,7 +79,7 @@ async def lifespan(app: FastAPI):
         await engine.dispose()
 
 
-app = FastAPI(title="XRPL Remittance Platform", lifespan=lifespan)
+app = FastAPI(title="Orbyt", lifespan=lifespan)
 register_error_handlers(app)
 
 app.add_middleware(SessionMiddleware, secret_key=settings.secret_key, max_age=3600 * 8)

@@ -90,7 +90,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_transactions_sender_id", "transactions", ["sender_id"])
     op.create_index("ix_transactions_beneficiary_id", "transactions", ["beneficiary_id"])
-    # Daily/monthly usage sums filter on sender + created_at (FR-LIM-01..02).
+    # Daily/monthly usage sums filter on created_at (FR-LIM-01..02); sender_id has its own index above.
     op.create_index("ix_transactions_created_at", "transactions", ["created_at"])
 
 

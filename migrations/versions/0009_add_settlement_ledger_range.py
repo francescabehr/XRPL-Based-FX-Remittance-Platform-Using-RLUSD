@@ -16,7 +16,7 @@ depends_on = None
 
 def upgrade() -> None:
     # FR-MQ-06: the ledger range a signed settlement payment can appear in, the
-    # same pair cash_out_requests already carries (migration 0006). Without both,
+    # same pair cashout_requests already carries (migration 0006). Without both,
     # a payment the node cannot currently see is merely absent, not proven dead —
     # and an admin retry would re-send a payment that may already have been paid.
     # Nullable: rows settled before this migration have no recorded range, and a

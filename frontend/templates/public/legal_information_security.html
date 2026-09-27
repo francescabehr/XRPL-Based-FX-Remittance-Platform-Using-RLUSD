@@ -2,8 +2,10 @@
 {% block heading %}Information security{% endblock %}
 {% block lead %}The practices we follow to keep the platform and its ledger activity safe.{% endblock %}
 {% block body %}
+
 <h2>Access</h2>
-<p>Admin tools sit behind a single access check, and every admin page requires an administrator account. Users can only see their own transfers, wallets and cash-outs.</p>
+<p>Admin tools sit behind a single access check, and every admin page requires an administrator account. Users can only
+  see their own transfers, wallets and cash-outs.</p>
 
 <h2>Ledger activity</h2>
 <ul>
@@ -13,5 +15,22 @@
 </ul>
 
 <h2>Reporting a problem</h2>
-<p>If you think you've found a security issue, email <a href="mailto:security@example.com">security@example.com</a> with the steps to reproduce it. Please don't test against other people's accounts.</p>
+<p>If you think you've found a security issue, email <a href="mailto:security@example.com">security@example.com</a>
+  with:</p>
+<ul>
+  <li>the page or feature affected,</li>
+  <li>the steps to reproduce it, and</li>
+  <li>what you expected to happen and what happened instead.</li>
+</ul>
+<p>We'll acknowledge your report within two working days and keep you updated while we look into it. Please give us a
+  reasonable chance to fix the issue before sharing it publicly.</p>
+
+<h2>Testing guidelines</h2>
+<ul>
+  <li>Only test against accounts you created yourself.</li>
+  <li>Don't try to access, change or delete other people's data.</li>
+  <li>Don't run tests that would slow the platform down for others.</li>
+</ul>
+<p>As a student project we can't offer rewards, but we're grateful for every report and happy to credit you if you'd
+  like.</p>
 {% endblock %}

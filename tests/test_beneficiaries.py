@@ -82,6 +82,25 @@ async def test_no_self_link(db: AsyncSession):
     assert ben.recipient_user_id is None
 
 
+async def test_never_links_to_an_admin(db: AsyncSession):
+    """An admin can't open a wallet, so funds settled to one would be stranded."""
+    sender = await _sender(db, "b09")
+    admin = await create_user(
+        db, full_name="Admin b09", email="adminb09@test.com",
+        mobile="+2781300b09", password="Pass1234!", is_admin=True,
+    )
+    by_email = await create_beneficiary(
+        db, sender, full_name="Admin", email=admin.email, mobile=None,
+        country="South Africa", payout_currency="ZAR", relationship="Other",
+    )
+    by_mobile = await create_beneficiary(
+        db, sender, full_name="Admin", email=None, mobile=admin.mobile,
+        country="South Africa", payout_currency="ZAR", relationship="Other",
+    )
+    assert by_email.recipient_user_id is None
+    assert by_mobile.recipient_user_id is None
+
+
 async def test_edit_beneficiary(db: AsyncSession):
     sender = await _sender(db, "b06")
     ben = await create_beneficiary(
