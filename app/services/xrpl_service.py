@@ -28,7 +28,7 @@ from typing import Awaitable, Callable, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from xrpl.asyncio.clients import AsyncJsonRpcClient
+from xrpl.asyncio.clients import AsyncJsonRpcClient, XRPLRequestFailureException
 from xrpl.asyncio.ledger import get_latest_validated_ledger_sequence
 from xrpl.asyncio.transaction import (
     XRPLReliableSubmissionException,
@@ -277,10 +277,20 @@ async def get_uctusd_balance(
 async def get_transaction_result(
     tx_hash: str, client: Optional[AsyncJsonRpcClient] = None
 ) -> Optional[str]:
-    """Final result code of a transaction, or None if it is not in a validated ledger."""
+    """Final result code of a transaction, or None if it is not in a validated ledger.
+
+    None is returned only for txnNotFound. Any other error (slowDown, tooBusy,
+    noNetwork...) says nothing about the transaction, and callers read None as
+    "absent" — which, with a complete ledger range, lets them restore a burn or
+    re-send a payment. So those raise instead.
+    """
     client = client or get_client()
     resp = await client.request(Tx(transaction=tx_hash))
-    if not resp.is_successful() or not resp.result.get("validated"):
+    if not resp.is_successful():
+        if resp.result.get("error") == "txnNotFound":
+            return None
+        raise XRPLRequestFailureException(resp.result)
+    if not resp.result.get("validated"):
         return None
     return resp.result["meta"]["TransactionResult"]
 

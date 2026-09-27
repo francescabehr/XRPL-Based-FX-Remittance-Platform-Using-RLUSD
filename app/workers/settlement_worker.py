@@ -272,12 +272,12 @@ async def process_settlement(
             (still without a hash) stays safe to retry.
             """
             nonlocal signed_hash
-            signed_hash = signed.tx_hash
             txn.xrpl_tx_hash = signed.tx_hash
             txn.settlement_last_ledger_sequence = signed.last_ledger_sequence
             txn.settlement_submitted_ledger_index = signed.submitted_ledger_index
             db.add(txn)
             await db.commit()
+            signed_hash = signed.tx_hash
 
         try:
             wallet = await xrpl_service.provision_wallet(db, recipient)

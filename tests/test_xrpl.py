@@ -508,6 +508,16 @@ async def test_transaction_result_none_until_final(ok, result):
     assert await xrpl_service.get_transaction_result("ABC", client=FakeTxClient(ok, result)) is None
 
 
+async def test_a_rate_limited_lookup_raises_instead_of_reading_as_absent():
+    """slowDown says nothing about the transaction. Returning None would let
+    reconcile restore a burn (or retry re-send a payment) that may have landed."""
+    from xrpl.clients import XRPLRequestFailureException
+
+    client = FakeTxClient(False, {"error": "slowDown", "error_message": "You are placing too much load on the server."})
+    with pytest.raises(XRPLRequestFailureException):
+        await xrpl_service.get_transaction_result("ABC", client=client)
+
+
 async def test_provisioning_marks_user_as_receiver(db, ledger):
     user = await _recipient(db)
     assert user.can_receive is False
