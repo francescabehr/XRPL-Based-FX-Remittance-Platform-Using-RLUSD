@@ -53,24 +53,26 @@
     {# ── Colour ─────────────────────────────────────────────────────────── #}
     <section class="sg-section" id="colour" aria-labelledby="colour-h">
       <h2 id="colour-h">Colour</h2>
-      <p class="text-muted">Deep teal is the brand; bubblegum pink is a highlight used only as a fill (never text on white, never a status); lavender is the soft accent. Status colours are separate from the brand and use three tones. Every text pair shown passes WCAG AA (≥ 4.5:1).</p>
+      <p class="text-muted">Palette 3 (“coastal”, see <code>ui themes/</code>). Amaranth is the brand; Thulian Pink is a highlight used only as a fill (never text on white, never a status); Brook Green (sage) is the soft accent; Chalk is the warm tint and the colour for anything sitting on the berry brand; Pomelo Olive is decorative only. Status colours are separate from the brand and use three tones. Every text pair shown passes WCAG AA (≥ 4.5:1), asserted in <code>tests/test_theme.py</code>.</p>
       {% for group, note, swatches in [
-        ("Brand · deep teal", "Buttons, links, heading accents, key amounts.", [
-          ("--accent", "#1B4B4F", "9.7:1 on white · white on it 9.7:1"), ("--accent-hover", "#143A3D", "Hover"),
-          ("--accent-active", "#0F2D2F", "Pressed"), ("--accent-soft", "#E6EEEE", "Hover wash · teal 8.2:1"),
-          ("--accent-mid", "#069494", "Icon circles, chart lines · 3.7:1 (not body text)")]),
-        ("Highlight · bubblegum pink", "Fills only: progress, active nav, check, focus halo, “Recipient gets”. Text on pink is --highlight-ink (5.4:1). Pink on white is 2.65:1, so it sits on or beside teal (3.7:1). Never used for status — danger stays red.", [
-          ("--highlight", "#FF69B4", "Ink text 5.4:1"), ("--highlight-hover", "#FC5AAB", "Ink text 4.9:1"),
-          ("--highlight-soft", "#FFE3F1", "Ink text 12.0:1"), ("--highlight-ink", "#102E31", "Text on pink · 14.4:1 on white")]),
-        ("Soft accent · lavender", "Secondary buttons, avatars, soft card highlights. Text is lavender-ink.", [
-          ("--lavender", "#D9C8F5", "Ink 6.7:1"), ("--lavender-soft", "#EDE4FB", "Ink 8.4:1"), ("--lavender-ink", "#4A2E86", "10.4:1 on white")]),
+        ("Brand · Amaranth", "Buttons, links, heading accents, key amounts, the sidebar.", [
+          ("--accent", "#933B5B", "White on it 6.96:1 · 6.56:1 on --bg"), ("--accent-hover", "#7D324D", "Hover · white 8.6:1"),
+          ("--accent-active", "#672940", "Pressed"), ("--accent-soft", "#F6ECF0", "Hover wash · berry 6.0:1"),
+          ("--accent-mid", "#B5728A", "Icon circles, chart lines · 3.7:1 (not body text)")]),
+        ("Highlight · Thulian Pink", "Fills only: progress, the landing pill, check, focus halo, “Recipient gets”. Text on it is --highlight-ink (4.85:1). On the berry brand it is only 1.9:1, so items on berry use Chalk or sage. Never used for status — danger stays red.", [
+          ("--highlight", "#B5728A", "Ink text 4.85:1"), ("--highlight-hover", "#C27F97", "Ink text 5.7:1"),
+          ("--highlight-soft", "#F4E6EB", "Ink text 14.7:1"), ("--highlight-ink", "#2A0F1C", "Text on Thulian · 17.7:1 on white")]),
+        ("Soft accent · Brook Green (sage)", "Secondary buttons, avatars, soft card highlights. Text is --sage-ink.", [
+          ("--sage", "#AABAAE", "Ink 5.5:1 · 3.4:1 on berry"), ("--sage-soft", "#E9EFEA", "Ink 9.5:1"), ("--sage-ink", "#2C4034", "11.1:1 on white")]),
+        ("Warm tint · Chalk · Pomelo Olive", "Chalk: landing bands, and the active item / focus ring / marks on berry (berry text on chalk 4.85:1). Olive: lines and dividers only.", [
+          ("--chalk", "#E3D6BF", "Berry text 4.85:1"), ("--chalk-soft", "#F3ECDF", "Band background · berry 5.9:1"), ("--olive", "#9F9679", "2.95:1 · never text")]),
         ("Status · vivid / tint / deep", "Vivid = dots and bars (always beside a text label). Tint = background. Deep = text.", [
           ("--success-vivid", "#12B76A", "Dots, bars"), ("--success-soft", "#ECFDF3", "Tint"), ("--success", "#027A48", "5.1:1 on tint"),
           ("--warning-vivid", "#F79009", "Dots, bars"), ("--warning-soft", "#FFFAEB", "Tint"), ("--warning", "#B54708", "5.2:1 on tint"),
           ("--danger-vivid", "#F04438", "Dots, bars"), ("--danger-soft", "#FEF3F2", "Tint"), ("--danger", "#B42318", "6.1:1 on tint"),
           ("--info-vivid", "#2E90FA", "Dots, bars"), ("--info-soft", "#EFF8FF", "Tint"), ("--info", "#175CD3", "5.6:1 on tint")]),
         ("Neutrals", "Near-white ground, white cards, quiet borders.", [
-          ("--bg", "#F7F7FA", "App background"), ("--surface", "#FFFFFF", "Cards"), ("--border", "#E6E6EE", "Hairlines"),
+          ("--bg", "#FAF8F4", "App background (warm)"), ("--surface", "#FFFFFF", "Cards"), ("--border", "#E6E6EE", "Hairlines"),
           ("--border-input", "#868B9C", "Form controls · 3.4:1"), ("--text", "#16161D", "18.0:1 on surface"),
           ("--text-muted", "#5B6071", "6.3:1 on surface"), ("--neutral-soft", "#EFF0F4", "Grey badges · 5.5:1")]),
       ] %}
@@ -89,7 +91,7 @@
       {% endfor %}
       <p class="sg-label">Highlight vs danger — never interchangeable</p>
       <div class="sg-row">
-        <span class="d-inline-flex align-items-center gap-2"><span style="display:inline-block;width:40px;height:20px;border-radius:999px;background:var(--highlight)" aria-hidden="true"></span>Highlight · pink #FF69B4 (hue 330°)</span>
+        <span class="d-inline-flex align-items-center gap-2"><span style="display:inline-block;width:40px;height:20px;border-radius:999px;background:var(--highlight)" aria-hidden="true"></span>Highlight · Thulian #B5728A (hue 339°, muted)</span>
         <span class="d-inline-flex align-items-center gap-2"><span style="display:inline-block;width:40px;height:20px;border-radius:999px;background:var(--danger-vivid)" aria-hidden="true"></span>Danger vivid · red #F04438 (hue 4°)</span>
         {{ status_badge("failed", "settlement") }}
       </div>
@@ -101,7 +103,7 @@
       <div class="card"><div class="card-body">
         <p class="sg-label mt-0">Inter · one typeface</p>
         <h1>Heading 1: Send money home</h1>
-        <h2>Heading 2 — Recipient gets</h2>
+        <h2>Heading 2: Recipient gets</h2>
         <h3>Heading 3 — Awaiting approval</h3>
         <h4>Heading 4 — Settled on XRPL</h4>
         <p class="mb-2">Body text. Short and human: “Recipient gets”, “Awaiting approval”, “Settled on XRPL”. <a href="#type">An inline link</a>.</p>
@@ -115,7 +117,7 @@
     <section class="sg-section" id="buttons" aria-labelledby="buttons-h">
       <h2 id="buttons-h">Buttons</h2>
       <div class="card"><div class="card-body">
-        <p class="sg-label mt-0">Primary · secondary (lavender) · ghost · danger · highlight (pink)</p>
+        <p class="sg-label mt-0">Primary · secondary (sage) · ghost · danger · highlight (Thulian)</p>
         <div class="sg-row">
           <button type="button" class="btn btn-primary"><i class="bi bi-send me-1" aria-hidden="true"></i>Send money</button>
           <button type="button" class="btn btn-outline-secondary">Add money</button>

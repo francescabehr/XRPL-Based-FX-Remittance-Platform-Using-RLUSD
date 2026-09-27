@@ -48,12 +48,15 @@
     var n = parseInt(h, 16);
     return "rgba(" + (n >> 16 & 255) + "," + (n >> 8 & 255) + "," + (n & 255) + "," + a + ")";
   }
+  // On the berry sphere, sage routes (3.4:1) and chalk land/markers (4.85:1) hold
+  // their contrast; the Thulian highlight (1.9:1) would disappear.
   var C = {
-    halo: token("--accent-soft", "#E6EEEE"),
-    sphere: token("--accent", "#1B4B4F"),
-    sphereDeep: token("--accent-active", "#0F2D2F"),
-    pink: token("--highlight", "#FF69B4"),
-    lavender: token("--lavender", "#D9C8F5"),
+    halo: token("--accent-soft", "#F6ECF0"),
+    sphere: token("--accent", "#933B5B"),
+    sphereDeep: token("--accent-active", "#672940"),
+    route: token("--sage", "#AABAAE"),
+    land: token("--chalk", "#E3D6BF"),
+    marker: token("--chalk", "#E3D6BF"),
   };
 
   /* ---- geometry ------------------------------------------------------------ */
@@ -187,7 +190,7 @@
     if (ring) {
       ctx.beginPath();
       ctx.arc(p[0], p[1], radius * 2, 0, 2 * Math.PI);
-      ctx.strokeStyle = rgba(C.pink, 0.45);
+      ctx.strokeStyle = rgba(C.marker, 0.55);
       ctx.lineWidth = 2;
       ctx.stroke();
     }
@@ -204,7 +207,7 @@
   function drawRoute(route, progress, alpha) {
     if (alpha <= 0 || progress <= 0) return;
     var pts = route.pts, last = Math.floor(progress * (pts.length - 1));
-    ctx.strokeStyle = rgba(C.pink, alpha);
+    ctx.strokeStyle = rgba(C.route, alpha);
     ctx.lineWidth = Math.max(1.5, R * 0.011);
     ctx.lineCap = "round";
     ctx.beginPath();
@@ -217,7 +220,7 @@
     if (head && progress < 1) {                     // the leading dot while drawing
       ctx.beginPath();
       ctx.arc(head[0], head[1], Math.max(2.5, R * 0.016), 0, 2 * Math.PI);
-      ctx.fillStyle = rgba(C.pink, alpha);
+      ctx.fillStyle = rgba(C.route, alpha);
       ctx.fill();
     }
   }
@@ -238,15 +241,15 @@
     ctx.clearRect(0, 0, size, size);
     drawSphere();
     drawGrid();
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = C.land;
     drawLand();
     drawShine();
     routes.forEach(function (r, i) {
       var s = still ? [1, 1] : routeState(i, t);
       drawRoute(r, s[0], s[1]);
-      marker(r.to[0], r.to[1], Math.max(2.5, R * 0.018), C.lavender, false);
+      marker(r.to[0], r.to[1], Math.max(2.5, R * 0.018), C.route, false);
     });
-    marker(ORIGIN[0], ORIGIN[1], Math.max(3.5, R * 0.026), C.pink, true);
+    marker(ORIGIN[0], ORIGIN[1], Math.max(3.5, R * 0.026), C.marker, true);
   }
 
   /* ---- loop ---------------------------------------------------------------- */

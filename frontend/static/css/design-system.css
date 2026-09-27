@@ -13,10 +13,12 @@
 /* 1. Tokens ---------------------------------------------------------------- */
 
 :root {
-  /* Colour — brand: deep teal · highlight: bubblegum pink · soft accent: lavender.
-     Status colours are separate from the brand and use three tones:
-     vivid base (dots, bars), light tint (backgrounds), deep shade (text ≥ 4.5:1). */
-  --bg: #F7F7FA;
+  /* Colour (Palette 3, "coastal"; see ui themes/) — brand: Amaranth ·
+     highlight: Thulian Pink · soft accent: Brook Green (sage) · warm tint: Chalk ·
+     decorative neutral: Pomelo Olive. Status colours are separate from the brand
+     and use three tones: vivid base (dots, bars), light tint (backgrounds), deep
+     shade (text ≥ 4.5:1). Contrast pairs are asserted in tests/test_theme.py. */
+  --bg: #FAF8F4;             /* warm, chalk-tinted page */
   --surface: #FFFFFF;
   --border: #E6E6EE;
   --border-strong: #D5D6E0;
@@ -25,25 +27,33 @@
   --text-muted: #5B6071;
 
   /* Brand / primary — buttons, links, heading accents, key amounts. */
-  --accent: #1B4B4F;         /* 9.7:1 on white */
-  --accent-hover: #143A3D;
-  --accent-active: #0F2D2F;
-  --accent-soft: #E6EEEE;    /* teal wash for hover states */
-  --accent-border: #B9CDCE;
-  --accent-mid: #069494;     /* mid-tone teal: icon circles, chart lines (3.7:1 on white — not for body text) */
+  --accent: #933B5B;         /* Amaranth — white on it 6.96:1; on --bg 6.56:1 */
+  --accent-hover: #7D324D;
+  --accent-active: #672940;
+  --accent-soft: #F6ECF0;    /* berry wash for hover states — accent text on it 6.0:1 */
+  --accent-border: #DDBFCB;
+  --accent-mid: #B5728A;     /* Thulian: icon circles, chart lines (3.7:1 on white — not for body text) */
 
-  /* Highlight — FILLS ONLY, never text on white (2.65:1) and never a status colour.
-     Text on pink is --highlight-ink (5.4:1). Pink sits on/next to teal so the shape
-     keeps its contrast (pink on the teal track is 3.7:1). */
-  --highlight: #FF69B4;
-  --highlight-hover: #FC5AAB;  /* ink 4.9:1 */
-  --highlight-soft: #FFE3F1;   /* ink 12.0:1 */
-  --highlight-ink: #102E31;
+  /* Highlight (Thulian Pink) — FILLS ONLY, never text on white (3.7:1) and never a
+     status colour. Text on it is --highlight-ink (4.85:1). On the berry brand it is
+     only 1.9:1, so anything that sits ON --accent uses --chalk or --sage instead. */
+  --highlight: #B5728A;
+  --highlight-hover: #C27F97;   /* lighter on hover: ink 5.7:1 (a darker shade would drop below 4.5) */
+  --highlight-soft: #F4E6EB;   /* ink 14.7:1 */
+  --highlight-ink: #2A0F1C;
 
-  /* Soft accent — secondary buttons, avatars, soft card highlights. Text is lavender-ink. */
-  --lavender: #D9C8F5;
-  --lavender-soft: #EDE4FB;
-  --lavender-ink: #4A2E86;   /* 8.4:1 on lavender-soft */
+  /* Soft accent (Brook Green) — secondary buttons, avatars, soft card highlights.
+     Text is --sage-ink. On the berry brand, sage holds 3.4:1 (graphics). */
+  --sage: #AABAAE;
+  --sage-soft: #E9EFEA;
+  --sage-active: #9DB0A3;
+  --sage-ink: #2C4034;       /* 9.5:1 on --sage-soft */
+
+  /* Warm tint (Chalk) — landing bands; the active item and focus ring on berry
+     surfaces (accent text on chalk 4.85:1). Pomelo Olive is decorative only. */
+  --chalk: #E3D6BF;
+  --chalk-soft: #F3ECDF;
+  --olive: #9F9679;          /* 2.95:1 — lines and dividers, never text */
 
   /* Status: deep (text) / -soft (tint) / -vivid (dots, bars — always beside a text label) */
   --success: #027A48;  --success-soft: #ECFDF3;  --success-vivid: #12B76A;  --success-border: #ABEFC6;
@@ -113,14 +123,14 @@
   --bs-border-radius-lg: var(--radius-lg);
   --bs-border-radius-pill: var(--radius-pill);
   --bs-link-color: var(--accent);
-  --bs-link-color-rgb: 27, 75, 79;
+  --bs-link-color-rgb: 147, 59, 91;
   --bs-link-hover-color: var(--accent-hover);
-  --bs-link-hover-color-rgb: 20, 58, 61;
-  --bs-code-color: var(--lavender-ink);
-  --bs-focus-ring-color: rgba(255, 105, 180, 0.5);
+  --bs-link-hover-color-rgb: 125, 50, 77;
+  --bs-code-color: var(--sage-ink);
+  --bs-focus-ring-color: rgba(181, 114, 138, 0.5);
 
   --bs-primary: var(--accent);
-  --bs-primary-rgb: 27, 75, 79;
+  --bs-primary-rgb: 147, 59, 91;
   --bs-primary-bg-subtle: var(--accent-soft);
   --bs-primary-text-emphasis: var(--accent);
   --bs-primary-border-subtle: var(--accent-border);
@@ -166,7 +176,7 @@
   --bs-btn-border-radius: var(--radius-pill);
   --bs-btn-font-weight: 600;
   --bs-btn-padding-x: 1.125rem;
-  --bs-btn-focus-box-shadow: 0 0 0 4px rgba(255, 105, 180, 0.55);
+  --bs-btn-focus-box-shadow: 0 0 0 4px rgba(181, 114, 138, 0.55);
   transition:
     color var(--dur-fast) var(--ease-in-out),
     background-color var(--dur-fast) var(--ease-in-out),
@@ -229,7 +239,7 @@
   --bs-btn-active-bg: #7A2E0E;
   --bs-btn-active-border-color: #7A2E0E;
 }
-/* Highlight button: pink fill, very dark teal text — for the one celebratory action. */
+/* Highlight button: Thulian fill, ink text — for the one celebratory action. */
 .ds-btn-highlight {
   --bs-btn-color: var(--highlight-ink);
   --bs-btn-bg: var(--highlight);
@@ -248,25 +258,25 @@
   --bs-btn-hover-bg: var(--accent-soft);
   --bs-btn-hover-border-color: var(--accent);
   --bs-btn-active-color: var(--accent);
-  --bs-btn-active-bg: #D5E2E2;
+  --bs-btn-active-bg: #EDD8E0;
   --bs-btn-active-border-color: var(--accent);
   --bs-btn-disabled-color: var(--accent);
   --bs-btn-disabled-border-color: var(--accent-border);
 }
-/* "Secondary" = lavender pill with deep-purple text. */
+/* "Secondary" = sage pill with deep-green ink text. */
 .btn-outline-secondary {
-  --bs-btn-color: var(--lavender-ink);
-  --bs-btn-bg: var(--lavender-soft);
-  --bs-btn-border-color: var(--lavender-soft);
-  --bs-btn-hover-color: var(--lavender-ink);
-  --bs-btn-hover-bg: var(--lavender);
-  --bs-btn-hover-border-color: var(--lavender);
-  --bs-btn-active-color: var(--lavender-ink);
-  --bs-btn-active-bg: #CBB4F0;
-  --bs-btn-active-border-color: #CBB4F0;
-  --bs-btn-disabled-color: var(--lavender-ink);
-  --bs-btn-disabled-bg: var(--lavender-soft);
-  --bs-btn-disabled-border-color: var(--lavender-soft);
+  --bs-btn-color: var(--sage-ink);
+  --bs-btn-bg: var(--sage-soft);
+  --bs-btn-border-color: var(--sage-soft);
+  --bs-btn-hover-color: var(--sage-ink);
+  --bs-btn-hover-bg: var(--sage);
+  --bs-btn-hover-border-color: var(--sage);
+  --bs-btn-active-color: var(--sage-ink);
+  --bs-btn-active-bg: var(--sage-active);
+  --bs-btn-active-border-color: var(--sage-active);
+  --bs-btn-disabled-color: var(--sage-ink);
+  --bs-btn-disabled-bg: var(--sage-soft);
+  --bs-btn-disabled-border-color: var(--sage-soft);
 }
 .btn-outline-danger {
   --bs-btn-color: var(--danger);
@@ -306,7 +316,7 @@
   --bs-btn-hover-bg: var(--accent-soft);
   --bs-btn-hover-border-color: transparent;
   --bs-btn-active-color: var(--accent-active);
-  --bs-btn-active-bg: #D5E2E2;
+  --bs-btn-active-bg: #EDD8E0;
   --bs-btn-active-border-color: transparent;
   --bs-btn-disabled-color: var(--text-muted);
   --bs-btn-disabled-bg: transparent;
@@ -332,7 +342,7 @@
   --bs-table-bg: transparent;
   --bs-table-color: var(--text);
   --bs-table-border-color: var(--border);
-  --bs-table-hover-bg: rgba(27, 75, 79, 0.04);
+  --bs-table-hover-bg: rgba(147, 59, 91, 0.04);
   --bs-table-hover-color: var(--text);
   --bs-table-striped-bg: rgba(22, 22, 29, 0.02);
 }
@@ -388,7 +398,7 @@
 .form-select:focus {
   background-color: var(--surface);
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(255, 105, 180, 0.55);
+  box-shadow: 0 0 0 3px rgba(181, 114, 138, 0.55);
 }
 .form-control::placeholder { color: #6B7082; }
 .form-control:disabled,
@@ -408,7 +418,7 @@
 }
 .form-check-input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(255, 105, 180, 0.55);
+  box-shadow: 0 0 0 3px rgba(181, 114, 138, 0.55);
 }
 .form-text { color: var(--text-muted); }
 
@@ -457,9 +467,9 @@ summary:focus-visible,
 .btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  box-shadow: 0 0 0 5px rgba(255, 105, 180, 0.55);
+  box-shadow: 0 0 0 5px rgba(181, 114, 138, 0.55);
 }
-.form-switch .form-check-input:focus { --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%231B4B4F'/%3e%3c/svg%3e"); }
+.form-switch .form-check-input:focus { --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23933B5B'/%3e%3c/svg%3e"); }
 
 .tnum { font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
 
@@ -500,8 +510,8 @@ summary:focus-visible,
 .ds-status--info    { background-color: var(--info-soft);    color: var(--info);    border-color: var(--info-border);    --ds-dot: var(--info-vivid); }
 .ds-status--neutral { background-color: var(--neutral-soft); color: var(--neutral); border-color: var(--border);         --ds-dot: var(--neutral); }
 
-/* Progress bar — filled with scaleX, never width. A pink fill on a light teal
-   track with a teal hairline edge, so an empty bar never reads as full. The
+/* Progress bar — filled with scaleX, never width. A Thulian fill on a light berry
+   track with a berry hairline edge, so an empty bar never reads as full. The
    macro always pairs the bar with text, so colour is never the only signal.
    Status tones use a vivid bar on a neutral track. */
 .ds-progress {
@@ -518,7 +528,7 @@ summary:focus-visible,
   inset: 0;
   border-radius: inherit;
   background: var(--highlight);
-  box-shadow: inset 0 0 0 1px rgba(16, 46, 49, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(42, 15, 28, 0.28);
   transform: scaleX(var(--ds-progress));
   transform-origin: left center;
   transition: transform var(--dur-slow) var(--ease-out);
@@ -625,7 +635,7 @@ summary:focus-visible,
 .ds-stepper__step.is-done .ds-stepper__marker {
   background: var(--accent);
   border-color: var(--accent);
-  color: var(--highlight);
+  color: var(--chalk);
 }
 .ds-stepper__step.is-current { color: var(--text); font-weight: 600; }
 .ds-stepper__step.is-current .ds-stepper__marker {
@@ -762,8 +772,8 @@ body.ds-scroll-lock { overflow: hidden; }
   height: 56px;
   margin-bottom: var(--space-2);
   border-radius: 50%;
-  background: var(--lavender-soft);
-  color: var(--lavender-ink);
+  background: var(--sage-soft);
+  color: var(--sage-ink);
   font-size: 1.5rem;
 }
 .ds-empty-state__title { margin: 0; font-size: var(--text-lg); font-weight: 600; color: var(--text); }
@@ -855,7 +865,7 @@ body.ds-scroll-lock { overflow: hidden; }
   animation: ds-pulse 1.6s var(--ease-out) infinite;
 }
 
-/* Check mark: a pink disc pops in, then a very dark teal tick draws itself (once). */
+/* Check mark: a Thulian disc pops in, then an ink tick draws itself (once). */
 .ds-check-draw { display: inline-block; }
 .ds-check-draw circle {
   fill: var(--highlight);
@@ -951,8 +961,8 @@ html.ds-reduce-motion .ds-pulse-dot::after { animation: none !important; }
 
 :root {
   --sidebar-width: 264px;
-  --sidebar-text: #F4F8F8;               /* 9.1:1 on teal */
-  --sidebar-muted: rgba(255, 255, 255, 0.72); /* 5.9:1 on teal */
+  --sidebar-text: #FBF7F8;               /* 6.7:1 on amaranth */
+  --sidebar-muted: rgba(255, 255, 255, 0.8); /* 4.9:1 on amaranth */
   --sidebar-hover: rgba(255, 255, 255, 0.08);
   --sidebar-line: rgba(255, 255, 255, 0.12);
 }
@@ -1009,8 +1019,10 @@ body { background: var(--bg); }
 }
 .ds-wordmark--dark,
 .ds-wordmark--dark:hover { color: var(--accent); }
+/* On the berry sidebar the Thulian mark would be 1.9:1: chalk with a berry glyph. */
+.ds-sidebar .ds-wordmark__mark { background: var(--chalk); color: var(--accent); }
 
-/* Sidebar — deep teal; pink active item with ink text. */
+/* Sidebar — Amaranth; chalk active item with berry text. */
 .ds-sidebar {
   --bs-offcanvas-width: min(300px, 85vw);
   --bs-offcanvas-bg: var(--accent);
@@ -1077,14 +1089,14 @@ body { background: var(--bg); }
 .ds-sidebar__link:hover { background: var(--sidebar-hover); color: var(--sidebar-text); }
 .ds-sidebar__link.is-active,
 .ds-sidebar__link.is-active:hover {
-  background: var(--highlight);
-  color: var(--highlight-ink);
+  background: var(--chalk);
+  color: var(--accent);        /* 4.85:1 */
   font-weight: 600;
 }
-/* A teal focus ring would vanish on teal: use pink here (3.7:1 on teal). */
+/* A berry focus ring would vanish on berry: use chalk here (4.85:1). */
 .ds-sidebar a:focus-visible,
 .ds-sidebar button:focus-visible {
-  outline: 2px solid var(--highlight);
+  outline: 2px solid var(--chalk);
   outline-offset: 2px;
   box-shadow: none;
 }
@@ -1105,8 +1117,8 @@ body { background: var(--bg); }
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: var(--lavender-soft);
-  color: var(--lavender-ink);
+  background: var(--sage-soft);
+  color: var(--sage-ink);
   font-size: var(--text-sm);
   font-weight: 700;
 }
@@ -1331,7 +1343,7 @@ a.ds-activity__row:hover { background: var(--bg); color: inherit; }
   color: var(--accent-mid);
   font-size: 1.05rem;
 }
-.ds-activity__icon--out { background: var(--lavender-soft); color: var(--lavender-ink); }
+.ds-activity__icon--out { background: var(--sage-soft); color: var(--sage-ink); }
 /* Red marker on failed items (the badge text carries the meaning). */
 .ds-activity__icon.is-failed::after {
   content: "";
@@ -1415,7 +1427,7 @@ a.ds-activity__row:hover { background: var(--bg); color: inherit; }
   font-size: 0.85rem;
   transition: background-color var(--dur-base) var(--ease-in-out), border-color var(--dur-base) var(--ease-in-out);
 }
-.ds-timeline__step.is-done .ds-timeline__marker { background: var(--accent); border-color: var(--accent); color: var(--highlight); }
+.ds-timeline__step.is-done .ds-timeline__marker { background: var(--accent); border-color: var(--accent); color: var(--chalk); }
 .ds-timeline__step.is-current .ds-timeline__marker { border-color: var(--warning); color: var(--warning); --ds-dot: var(--warning-vivid); }
 .ds-timeline__step.is-failed .ds-timeline__marker { background: var(--danger); border-color: var(--danger); color: #fff; }
 .ds-timeline__body { display: flex; flex-direction: column; min-width: 0; padding-top: 3px; }
@@ -1596,8 +1608,8 @@ a.ds-activity__row:hover { background: var(--bg); color: inherit; }
   margin: 0 0 var(--space-4);
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-pill);
-  background: var(--lavender-soft);
-  color: var(--lavender-ink);           /* 8.4:1 */
+  background: var(--sage-soft);
+  color: var(--sage-ink);           /* 8.4:1 */
   font-size: var(--text-sm);
   font-weight: 600;
 }
@@ -1610,7 +1622,7 @@ a.ds-activity__row:hover { background: var(--bg); color: inherit; }
   color: var(--text);
   text-wrap: balance;
 }
-/* One highlighted word on a pink pill; text on pink is always the ink (5.4:1). */
+/* One highlighted word on a Thulian pill; text on it is always the ink (4.85:1). */
 .ds-highlight-word {
   display: inline-block;
   margin-block: 0.06em;      /* an inline-block's margin grows its line box: the "y" above can't reach it */
@@ -1673,8 +1685,8 @@ a.ds-activity__row:hover { background: var(--bg); color: inherit; }
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: var(--lavender-soft);
-  color: var(--lavender-ink);
+  background: var(--sage-soft);
+  color: var(--sage-ink);
   font-size: 1.125rem;
 }
 
@@ -1693,12 +1705,12 @@ a.ds-activity__row:hover { background: var(--bg); color: inherit; }
 
 /* Landing sections */
 .ds-landing-section { padding: var(--space-8) 0; }
-/* "How it works" sits on a soft teal band, inside the content width. */
+/* "How it works" sits on a soft chalk band, inside the content width. */
 .ds-landing-section--band {
   margin: var(--space-4) 0;
   padding: var(--space-8) var(--space-6);
   border-radius: var(--radius-lg);
-  background: var(--accent-soft);
+  background: var(--chalk-soft);
 }
 .ds-landing-section__title {
   margin: 0 0 var(--space-5);
@@ -1723,8 +1735,8 @@ a.ds-activity__row:hover { background: var(--bg); color: inherit; }
   height: 44px;
   margin-bottom: var(--space-3);
   border-radius: 50%;
-  background: var(--lavender-soft);
-  color: var(--lavender-ink);
+  background: var(--sage-soft);
+  color: var(--sage-ink);
   font-size: 1.25rem;
 }
 .ds-how-step__num {
@@ -1760,7 +1772,7 @@ a.ds-activity__row:hover { background: var(--bg); color: inherit; }
   .ds-real-sim__col + .ds-real-sim__col { border-left: 0; border-top: 1px solid var(--border); }
 }
 
-/* Closing call to action: white on deep teal (9.7:1), pink button with ink text. */
+/* Closing call to action: white on Amaranth (6.96:1), chalk button with berry text. */
 .ds-cta-band {
   margin: var(--space-6) 0 0;
   padding: var(--space-10) var(--space-6);
@@ -1770,7 +1782,19 @@ a.ds-activity__row:hover { background: var(--bg); color: inherit; }
   text-align: center;
 }
 .ds-cta-band__title { margin: 0 0 var(--space-2); font-size: var(--text-2xl); font-weight: 700; color: #fff; }
-.ds-cta-band__text { margin: 0 auto var(--space-6); max-width: 48ch; color: #F4F8F8; }
+.ds-cta-band__text { margin: 0 auto var(--space-6); max-width: 48ch; color: #FBF7F8; }
+/* On the berry band the Thulian button would be 1.9:1: use chalk with berry text. */
+.ds-cta-band .ds-btn-highlight {
+  --bs-btn-color: var(--accent);
+  --bs-btn-bg: var(--chalk);
+  --bs-btn-border-color: var(--chalk);
+  --bs-btn-hover-color: var(--accent-hover);
+  --bs-btn-hover-bg: #EDE3D1;
+  --bs-btn-hover-border-color: #EDE3D1;
+  --bs-btn-active-color: var(--accent-active);
+  --bs-btn-active-bg: #D8C9AE;
+  --bs-btn-active-border-color: #D8C9AE;
+}
 .ds-cta-band .btn:focus-visible { box-shadow: 0 0 0 3px var(--accent), 0 0 0 5px #fff; }
 
 /* Auth screens: one centred card (login) or card + "what happens next" (register). */
@@ -1877,13 +1901,13 @@ a.ds-activity__row:hover { background: var(--bg); color: inherit; }
 legend.ds-form-section__title { float: none; width: auto; padding: 0; line-height: inherit; }
 .ds-choice { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .ds-choice .btn { min-width: 5.5rem; }
-/* The chosen option is a solid teal pill (white text 9.7:1), not just a tint. */
+/* The chosen option is a solid berry pill (white text 6.96:1), not just a tint. */
 .ds-choice .btn-check:checked + .btn { background: var(--accent); border-color: var(--accent); color: #fff; }
 
 
 /* 11. History and monitor (Phase 5c) ---------------------------------------- */
 
-/* Bootstrap's own nav-pills, skinned: teal pill for the active filter (white 9.7:1). */
+/* Bootstrap's own nav-pills, skinned: berry pill for the active filter (white 6.96:1). */
 .nav-pills {
   --bs-nav-link-color: var(--accent);
   --bs-nav-link-hover-color: var(--accent-hover);
@@ -1896,7 +1920,7 @@ legend.ds-form-section__title { float: none; width: auto; padding: 0; line-heigh
 }
 .nav-pills .nav-link { transition: color var(--dur-fast) var(--ease-in-out), background-color var(--dur-fast) var(--ease-in-out); }
 .nav-pills .nav-link:not(.active):hover { background: var(--accent-soft); }
-.nav-pills .nav-link:focus-visible { box-shadow: 0 0 0 4px rgba(255, 105, 180, 0.55); }
+.nav-pills .nav-link:focus-visible { box-shadow: 0 0 0 4px rgba(181, 114, 138, 0.55); }
 
 /* Filter pills with a count; wraps on phones. */
 .ds-filter { gap: var(--space-2); flex-wrap: wrap; }
@@ -1938,7 +1962,8 @@ h1.ds-empty-state__title { font-size: var(--text-xl); font-weight: 700; }
 
 /* A static globe; only the routes draw, once (stroke-dashoffset, like
    .ds-check-draw). Reduced motion: the global rule makes it appear drawn. Colours:
-   teal sphere, white grid at low opacity, pink routes/origin as graphic fills. */
+   berry sphere, white grid at low opacity, sage routes and chalk markers (both hold
+   contrast on berry, where Thulian would not). */
 .ds-landing-visual { position: relative; }
 .ds-globe { display: block; width: 100%; max-width: 440px; height: auto; margin: 0 auto; }
 .ds-globe__halo { fill: var(--accent-soft); }
@@ -1946,7 +1971,7 @@ h1.ds-empty-state__title { font-size: var(--text-xl); font-weight: 700; }
 .ds-globe__grid { fill: none; stroke: #fff; stroke-opacity: 0.14; stroke-width: 1; }
 .ds-globe__route {
   fill: none;
-  stroke: var(--highlight);
+  stroke: var(--sage);                   /* 3.4:1 on the berry sphere */
   stroke-width: 2.5;
   stroke-linecap: round;
   stroke-dasharray: 1;
@@ -1956,14 +1981,14 @@ h1.ds-empty-state__title { font-size: var(--text-xl); font-weight: 700; }
 }
 @keyframes ds-route-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 .ds-globe__dot {
-  fill: var(--lavender);
+  fill: var(--chalk);
   stroke: var(--accent);
   stroke-width: 2;
   animation: ds-fade-in var(--dur-slow) var(--ease-out) both;
   animation-delay: calc(900ms + var(--i, 0) * 150ms);
 }
-.ds-globe__origin { fill: var(--highlight); stroke: #fff; stroke-width: 2; }
-.ds-globe__origin-ring { fill: none; stroke: var(--highlight); stroke-opacity: 0.45; stroke-width: 2; }
+.ds-globe__origin { fill: var(--chalk); stroke: #fff; stroke-width: 2; }
+.ds-globe__origin-ring { fill: none; stroke: var(--chalk); stroke-opacity: 0.55; stroke-width: 2; }
 
 /* ≥lg: the example cards float over the globe's edges (Uvodo pattern). */
 @media (min-width: 992px) {
