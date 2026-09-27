@@ -5,8 +5,7 @@
 {% block page_title %}Identity verification{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-lg-9 col-xl-8">
+<div class="ds-form-page">
 
     {% if kyc %}
     <section class="card mb-4" aria-labelledby="kyc-status-title">
@@ -127,14 +126,13 @@
       </div>
 
       <div class="d-flex flex-wrap gap-2">
-        <button type="submit" class="btn btn-primary btn-lg px-4">
+        <button type="submit" class="btn btn-primary px-4">
           {% if kyc and kyc.status.value == 'rejected' %}Resubmit KYC{% else %}Submit KYC{% endif %}
         </button>
-        <a href="/dashboard" class="btn btn-outline-secondary btn-lg">Cancel</a>
+        <a href="/dashboard" class="btn btn-outline-secondary">Cancel</a>
       </div>
     </form>
     {% endif %}
-  </div>
 </div>
 {% endblock %}
 

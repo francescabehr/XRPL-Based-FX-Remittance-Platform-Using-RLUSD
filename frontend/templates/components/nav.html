@@ -69,10 +69,11 @@
                        "rejected": ("Rejected", "danger")}.get(user.kyc_status.value) if user.can_send else none -%}
   {%- set groups = groups + [("Account", [
     {"label": "Verification", "href": "/kyc", "icon": "shield-check", "badge": kyc_badge},
-    {"label": "Profile", "href": "/profile", "icon": "person-circle"},
   ])] -%}
 {%- endif -%}
 {%- set initials = (user.full_name.split()|map("first")|list)[:2]|join|upper -%}
+{#- The profile lives on the footer's user block, not a nav item. -#}
+{%- set on_profile = path == "/profile" or path.startswith("/profile/") -%}
 <aside class="offcanvas-lg offcanvas-start ds-sidebar" id="ds-sidebar" tabindex="-1" aria-label="Main navigation">
   <div class="ds-sidebar__head">
     <a class="ds-wordmark" href="{{ '/admin' if user.is_admin else '/dashboard' }}">
@@ -91,7 +92,7 @@
     {%- endfor %}
   </nav>
   <div class="ds-sidebar__foot">
-    <a class="ds-sidebar__profile" href="/profile">
+    <a class="ds-sidebar__profile{% if on_profile %} is-active{% endif %}" href="/profile"{% if on_profile %} aria-current="page"{% endif %}>
       <span class="ds-avatar" aria-hidden="true">{{ initials }}</span>
       <span class="ds-sidebar__who">
         <span class="ds-sidebar__name">{{ user.full_name }}</span>

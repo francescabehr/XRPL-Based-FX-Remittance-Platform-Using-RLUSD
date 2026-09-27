@@ -33,11 +33,11 @@
           </p>
         {% endif %}
         <div class="d-flex flex-wrap gap-2">
-          <a href="{{ details_href }}" class="btn btn-outline-secondary btn-lg">
+          <a href="{{ details_href }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Change
           </a>
           {% if not error %}
-          <a href="/send/pay?beneficiary_id={{ beneficiary.id }}&zar_amount={{ quote.zar_amount }}" class="btn btn-primary btn-lg flex-grow-1">
+          <a href="/send/pay?beneficiary_id={{ beneficiary.id }}&zar_amount={{ quote.zar_amount }}" class="btn btn-primary flex-grow-1">
             Continue to payment <i class="bi bi-arrow-right ms-1" aria-hidden="true"></i>
           </a>
           {% endif %}

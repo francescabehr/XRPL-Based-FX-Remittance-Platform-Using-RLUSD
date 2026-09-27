@@ -1843,6 +1843,11 @@ a.ds-activity__row:hover { background: var(--bg); color: inherit; }
   transition: background-color var(--dur-fast) var(--ease-in-out);
 }
 .ds-sidebar__profile:hover { background: var(--sidebar-hover); color: var(--sidebar-text); }
+/* On /profile the block takes the nav's active pill: chalk, berry text (4.85:1). */
+.ds-sidebar__profile.is-active,
+.ds-sidebar__profile.is-active:hover { background: var(--chalk); color: var(--accent); }
+.ds-sidebar__profile.is-active .ds-sidebar__email { color: var(--accent); }
+.ds-sidebar__profile.is-active:focus-visible { outline-color: var(--sidebar-text); }
 
 /* Profile */
 .ds-avatar--lg { flex-basis: 56px; width: 56px; height: 56px; font-size: var(--text-lg); }
@@ -1893,8 +1898,12 @@ a.ds-activity__row:hover { background: var(--bg); color: inherit; }
   background: transparent;
 }
 
-/* Forms: a readable width, a required marker and a segmented choice. */
-.ds-form-narrow { max-width: 760px; }
+/* Forms: page width, a required marker and a segmented choice.
+   A sectioned form page (cards of fieldsets, fields in a two-up grid) fills the
+   content column; .ds-content's 1200px cap is the readability limit, so two-up
+   fields never grow past ~550px. Pages with a form beside a summary (send,
+   pay, cash-out) keep their own two-column grid. */
+.ds-form-page { width: 100%; max-width: 1136px; }
 .ds-form-legend { margin: 0 0 var(--space-4); font-size: var(--text-sm); color: var(--text-muted); }
 .ds-required { color: var(--danger); }        /* 6.6:1 on white */
 .ds-form-section > fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }

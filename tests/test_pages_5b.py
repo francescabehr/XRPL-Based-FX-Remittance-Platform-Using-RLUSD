@@ -35,9 +35,21 @@ async def test_profile_for_a_sender(client: AsyncClient, db: AsyncSession, seed_
     assert "Verified" in page and "View submission" in page
     assert "Used today" in page and "Used this month" in page and "Standard tier" in page
     assert "XRPL wallet" not in page
-    assert active_link(page) == "Profile"
+    # No "Profile" nav item: the footer's user block is the link, marked current here.
+    assert active_link(page) == ""
+    assert '<a class="ds-sidebar__profile is-active" href="/profile" aria-current="page">' in page
     assert page.count("<h1") == 1
     assert not undecorated_icons(page)
+
+
+async def test_sidebar_user_block_links_to_profile(client: AsyncClient, db: AsyncSession, seed_tiers):
+    sender = await approved_sender(db)
+    with logged_in(sender):
+        page = (await client.get("/dashboard")).text
+    assert '<a class="ds-sidebar__profile" href="/profile">' in page
+    assert 'aria-current="page">' not in page.split('class="ds-sidebar__foot"')[1]
+    assert '<span>Profile</span>' not in page
+    assert 'href="/logout"' in page
 
 
 async def test_profile_asks_unverified_users_to_verify(client: AsyncClient, db: AsyncSession, seed_tiers):
