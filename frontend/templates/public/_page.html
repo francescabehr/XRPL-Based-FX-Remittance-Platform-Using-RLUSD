@@ -3,7 +3,7 @@
     signed-out layout: the route never passes `user`, only `home` (the dashboard
     link for a visitor who happens to be signed in). Pages fill in heading,
     lead and body; the placeholder note is shared. -#}
-{% block title %}{{ self.heading() }} · XRPL Remit{% endblock %}
+{% block title %}{{ self.heading() }} · Orbyt{% endblock %}
 {% block public_main_class %} ds-public-main--wide{% endblock %}
 {% block site_footer %}{% include "components/site_footer.html" %}{% endblock %}
 
@@ -21,7 +21,7 @@
   <h1>{% block heading %}{% endblock %}</h1>
   <p class="ds-prose__lead">{% block lead %}{% endblock %}</p>
   {% block body %}{% endblock %}
-  <p class="ds-prose__note"><i class="bi bi-mortarboard" aria-hidden="true"></i><span>XRPL Remit is an academic prototype. This page is placeholder text written for the project; it is not a statement by a real company and not legal advice.</span></p>
+  <p class="ds-prose__note"><i class="bi bi-mortarboard" aria-hidden="true"></i><span>Orbyt is an academic prototype. This page is placeholder text written for the project; it is not a statement by a real company and not legal advice.</span></p>
   {%- block related %}{% endblock %}
 </article>
 {% endblock %}

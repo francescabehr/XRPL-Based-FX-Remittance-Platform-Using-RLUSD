@@ -1,3 +1,4 @@
+{% from "components/brand.html" import mark %}
 {#- App sidebar (UI_REDESIGN.md §5). Role-aware: admin links for admins; send
     links for can_send; wallet links for can_receive (set once a wallet exists).
     Static on ≥lg, Bootstrap off-canvas below.
@@ -77,7 +78,7 @@
 <aside class="offcanvas-lg offcanvas-start ds-sidebar" id="ds-sidebar" tabindex="-1" aria-label="Main navigation">
   <div class="ds-sidebar__head">
     <a class="ds-wordmark" href="{{ '/admin' if user.is_admin else '/dashboard' }}">
-      <span class="ds-wordmark__mark" aria-hidden="true"><i class="bi bi-arrow-left-right" aria-hidden="true"></i></span>XRPL Remit
+      <span class="ds-wordmark__mark" aria-hidden="true">{{ mark() }}</span>Orbyt
     </a>
     <button type="button" class="btn-close btn-close-white d-lg-none" data-bs-dismiss="offcanvas" data-bs-target="#ds-sidebar" aria-label="Close menu"></button>
   </div>

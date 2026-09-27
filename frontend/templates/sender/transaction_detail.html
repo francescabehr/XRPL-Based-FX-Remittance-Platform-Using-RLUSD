@@ -3,7 +3,7 @@
 {% from "components/status.html" import transaction_badge %}
 {% from "components/ui.html" import SEND_STEPS, stepper, timeline, check_draw %}
 {% from "components/xrpl.html" import tx_hash %}
-{% block title %}Transaction · XRPL Remit{% endblock %}
+{% block title %}Transaction · Orbyt{% endblock %}
 
 {% block page_title %}Transfer to {{ txn.beneficiary.full_name }}{% endblock %}
 {% block page_back %}{{ '/transactions' if is_sender else ('/admin/transactions' if user.is_admin else '/wallet') }}{% endblock %}

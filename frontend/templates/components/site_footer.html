@@ -1,3 +1,4 @@
+{% from "components/brand.html" import mark %}
 {#- Site footer for the landing page and its info pages (they set the
     site_footer block; auth and error pages don't). Every link opens without
     login (app/routers/public.py). Content is generic placeholder text: no
@@ -6,7 +7,7 @@
   <div class="ds-site-footer__inner">
     <div class="ds-site-footer__brand">
       <a class="ds-wordmark ds-wordmark--dark" href="/">
-        <span class="ds-wordmark__mark" aria-hidden="true"><i class="bi bi-arrow-left-right" aria-hidden="true"></i></span>XRPL Remit
+        <span class="ds-wordmark__mark" aria-hidden="true">{{ mark() }}</span>Orbyt
       </a>
       <p class="ds-site-footer__tagline">Send rand, receive UCTUSD in a wallet on the XRPL Testnet.</p>
     </div>

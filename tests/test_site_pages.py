@@ -171,7 +171,7 @@ async def test_info_pages_are_public(client: AsyncClient, path, title):
     assert response.status_code == 200
     page = response.text
     assert f"<h1>{title}</h1>" in page and page.count("<h1") == 1
-    assert f"<title>{title} · XRPL Remit</title>" in page
+    assert f"<title>{title} · Orbyt</title>" in page
     assert "ds-sidebar" not in page                               # signed-out layout
     assert 'href="/login"' in page and 'href="/register"' in page
     assert "academic prototype" in page and FOOTER_NOTE in page

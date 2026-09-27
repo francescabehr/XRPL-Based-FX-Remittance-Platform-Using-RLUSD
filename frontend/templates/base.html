@@ -2,12 +2,14 @@
     shadow the `flash` context variable used below. -#}
 {% from "components/ui.html" import flash as flash_message %}
 {% from "components/nav.html" import sidebar %}
+{% from "components/brand.html" import mark %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>{% block title %}XRPL Remittance{% endblock %}</title>
+  <title>{% block title %}Orbyt{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ static_url('img/favicon.svg') }}">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -38,7 +40,7 @@
       {%- if back %}
       <a class="btn ds-btn-ghost btn-sm ds-topbar__back" href="{{ back }}"><i class="bi bi-arrow-left" aria-hidden="true"></i><span class="visually-hidden">Back</span></a>
       {%- endif %}
-      <h1 class="ds-topbar__title">{% block page_title %}{{ self.title()|replace(" · XRPL Remit", "")|replace(" · Admin", "") }}{% endblock %}</h1>
+      <h1 class="ds-topbar__title">{% block page_title %}{{ self.title()|replace(" · Orbyt", "")|replace(" · Admin", "") }}{% endblock %}</h1>
       <div class="ds-topbar__actions">
         {#- Top-bar actions only where the page has no other way to do them. #}
         {% block page_actions %}{% endblock %}
@@ -56,7 +58,7 @@
 <header class="ds-public-header{% if public_actions %} ds-public-header--actions{% endif %}">
   <div class="ds-public-header__inner">
     <a class="ds-wordmark ds-wordmark--dark" href="/">
-      <span class="ds-wordmark__mark" aria-hidden="true"><i class="bi bi-arrow-left-right" aria-hidden="true"></i></span>XRPL Remit
+      <span class="ds-wordmark__mark" aria-hidden="true">{{ mark() }}</span>Orbyt
     </a>
     {%- if public_actions %}
     <nav class="ds-public-header__actions" aria-label="Account">{{ public_actions|safe }}</nav>

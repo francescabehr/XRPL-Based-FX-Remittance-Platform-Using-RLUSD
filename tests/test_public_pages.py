@@ -1,6 +1,7 @@
 """Public pages (UI redesign Phase 5a): landing page at /, login and register."""
 import re
 
+import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -89,7 +90,15 @@ async def test_landing_globe_is_decorative(client: AsyncClient):
     assert 'aria-hidden="true"' in svg
     assert page.count('class="ds-globe__route"') == 3
     assert page.count("<h1") == 1
-    assert "<title>XRPL Remit · Send money across borders" in page
+    assert "<title>Orbyt · Send money across borders" in page
+
+
+@pytest.mark.parametrize("path", ["/", "/login", "/about", "/legal/cookies"])  # last one is the 404 page
+async def test_every_layout_links_the_orbyt_favicon(client: AsyncClient, path):
+    client.cookies.clear()
+    page = (await client.get(path, headers={"accept": "text/html"})).text
+    assert re.search(r'<link rel="icon" type="image/svg\+xml" href="/static/img/favicon\.svg[?"]', page)
+    assert '<span class="ds-wordmark__mark" aria-hidden="true"><i class="bi bi-arrow-left-right"' in page
 
 
 async def test_register_flash_has_no_em_dash(client: AsyncClient):

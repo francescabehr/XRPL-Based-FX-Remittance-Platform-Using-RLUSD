@@ -1,0 +1,9 @@
+{#- Orbyt mark for the wordmark tile. The .ds-wordmark__mark tile sets its
+    colours in every variant (header, footer, sidebar). The favicon
+    (static/img/favicon.svg) is a separate "O" monogram on the same tile colours.
+
+    Usage: {% from "components/brand.html" import mark %} … {{ mark() }}
+-#}
+{% macro mark() -%}
+<i class="bi bi-arrow-left-right" aria-hidden="true"></i>
+{%- endmacro %}

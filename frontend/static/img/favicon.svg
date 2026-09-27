@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Orbyt favicon: a bold "O" on the wordmark tile (--highlight fill, --highlight-ink letter).
+       The O is drawn, not set as text: favicons can't load Inter, and a system-font fallback
+       would render differently per OS. -->
+  <rect width="32" height="32" rx="10" fill="#B5728A"/>
+  <ellipse cx="16" cy="16" rx="7.25" ry="8.25" fill="none" stroke="#2A0F1C" stroke-width="4.5"/>
+</svg>
