@@ -340,6 +340,34 @@ async def test_fee_edit_rejects_invalid_input(
     assert cfg.market_rate_zar_per_usd == Decimal("18.50")
 
 
+@pytest.mark.parametrize(
+    "daily, monthly",
+    [
+        ("Infinity", "50000"),   # used to reach the DB and 500
+        ("10000", "Infinity"),
+        ("10000", "1e30"),       # too large for Numeric(20, 2)
+        ("20000", "10000"),      # daily above monthly
+    ],
+)
+async def test_tier_edit_rejects_invalid_limits(
+    client: AsyncClient, db: AsyncSession, seed_tiers, daily, monthly
+):
+    admin = await admin_user(db)
+    tier = seed_tiers["standard"]
+
+    with logged_in(admin):
+        response = await client.post(
+            f"/admin/config/tiers/{tier.id}",
+            data={"daily_limit_zar": daily, "monthly_limit_zar": monthly},
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 302
+    await db.refresh(tier)
+    assert tier.daily_limit_zar == Decimal("10000")   # untouched
+    assert tier.monthly_limit_zar == Decimal("50000")
+
+
 async def test_config_page_renders_both_editors(client: AsyncClient, db: AsyncSession, seed_fee_config):
     admin = await admin_user(db)
 

@@ -173,13 +173,15 @@ async def update_tier_limits(
     daily_limit_zar: str = Form(...),
     monthly_limit_zar: str = Form(...),
 ):
-    from decimal import Decimal, InvalidOperation
     try:
-        daily = Decimal(daily_limit_zar)
-        monthly = Decimal(monthly_limit_zar)
-        if daily < 0 or monthly < 0:
-            raise ValueError("Limits cannot be negative.")
-    except (InvalidOperation, ValueError) as exc:
+        daily = _decimal_field("Daily limit", daily_limit_zar)
+        monthly = _decimal_field("Monthly limit", monthly_limit_zar)
+        # Numeric(20, 2) holds 18 integer digits; anything larger fails in the DB.
+        if max(daily, monthly) >= Decimal("1e18"):
+            raise ValueError("Limits must be less than R1,000,000,000,000,000,000.")
+        if daily > monthly:
+            raise ValueError("Daily limit cannot be greater than the monthly limit.")
+    except ValueError as exc:
         set_flash(request, f"Invalid value: {exc}", "danger")
         return RedirectResponse(url="/admin/config", status_code=302)
 
