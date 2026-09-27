@@ -4,6 +4,7 @@
 {% from "components/ui.html" import check_draw %}
 {% block title %}XRPL Remit · Send money across borders on the XRPL Testnet{% endblock %}
 {% block public_main_class %} ds-public-main--wide{% endblock %}
+{% block site_footer %}{% include "components/site_footer.html" %}{% endblock %}
 
 {% block public_actions %}
 <a class="btn ds-btn-ghost ds-public-header__secondary" href="/login">Log in</a>
@@ -15,7 +16,6 @@
     The cards show no rate, fee or payout figures: live pricing stays behind login and KYC (FR-FX-07). -#}
 <section class="ds-landing-hero" aria-labelledby="landing-title">
   <div class="ds-landing-hero__copy ds-slide-up">
-    <p class="ds-landing-eyebrow"><i class="bi bi-mortarboard" aria-hidden="true"></i>XRPL Testnet prototype</p>
     <h1 class="ds-landing-hero__title" id="landing-title">
       Send money <span class="ds-highlight-word">across borders</span> on the XRPL.
     </h1>
@@ -71,10 +71,12 @@
   </div>
 </section>
 
-<section class="ds-landing-section ds-landing-section--band" aria-labelledby="how-title">
-  <h2 class="ds-landing-section__title" id="how-title">How it works</h2>
+{#- Sections below the hero slide up as they scroll into view (ui.js, [data-reveal]);
+    items marked [data-reveal-item] stagger. Visible by default: only JS hides them. -#}
+<section class="ds-landing-section ds-landing-section--band" id="how-it-works" aria-labelledby="how-title" data-reveal>
+  <h2 class="ds-landing-section__title" id="how-title" data-reveal-item>How it works</h2>
   <ol class="ds-how">
-    <li class="card ds-how-step">
+    <li class="card ds-how-step" data-reveal-item>
       <div class="card-body">
         <span class="ds-how-step__icon" aria-hidden="true"><i class="bi bi-person-check" aria-hidden="true"></i></span>
         <p class="ds-how-step__num">Step 1</p>
@@ -82,7 +84,7 @@
         <p class="ds-how-step__text">Create an account and submit your KYC details. An admin reviews and approves them before you can send.</p>
       </div>
     </li>
-    <li class="card ds-how-step">
+    <li class="card ds-how-step" data-reveal-item>
       <div class="card-body">
         <span class="ds-how-step__icon" aria-hidden="true"><i class="bi bi-credit-card" aria-hidden="true"></i></span>
         <p class="ds-how-step__num">Step 2</p>
@@ -90,7 +92,7 @@
         <p class="ds-how-step__text">Choose a recipient, see the exact quote, and pay with a simulated card. An admin confirms the payment.</p>
       </div>
     </li>
-    <li class="card ds-how-step">
+    <li class="card ds-how-step" data-reveal-item>
       <div class="card-body">
         <span class="ds-how-step__icon" aria-hidden="true"><i class="bi bi-arrow-left-right" aria-hidden="true"></i></span>
         <p class="ds-how-step__num">Step 3</p>
@@ -98,7 +100,7 @@
         <p class="ds-how-step__text">UCTUSD moves to the recipient's own Testnet wallet. Every transfer has a hash you can check in the XRPL explorer.</p>
       </div>
     </li>
-    <li class="card ds-how-step">
+    <li class="card ds-how-step" data-reveal-item>
       <div class="card-body">
         <span class="ds-how-step__icon" aria-hidden="true"><i class="bi bi-cash-coin" aria-hidden="true"></i></span>
         <p class="ds-how-step__num">Step 4</p>
@@ -109,9 +111,9 @@
   </ol>
 </section>
 
-<section class="ds-landing-section" aria-labelledby="real-title">
-  <h2 class="ds-landing-section__title" id="real-title">What's real, what's simulated</h2>
-  <div class="card ds-real-sim">
+<section class="ds-landing-section" aria-labelledby="real-title" data-reveal>
+  <h2 class="ds-landing-section__title" id="real-title" data-reveal-item>What's real, what's simulated</h2>
+  <div class="card ds-real-sim" data-reveal-item>
     <div class="ds-real-sim__col">
       <h3 class="ds-real-sim__title"><i class="bi bi-check-circle-fill" aria-hidden="true"></i>Real, on the XRPL Testnet</h3>
       <ul>
@@ -133,10 +135,10 @@
   </div>
 </section>
 
-<section class="ds-cta-band" aria-labelledby="cta-title">
-  <h2 class="ds-cta-band__title" id="cta-title">Try a transfer end to end</h2>
-  <p class="ds-cta-band__text">Create an account, get verified, and follow your first transfer onto the ledger.</p>
-  <a class="btn ds-btn-highlight btn-lg" href="/register">Create account</a>
+<section class="ds-cta-band" aria-labelledby="cta-title" data-reveal>
+  <h2 class="ds-cta-band__title" id="cta-title" data-reveal-item>Try a transfer end to end</h2>
+  <p class="ds-cta-band__text" data-reveal-item>Create an account, get verified, and follow your first transfer onto the ledger.</p>
+  <div data-reveal-item><a class="btn ds-btn-highlight btn-lg" href="/register">Create account</a></div>
 </section>
 {% endblock %}
 

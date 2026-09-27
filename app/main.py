@@ -10,7 +10,7 @@ from app.config import settings
 from app.database import AsyncSessionLocal, engine
 from app.errors import register_error_handlers
 from app.services import cashin_service, cashout_service
-from app.routers import admin, auth, beneficiaries, cashout, dev, kyc, sender, status, transactions, wallet
+from app.routers import admin, auth, beneficiaries, cashout, dev, kyc, public, sender, status, transactions, wallet
 
 
 logger = logging.getLogger(__name__)
@@ -87,6 +87,7 @@ app.add_middleware(SessionMiddleware, secret_key=settings.secret_key, max_age=36
 app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
 
 app.include_router(auth.router)
+app.include_router(public.router)
 app.include_router(sender.router)
 app.include_router(kyc.router)
 app.include_router(beneficiaries.router)

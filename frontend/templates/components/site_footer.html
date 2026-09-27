@@ -1,0 +1,47 @@
+{#- Site footer for the landing page and its info pages (they set the
+    site_footer block; auth and error pages don't). Every link opens without
+    login (app/routers/public.py). Content is generic placeholder text: no
+    licence, registration or phone numbers and no addresses. -#}
+<footer class="ds-site-footer">
+  <div class="ds-site-footer__inner">
+    <div class="ds-site-footer__brand">
+      <a class="ds-wordmark ds-wordmark--dark" href="/">
+        <span class="ds-wordmark__mark" aria-hidden="true"><i class="bi bi-arrow-left-right" aria-hidden="true"></i></span>XRPL Remit
+      </a>
+      <p class="ds-site-footer__tagline">Send rand, receive UCTUSD in a wallet on the XRPL Testnet.</p>
+    </div>
+    <nav class="ds-site-footer__nav" aria-label="Footer">
+      <div class="ds-site-footer__col">
+        <h2 class="ds-site-footer__title" id="footer-about">About us</h2>
+        <ul aria-labelledby="footer-about">
+          <li><a href="/about">About us</a></li>
+          <li><a href="/#how-it-works">How it works</a></li>
+        </ul>
+      </div>
+      <div class="ds-site-footer__col">
+        <h2 class="ds-site-footer__title" id="footer-contact">Contact us</h2>
+        <ul aria-labelledby="footer-contact">
+          <li><a href="/contact">Contact us</a></li>
+          <li><a href="mailto:support@example.com">support@example.com</a></li>
+        </ul>
+      </div>
+      <div class="ds-site-footer__col">
+        <h2 class="ds-site-footer__title" id="footer-legal">Legal</h2>
+        <ul aria-labelledby="footer-legal">
+          <li><a href="/legal/data-security">Data security</a></li>
+          <li><a href="/legal/information-security">Information security</a></li>
+          <li><a href="/legal/terms">Terms and conditions</a></li>
+          <li><a href="/legal/privacy">Privacy policy</a></li>
+        </ul>
+      </div>
+      <div class="ds-site-footer__col">
+        <h2 class="ds-site-footer__title" id="footer-help">Help and support</h2>
+        <ul aria-labelledby="footer-help">
+          <li><a href="/help">Help and support</a></li>
+          <li><a href="/help#faqs">FAQs</a></li>
+        </ul>
+      </div>
+    </nav>
+  </div>
+  <p class="ds-site-footer__note">Academic prototype. Runs on the XRPL Testnet; no real money moves.</p>
+</footer>

@@ -956,6 +956,29 @@ html.ds-reduce-motion *::after {
 html.ds-reduce-motion .ds-skeleton::after,
 html.ds-reduce-motion .ds-pulse-dot::after { animation: none !important; }
 
+/* Scroll reveal (landing, ui.js initReveal). Content is visible by default: an
+   element is hidden only while it carries .ds-reveal-pending AND ui.js has set
+   html.ds-reveal-ready after its observer is running, so no JS, an old browser
+   or a script error leaves everything on screen. Each element animates once;
+   only transform and opacity move. --reveal-i staggers items within a section. */
+html.ds-reveal-ready .ds-reveal-pending {
+  opacity: 0;
+  transform: translateY(24px);
+}
+.ds-reveal-in {
+  transition:
+    opacity calc(var(--dur-slow) * 2) var(--ease-out),
+    transform calc(var(--dur-slow) * 2) var(--ease-out);
+  transition-delay: calc(var(--reveal-i, 0) * 80ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  html.ds-reveal-ready .ds-reveal-pending { opacity: 1 !important; transform: none !important; }
+}
+html.ds-reduce-motion.ds-reveal-ready .ds-reveal-pending { opacity: 1 !important; transform: none !important; }
+@media print {
+  html.ds-reveal-ready .ds-reveal-pending { opacity: 1 !important; transform: none !important; }
+}
+
 
 /* 7. App shell (Phase 3) ---------------------------------------------------- */
 
@@ -1581,37 +1604,93 @@ a.ds-activity__row:hover { background: var(--bg); color: inherit; }
 
 .ds-public-main--wide { max-width: 1132px; }
 
-.ds-public-footer {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: var(--space-6) var(--space-4) calc(var(--space-8) + env(safe-area-inset-bottom, 0px));
-  border-top: 1px solid var(--border);
-  text-align: center;
+/* Site footer (landing + info pages): a full-width Chalk-tint band so it reads
+   as separate from the page; brand + four link columns, then the prototype
+   note, both inside the 1100px content width. On chalk-soft: muted text
+   5.33:1, body text 15.3:1, berry 5.92:1 (all AA, tests/test_theme.py). */
+.ds-site-footer {
+  margin-top: var(--space-8);
+  padding: var(--space-10) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+  background: var(--chalk-soft);
+  border-top: 1px solid var(--chalk);
   font-size: var(--text-sm);
   color: var(--text-muted);
 }
-.ds-public-footer p { margin: 0 auto; max-width: 70ch; }
-.ds-public-footer strong { color: var(--text); font-weight: 600; }
+.ds-site-footer__inner,
+.ds-site-footer__note { max-width: 1100px; margin-left: auto; margin-right: auto; }
+.ds-site-footer__inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 4fr);
+  gap: var(--space-8);
+}
+.ds-site-footer__tagline { margin: var(--space-3) 0 0; max-width: 30ch; }
+.ds-site-footer__nav {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+.ds-site-footer__title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text);
+}
+.ds-site-footer ul { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.ds-site-footer a:not(.ds-wordmark) { color: var(--text-muted); text-decoration: none; overflow-wrap: anywhere; }
+.ds-site-footer a:not(.ds-wordmark):hover { color: var(--accent); }   /* colour only, no underline */
+.ds-site-footer__note {
+  margin-top: var(--space-8);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--chalk);
+  font-size: var(--text-xs);
+}
+@media (max-width: 991.98px) {
+  .ds-site-footer__inner { grid-template-columns: 1fr; gap: var(--space-6); }
+}
+@media (max-width: 575.98px) {
+  .ds-site-footer { padding-top: var(--space-6); }
+  .ds-site-footer__nav { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: var(--space-5); }
+  .ds-site-footer__note { margin-top: var(--space-6); }
+}
+
+/* Info pages (about, contact, help, legal): readable prose in the public layout. */
+.ds-prose { max-width: 72ch; }
+.ds-prose h1 { margin: var(--space-4) 0 var(--space-3); font-size: var(--text-2xl); font-weight: 700; letter-spacing: -0.02em; }
+.ds-prose__lead { margin: 0 0 var(--space-6); font-size: var(--text-lg); color: var(--text-muted); }
+.ds-prose h2 { margin: var(--space-6) 0 var(--space-2); font-size: var(--text-lg); font-weight: 700; scroll-margin-top: var(--space-6); }
+.ds-prose p, .ds-prose ul { margin: 0 0 var(--space-3); line-height: 1.6; }
+.ds-prose ul { padding-left: 1.25rem; }
+.ds-prose li + li { margin-top: var(--space-1); }
+.ds-prose__note {
+  display: flex;
+  gap: var(--space-2);
+  margin: var(--space-6) 0 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--chalk-soft);
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+.ds-prose__related { margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--border); font-size: var(--text-sm); }
+.ds-prose__related ul { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); padding: 0; list-style: none; }
+.ds-prose__related li + li { margin-top: 0; }
+.ds-prose__related a[aria-current="page"] { color: var(--text); font-weight: 600; text-decoration: none; }
 
 /* Landing hero (Uvodo/Stripe pattern, our palette). */
+/* The hero fills the first screen below the header (--landing-hero-top: the
+   header + main padding above it), so "How it works" starts below the fold and
+   slides in only when scrolled to. svh = the smallest mobile viewport, so a
+   collapsing address bar never uncovers it; vh is the fallback. */
 .ds-landing-hero {
+  --landing-hero-top: 94px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: center;
+  align-content: center;
   gap: var(--space-10);
+  min-height: calc(100vh - var(--landing-hero-top));
+  min-height: calc(100svh - var(--landing-hero-top));
   padding: var(--space-8) 0;
-}
-.ds-landing-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0 0 var(--space-4);
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-pill);
-  background: var(--sage-soft);
-  color: var(--sage-ink);           /* 8.4:1 */
-  font-size: var(--text-sm);
-  font-weight: 600;
 }
 .ds-landing-hero__title {
   margin: 0 0 var(--space-5);
@@ -1695,7 +1774,7 @@ a.ds-activity__row:hover { background: var(--bg); color: inherit; }
   .ds-landing-cards { max-width: 520px; }
 }
 @media (max-width: 575.98px) {
-  .ds-landing-hero { padding-top: var(--space-4); }
+  .ds-landing-hero { --landing-hero-top: 79px; padding-top: var(--space-4); }
   .ds-landing-hero__lead { font-size: var(--text-base); }
   .ds-landing-hero__actions .btn { flex: 1 1 auto; }
   .ds-landing-card--send,
@@ -1816,6 +1895,10 @@ a.ds-activity__row:hover { background: var(--bg); color: inherit; }
 .ds-auth__aside > .card-body { padding: var(--space-6); }
 .ds-auth__aside .ds-section-title { margin-bottom: var(--space-4); }
 .ds-auth__switch { margin: var(--space-5) 0 0; text-align: center; font-size: var(--text-sm); color: var(--text-muted); }
+/* "Register" / "Log in": berry and semibold, no underline (hover darkens). The
+   weight is the non-colour cue: berry vs the muted text is only 1.11:1 (WCAG 1.4.1). */
+.ds-auth__switch a { color: var(--accent); font-weight: 600; text-decoration: none; }
+.ds-auth__switch a:hover { color: var(--accent-hover); text-decoration: none; }
 @media (max-width: 991.98px) {
   .ds-auth--wide { max-width: 600px; }
   .ds-auth__layout { grid-template-columns: 1fr; }
@@ -2019,7 +2102,6 @@ h1.ds-empty-state__title { font-size: var(--text-xl); font-weight: 700; }
    cards go; "How it works" becomes compact rows; everything is tighter. */
 @media (max-width: 575.98px) {
   .ds-landing-hero { gap: var(--space-6); padding-bottom: var(--space-4); }
-  .ds-landing-eyebrow { margin-bottom: var(--space-3); }
   .ds-landing-hero__title { margin-bottom: var(--space-3); }
   .ds-landing-hero__lead { margin-bottom: var(--space-5); }
   .ds-globe { max-width: 220px; margin-bottom: 0; }

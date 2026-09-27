@@ -652,6 +652,78 @@
     if (!confirmSubmit(form, event.submitter)) event.preventDefault();
   });
 
+  // ── Scroll reveal (landing) ────────────────────────────────────────────────
+  // Items in a [data-reveal] section (its [data-reveal-item]s, or the section
+  // itself) slide up once as they scroll into view; items arriving together
+  // stagger. Nothing is hidden when motion is reduced, IntersectionObserver is
+  // missing, or an item is already on screen, and the CSS hides only once
+  // html.ds-reveal-ready is set, after the observer is running.
+
+  var revealObserver = null;
+
+  function revealItem(item) {
+    if (!item.classList.contains("ds-reveal-pending")) return;
+    if (revealObserver) revealObserver.unobserve(item);
+    item.classList.add("ds-reveal-in");
+    void item.offsetWidth;               // commit the transition before leaving the hidden state
+    item.classList.remove("ds-reveal-pending");
+    item.addEventListener("transitionend", function done(event) {
+      if (event.target !== item) return;
+      item.removeEventListener("transitionend", done);
+      item.classList.remove("ds-reveal-in");
+      item.style.removeProperty("--reveal-i");
+    });
+  }
+
+  function revealAll() {
+    doc.querySelectorAll(".ds-reveal-pending").forEach(function (item) {
+      item.classList.remove("ds-reveal-pending");
+      item.style.removeProperty("--reveal-i");
+    });
+  }
+
+  function initReveal() {
+    var sections = doc.querySelectorAll("[data-reveal]");
+    if (!sections.length || revealObserver || reducedMotion() || !("IntersectionObserver" in window)) return;
+    try {
+      revealObserver = new IntersectionObserver(function (entries) {
+        var batch = {};                  // stagger only items that arrive together, per section
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          var key = entry.target._revealSection;
+          var i = batch[key] = (batch[key] == null ? 0 : batch[key] + 1);
+          entry.target.style.setProperty("--reveal-i", i);
+          revealItem(entry.target);
+        });
+      }, { rootMargin: "0px 0px -8% 0px", threshold: 0.12 });
+
+      sections.forEach(function (section, s) {
+        var items = section.querySelectorAll("[data-reveal-item]");
+        (items.length ? Array.prototype.slice.call(items) : [section]).forEach(function (item) {
+          if (item.getBoundingClientRect().top < window.innerHeight) return;   // already visible: leave it
+          item._revealSection = s;
+          item.classList.add("ds-reveal-pending");
+          revealObserver.observe(item);
+        });
+      });
+      root.classList.add("ds-reveal-ready");
+    } catch (err) {
+      revealAll();
+      return;
+    }
+
+    // Never leave content hidden: keyboard focus, printing, or switching to
+    // reduced motion shows it straight away.
+    doc.addEventListener("focusin", function (event) {
+      var item = event.target.closest && event.target.closest(".ds-reveal-pending");
+      if (item) revealItem(item);
+    });
+    window.addEventListener("beforeprint", revealAll);
+    if (motionQuery && motionQuery.addEventListener) {
+      motionQuery.addEventListener("change", function () { if (motionQuery.matches) revealAll(); });
+    }
+  }
+
   // ── Auto-wiring ────────────────────────────────────────────────────────────
 
   function wire(scope) {
@@ -675,7 +747,10 @@
 
     scope.querySelectorAll(".ds-flash").forEach(initFlash);
 
-    if (scope === doc) doc.querySelectorAll("[data-status-poll]").forEach(watchStatus);
+    if (scope === doc) {
+      doc.querySelectorAll("[data-status-poll]").forEach(watchStatus);
+      initReveal();
+    }
   }
 
   doc.addEventListener("click", function (event) {
@@ -720,6 +795,7 @@
     dismissFlash: dismissFlash,
     poll: poll,
     watchStatus: watchStatus,
+    revealAll: revealAll,
     wire: wire,
   };
 })();

@@ -22,6 +22,9 @@
 {% if false %}{% block page_back %}{% endblock %}{% endif %}
 {#- Same trick for the signed-out header's links (landing, login, register). -#}
 {% if false %}{% block public_actions %}{% endblock %}{% endif %}
+{#- The site footer is opt-in: only the landing page and the info pages it links
+    to set it (auth and error pages have none). -#}
+{% if false %}{% block site_footer %}{% endblock %}{% endif %}
 
 {% if user is defined and user %}
 <div class="ds-shell">
@@ -64,9 +67,7 @@
   {% if flash %}{{ flash_message(flash.message, flash.kind) }}{% endif %}
   {{ self.content() }}
 </main>
-<footer class="ds-public-footer">
-  <p>Academic prototype (ECO5040W). Transfers settle on the XRPL <strong>Testnet</strong>; card payments, exchange rates and fiat payouts are simulated. No real money moves.</p>
-</footer>
+{{ self.site_footer() }}
 {% endif %}
 
 {#- One shared confirmation dialog for forms marked data-confirm (ui.js). -#}
