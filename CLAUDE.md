@@ -93,7 +93,7 @@ Phase 2  KYC                           ✅ DONE   FR-KYC-01..05
 
 Phase 3  Beneficiaries & Limits        ✅ DONE   FR-BEN-01..05  FR-LIM-01..05
          Limit usage tracking un-stubbed in Phase 4 — it now sums real
-         transactions for the current UTC day/month.
+         transactions for the current day/month in DISPLAY_TIMEZONE.
 
 Phase 4  FX Quote Engine               ✅ DONE   FR-FX-01..08
          Transaction model, rate source, fee/margin calc, GET /quote.
@@ -119,8 +119,8 @@ Phase 7  Cash-Out (burn)               ✅ DONE   FR-CO-01..06
          Request (priced preview, snapshot persisted) → admin approve (wallet row
          locked, balance debited once) → RQ burn message → worker claims → recipient
          →issuer burn → completed + simulated fiat payout. Three post-signing
-         outcomes: validated success completes; a validated tec*/tef* restores the
-         reserve once; an UNKNOWN outcome holds the reserve (status stays approved,
+         outcomes: validated success completes; a validated tec* (or a malformed
+         tem* the ledger never took) restores the reserve once; an UNKNOWN outcome holds the reserve (status stays approved,
          "Awaiting ledger confirmation") and is never auto-resubmitted — an admin
          Reconcile resolves it from LastLedgerSequence + complete_ledgers coverage,
          never from elapsed time. Migration 0006. Worker: cashout_worker.py.
@@ -297,7 +297,7 @@ No `roles` array — role membership is the three booleans above.
 - **`limit_service.py`** must run inside the same DB transaction as the transaction insert (not
   before it) to prevent a TOCTOU race under concurrent sends from the same user.
   `get_daily_usage`/`get_monthly_usage` were un-stubbed in Phase 4 and now sum real
-  `transactions` rows for the current UTC day/month (a `failed` cash-in does not consume
+  `transactions` rows for the current day/month in `DISPLAY_TIMEZONE` (a `failed` cash-in does not consume
   allowance).
 - **`settlement_worker.py`** must check `idempotency_key` before processing. The first DB write
   claiming that key wins; subsequent redeliveries of the same message are a no-op (FR-MQ-04).

@@ -20,7 +20,8 @@ class Settings(BaseSettings):
     fx_rate_source: str = "config"
     fx_static_market_rate: str = "18.50"
 
-    # IANA zone used to display timestamps. Storage and limit windows stay UTC.
+    # IANA zone used to display timestamps and to bound daily/monthly limit windows.
+    # Timestamps are stored in UTC.
     display_timezone: str = "Africa/Johannesburg"
 
     # XRPL / UCTUSD — real values come from .env, never from defaults here.

@@ -5,7 +5,7 @@ XRPL currency codes are either exactly 3 characters or a 160-bit (40-hex-char) v
 into XRPL_CURRENCY_CODE — never guess it.
 
 The endpoint, treasury and issuer come from .env like everywhere else, so switching
-issuer stays a config change (CLAUDE.md §4). XRPL_CURRENCY_CODE is the one value this
+issuer stays a config change (brief §4). XRPL_CURRENCY_CODE is the one value this
 script exists to discover, so it is the only one it does not read.
 
 Usage: python scripts/check_currency.py
