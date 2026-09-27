@@ -2,17 +2,29 @@
 {% block heading %}Data security{% endblock %}
 {% block lead %}How the prototype protects the data you give it.{% endblock %}
 {% block body %}
+
 <h2>What we store</h2>
-<p>Your account details (name, email, mobile), your identity verification details, your recipients and your transfer history. We don't store card numbers: only the last four digits are kept for display.</p>
+<p>Your account details (name, email, mobile), your identity verification details, your recipients and your transfer
+  history. We don't store card numbers.</p>
 
 <h2>How it's protected</h2>
 <ul>
-  <li>Passwords are stored only as salted hashes, never in plain text.</li>
-  <li>The keys to each recipient's wallet are encrypted, and the encryption key is kept separately from the database.</li>
-  <li>Wallet keys are never shown on any page or sent in any response.</li>
-  <li>Sessions are signed and expire after a few hours.</li>
+  We ensure all sensitive data is encrypted in transit and at rest, and we limit access to it to the minimum number of
+  people who need it.
 </ul>
 
 <h2>Who can see it</h2>
-<p>Only you and the platform's administrators, who need it to review identity checks and confirm payments. Transfers on the XRPL Testnet are public by design: anyone can see a transaction's amount and wallet addresses, but not your name.</p>
+<p>Only you and the platform's administrators, who need it to review identity checks and confirm payments. Transfers on
+  the XRPL Testnet are public by design: anyone can see a transaction's amount and wallet addresses, but not your name.
+</p>
+
+<h2>If something goes wrong</h2>
+<p>If we learn that personal data has been accessed without permission, we'll let affected users know by email as soon
+  as we can, along with what happened and what we're doing about it.</p>
+
+<h2>A note on testing</h2>
+<p>Orbyt is a student prototype, not a production system. We take reasonable care, but we recommend using test details
+  wherever you can rather than real identity documents.</p>
+
+<p>Related: <a href="/privacy">Privacy policy</a> · <a href="/information-security">Information security</a></p>
 {% endblock %}

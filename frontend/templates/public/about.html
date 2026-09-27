@@ -1,14 +1,33 @@
 {% extends "public/_page.html" %}
 {% block heading %}About us{% endblock %}
-{% block lead %}Orbyt shows how a cross-border transfer could settle on a public ledger, from a card payment in rand to a dollar token in the recipient's own wallet.{% endblock %}
+{% block lead %}Orbyt shows how a cross-border transfer could settle on a public ledger, from a card payment in rand to
+a dollar token in the recipient's own wallet.{% endblock %}
 {% block body %}
 <h2>What we built</h2>
-<p>A sender in South Africa pays in rand. Once the payment is confirmed, the recipient receives UCTUSD, a dollar test token, in a wallet on the XRPL Testnet. The recipient can then cash out to USD or ZAR.</p>
-<p>Every transfer leaves a transaction hash that anyone can look up in the public XRPL explorer, so each step can be checked independently.</p>
+<p>A sender in South Africa pays in rand. Once the payment is confirmed, the recipient receives UCTUSD, a dollar test
+    token, in a wallet on the XRPL Testnet. The recipient can then cash out to USD or ZAR.</p>
+<p>Every transfer leaves a transaction hash that anyone can look up in the public XRPL explorer, so each step can be
+    checked independently.</p>
+
+<h2>How a transfer works</h2>
+<ol>
+    <li>The sender verifies their identity and adds a recipient.</li>
+    <li>They enter an amount in rand, review the quote and pay by card.</li>
+    <li>An administrator confirms the payment, and UCTUSD is sent to the recipient's wallet on the ledger.</li>
+    <li>The recipient holds the tokens or cashes out to USD or ZAR.</li>
+</ol>
 
 <h2>Why the XRPL</h2>
-<p>The XRP Ledger settles payments in a few seconds at very low cost, and it supports tokens issued by a trusted party. That makes it a good fit for testing a remittance flow end to end.</p>
+<p>The XRP Ledger settles payments in a few seconds at very low cost, and it supports tokens issued by a trusted party.
+    That makes it a good fit for testing a remittance flow end to end.</p>
+
+<h2>What's real and what's simulated</h2>
+<p>The ledger side is real: wallets, token transfers and burns happen on the XRPL Testnet and can be verified in the
+    explorer. The money side is simulated: card payments, exchange rates and fiat payouts are stand-ins, and no real
+    funds ever move.</p>
 
 <h2>Who we are</h2>
-<p>Orbyt is a class project built by a small student team. It is a prototype for learning and demonstration, not a licensed financial service, and it never handles real money.</p>
+<p>Orbyt is a class project built by a small student team. It is a prototype for learning and demonstration, not a
+    licensed financial service, and it never handles real money.</p>
+<p>Questions or feedback? <a href="/contact">Get in touch</a>.</p>
 {% endblock %}
