@@ -249,6 +249,9 @@ Changes for UCTUSD:
 - **`transactions.aml_flagged`** (added by migration 0007, Phase 8): NOT NULL boolean,
   `server_default false`, indexed. An admin review marker only — set from the transaction monitor,
   filterable there, and it never changes cash-in state, settlement state or any balance.
+- **`fee_config.min_send_zar`** (migration 0008): smallest send the platform will quote or accept, default R50.00, admin-editable.
+- **`transactions.settlement_last_ledger_sequence` + `settlement_submitted_ledger_index`** (migration 0009): the settlement payment's ledger range, so an admin retry can prove a missing payment dead.
+- **`transactions.settlement_previous_attempts`** (migration 0010): JSONB archive of attempts retired by an admin retry, each hash kept with its ledger range.
 
 Keep `transactions.idempotency_key` (UUID UNIQUE) as the queue-dedup / anti-double-credit key.
 

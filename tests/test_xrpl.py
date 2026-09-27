@@ -378,10 +378,12 @@ async def test_burn_goes_to_issuer_signed_by_recipient(db, ledger):
 async def test_seeds_never_logged(db, ledger, caplog, xrpl_settings):
     caplog.set_level(logging.DEBUG)
     user = await _recipient(db)
-    ledger.outcomes.append("tecPATH_DRY")
 
     wallet = await xrpl_service.provision_wallet(db, user, client=object())
-    await xrpl_service.send_from_treasury(wallet.xrpl_address, Decimal("1"), client=object())
+    assert wallet.trust_set_complete  # the TrustSet succeeded...
+    ledger.outcomes.append("tecPATH_DRY")  # ...so this failure lands on the payment
+    result = await xrpl_service.send_from_treasury(wallet.xrpl_address, Decimal("1"), client=object())
+    assert result.result_code == "tecPATH_DRY"
 
     assert ledger.faucet_accounts[0].seed not in caplog.text
     assert xrpl_settings.seed not in caplog.text

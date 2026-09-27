@@ -241,8 +241,10 @@ async def update_fees(
         set_flash(request, "Invalid value: Mock market rate must be greater than zero.", "danger")
         return RedirectResponse(url="/admin/config", status_code=302)
 
-    # A minimum at or below the fixed fee would let a send through that the fee
-    # consumes entirely — the floor exists precisely to make that unreachable.
+    # Policy guard: a minimum at or below the fixed fee is plainly misconfigured.
+    # It does not by itself stop a fully consumed send — once a percentage fee
+    # applies, the fee can still exceed an amount just above this floor.
+    # fx_service.calculate_quote's AmountTooSmall is what refuses that send.
     if values["min_send_zar"] <= values["fixed_fee_zar"]:
         set_flash(
             request,
