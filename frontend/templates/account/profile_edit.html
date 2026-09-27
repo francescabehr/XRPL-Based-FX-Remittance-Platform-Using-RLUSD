@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Edit Details · XRPL Remit{% endblock %}
+
+{% block page_title %}Edit details{% endblock %}
+{% block page_back %}/profile{% endblock %}
+
+{#- POST /profile. Full name is an input only while the user has no KYC submission (the service enforces it too); Cancel leaves without saving. -#}
+{% block content %}
+<div class="ds-form-page">
+<section class="card" aria-labelledby="details-title">
+  <div class="card-body p-4">
+    <form method="post" action="/profile" novalidate>
+      <div class="ds-form-section"><fieldset>
+        <legend class="ds-form-section__title" id="details-title">Your details</legend>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label" for="profile-full_name">Full name</label>
+            {%- if name_editable %}
+            <input type="text" name="full_name" class="form-control" id="profile-full_name" autocomplete="name"
+                   value="{{ details.full_name }}" required maxlength="255" aria-describedby="profile-name-help">
+            <div class="form-text" id="profile-name-help">You can change your name until you submit identity verification.</div>
+            {%- else %}
+            <input type="text" readonly class="form-control-plaintext" id="profile-full_name"
+                   value="{{ user.full_name }}" aria-describedby="profile-name-help">
+            <div class="form-text" id="profile-name-help">
+              {%- if user.is_admin %}Administrator names can't be changed here.
+              {%- else %}Your name is locked because you've submitted identity verification.{% endif -%}
+            </div>
+            {%- endif %}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="profile-email">Email</label>
+            <input type="email" name="email" class="form-control" id="profile-email" autocomplete="email"
+                   value="{{ details.email }}" required maxlength="255" aria-describedby="profile-email-help">
+            <div class="form-text" id="profile-email-help">You log in with this email.</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="profile-mobile">Mobile</label>
+            <input type="tel" name="mobile" class="form-control" id="profile-mobile" autocomplete="tel"
+                   value="{{ details.mobile }}" required pattern="\+?[0-9]{7,15}" maxlength="16" aria-describedby="profile-mobile-help">
+            <div class="form-text" id="profile-mobile-help">Digits only, optionally starting with +, like +27821234567.</div>
+          </div>
+        </div>
+      </fieldset></div>
+      <div class="mt-4 d-flex flex-wrap gap-2">
+        <button type="submit" class="btn btn-primary px-4">Save changes</button>
+        <a href="/profile" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</section>
+</div>
+{% endblock %}

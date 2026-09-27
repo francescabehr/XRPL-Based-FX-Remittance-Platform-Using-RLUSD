@@ -1,0 +1,22 @@
+{#- XRPL transaction hash: truncated, linked to the Testnet explorer (FR-WAL-05),
+    with a copy button. The link keeps the full explorer URL.
+
+    Usage:
+      {% from "components/xrpl.html" import tx_hash %}
+      {{ tx_hash(txn.xrpl_tx_hash) }}
+-#}
+{% macro tx_hash(value, short=true) -%}
+{%- if value -%}
+<span class="ds-hash">
+  <a href="{{ explorer_tx_url }}{{ value }}" target="_blank" rel="noopener" title="{{ value }}">
+    {{- value[:10] ~ "…" if short else value -}}
+    <i class="bi bi-box-arrow-up-right ms-1" aria-hidden="true"></i><span class="visually-hidden"> (opens the XRPL Testnet explorer in a new tab)</span>
+  </a>
+  <button type="button" class="btn btn-outline-secondary btn-sm ds-hash__copy" data-copy="{{ value }}" aria-label="Copy transaction hash">
+    <span data-copy-label>Copy</span>
+  </button>
+</span>
+{%- else -%}
+<span class="text-muted">—</span>
+{%- endif -%}
+{%- endmacro %}

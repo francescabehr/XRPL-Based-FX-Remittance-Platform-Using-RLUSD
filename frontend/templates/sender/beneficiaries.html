@@ -1,69 +1,64 @@
 {% extends "base.html" %}
-{% block title %}Beneficiaries — XRPL Remit{% endblock %}
+{% from "components/status.html" import status_badge %}
+{% from "components/ui.html" import empty_state %}
+{% block title %}Beneficiaries · XRPL Remit{% endblock %}
+
+{% block page_title %}Beneficiaries{% endblock %}
+{% block page_actions %}
+  <a href="/beneficiaries/new" class="btn btn-primary"><i class="bi bi-person-plus me-1" aria-hidden="true"></i>Add beneficiary</a>
+{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <h3 class="fw-bold mb-0"><i class="bi bi-people me-2"></i>Beneficiaries</h3>
-  <a href="/beneficiaries/new" class="btn btn-primary">
-    <i class="bi bi-person-plus me-1"></i>Add Beneficiary
-  </a>
-</div>
+{%- set can_send_now = user.can_send and user.kyc_status.value == "approved" -%}
 
 {% if beneficiaries %}
-<div class="card shadow-sm">
-  <div class="table-responsive">
-    <table class="table table-hover mb-0 align-middle">
-      <thead class="table-light">
-        <tr>
-          <th>Name</th>
-          <th>Contact</th>
-          <th>Country</th>
-          <th>Payout</th>
-          <th>Relationship</th>
-          <th>Linked account</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for b in beneficiaries %}
-        <tr>
-          <td class="fw-semibold">{{ b.full_name }}</td>
-          <td class="text-muted small">
-            {% if b.email %}<div>{{ b.email }}</div>{% endif %}
-            {% if b.mobile %}<div>{{ b.mobile }}</div>{% endif %}
-          </td>
-          <td>{{ b.country }}</td>
-          <td><span class="badge bg-secondary">{{ b.payout_currency.value }}</span></td>
-          <td class="text-muted">{{ b.relation_type }}</td>
-          <td>
-            {% if b.recipient_user_id %}
-              <span class="badge bg-success"><i class="bi bi-check-lg me-1"></i>Linked</span>
-            {% else %}
-              <span class="badge bg-light text-muted border">Not registered</span>
-            {% endif %}
-          </td>
-          <td class="text-end">
-            <a href="/beneficiaries/{{ b.id }}/edit" class="btn btn-sm btn-outline-secondary me-1">
-              <i class="bi bi-pencil"></i>
-            </a>
-            <form method="post" action="/beneficiaries/{{ b.id }}/delete" class="d-inline"
-                  onsubmit="return confirm('Remove {{ b.full_name }}?')">
-              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
+<p class="text-muted mb-3">{{ beneficiaries|length }} {{ "person" if beneficiaries|length == 1 else "people" }} you can send to.</p>
+<ul class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 list-unstyled mb-0">
+  {% for b in beneficiaries %}
+  {%- set initials = (b.full_name.split()|map("first")|list)[:2]|join|upper %}
+  <li class="col">
+    <article class="card h-100 ds-ben-card" aria-labelledby="ben-{{ b.id }}-name">
+      <div class="card-body">
+        <div class="ds-ben-card__head">
+          <span class="ds-avatar" aria-hidden="true">{{ initials }}</span>
+          <div class="ds-ben-card__who">
+            <h2 class="ds-ben-card__name" id="ben-{{ b.id }}-name">{{ b.full_name }}</h2>
+            <p class="ds-ben-card__meta">{{ b.relation_type }} · {{ b.country }}</p>
+          </div>
+        </div>
+        <div class="ds-ben-card__badges">
+          {{ status_badge("linked" if b.recipient_user_id else "not_registered", "beneficiary") }}
+          <span class="badge ds-status ds-status--neutral"><span class="visually-hidden">Payout currency: </span>{{ b.payout_currency.value }} payout</span>
+        </div>
+        {%- if b.email or b.mobile %}
+        <ul class="ds-ben-card__contact">
+          {% if b.email %}<li><i class="bi bi-envelope" aria-hidden="true"></i><span>{{ b.email }}</span></li>{% endif %}
+          {% if b.mobile %}<li><i class="bi bi-phone" aria-hidden="true"></i><span>{{ b.mobile }}</span></li>{% endif %}
+        </ul>
+        {%- endif %}
+      </div>
+      <div class="card-footer ds-ben-card__actions">
+        {%- if can_send_now %}
+        <a href="/send?beneficiary_id={{ b.id }}" class="btn btn-sm btn-primary"><i class="bi bi-send me-1" aria-hidden="true"></i>Send<span class="visually-hidden"> to {{ b.full_name }}</span></a>
+        {%- endif %}
+        <a href="/beneficiaries/{{ b.id }}/edit" class="btn btn-sm btn-outline-secondary" aria-label="Edit {{ b.full_name }}">
+          <i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit
+        </a>
+        <form method="post" action="/beneficiaries/{{ b.id }}/delete" class="d-inline ms-auto"
+              data-confirm="Remove {{ b.full_name }} from your beneficiaries? Past transfers are kept." data-confirm-title="Remove beneficiary?" data-confirm-label="Remove">
+          <button class="btn btn-sm btn-outline-danger" aria-label="Remove {{ b.full_name }}"><i class="bi bi-trash" aria-hidden="true"></i></button>
+        </form>
+      </div>
+    </article>
+  </li>
+  {% endfor %}
+</ul>
 {% else %}
-<div class="text-center py-5 text-muted">
-  <i class="bi bi-people fs-1 d-block mb-2"></i>
-  <strong>No beneficiaries yet.</strong>
-  <div class="mt-2">
-    <a href="/beneficiaries/new" class="btn btn-outline-primary">Add your first beneficiary</a>
-  </div>
+<div class="card">
+  {{ empty_state("No beneficiaries yet",
+                 "Add someone you want to send money to. If they already have an account, we link it automatically.",
+                 {"label": "Add your first beneficiary", "href": "/beneficiaries/new", "icon": "person-plus"},
+                 icon="people") }}
 </div>
 {% endif %}
 {% endblock %}

@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% from "components/money.html" import amount %}
+{% from "components/status.html" import status_badge %}
+{% from "components/ui.html" import stat_tile, empty_state %}
+{% block title %}Profile · XRPL Remit{% endblock %}
+
+{#- Read-only summary. Editing happens on /profile/edit and /profile/password.
+    The wallet card renders the public address only — never the encrypted key or
+    its key id. -#}
+{% block content %}
+{%- set initials = (user.full_name.split()|map("first")|list)[:2]|join|upper -%}
+{%- if user.is_admin -%}
+  {%- set account_type = "Administrator" -%}
+{%- elif user.can_send and user.can_receive -%}
+  {%- set account_type = "Sender and recipient" -%}
+{%- elif user.can_receive -%}
+  {%- set account_type = "Recipient" -%}
+{%- else -%}
+  {%- set account_type = "Sender" -%}
+{%- endif -%}
+{%- set kyc = user.kyc_status.value -%}
+
+<div class="row g-4">
+  <div class="col-lg-6 d-flex flex-column gap-4">
+    <section class="card" aria-labelledby="identity-title">
+      <div class="card-body">
+        <div class="ds-profile-head">
+          <span class="ds-avatar ds-avatar--lg" aria-hidden="true">{{ initials }}</span>
+          <div class="ds-profile-head__who">
+            <h2 class="ds-profile-head__name" id="identity-title">{{ user.full_name }}</h2>
+            <p class="ds-profile-head__meta">Member since {{ user.created_at|localtime('%d %B %Y') }}</p>
+          </div>
+        </div>
+        <dl class="ds-facts">
+          <dt>Full name</dt><dd>{{ user.full_name }}</dd>
+          <dt>Email</dt><dd>{{ user.email }}</dd>
+          <dt>Mobile</dt><dd>{{ user.mobile }}</dd>
+          <dt>Account type</dt><dd>{{ account_type }}</dd>
+        </dl>
+        <div class="d-flex flex-wrap gap-2 mt-4">
+          <a href="/profile/edit" class="btn btn-primary"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Edit details</a>
+          <a href="/profile/password" class="btn btn-outline-secondary"><i class="bi bi-key me-1" aria-hidden="true"></i>Change password</a>
+        </div>
+      </div>
+    </section>
+
+    {% if not user.is_admin %}
+    <section class="card" aria-labelledby="kyc-title">
+      <div class="card-body">
+        <div class="ds-card-head mb-2">
+          <h2 class="ds-section-title" id="kyc-title">Verification</h2>
+          {{ status_badge(user.kyc_status, "kyc") }}
+        </div>
+        <p class="text-muted mb-3">
+          {%- if kyc == "approved" %}Your identity is verified{% if user.can_send %}, so you can send money{% endif %}.
+          {%- elif kyc == "pending" %}An admin is reviewing your details. We'll update your status here.
+          {%- elif kyc == "rejected" %}Your verification was not approved. Please check your details and submit them again.
+          {%- else %}Verify your identity{% if user.can_send %} to start sending money{% endif %}.{% endif -%}
+        </p>
+        {%- if kyc in ("not_submitted", "rejected") %}
+        <a href="/kyc" class="btn btn-primary">{{ "Start verification" if kyc == "not_submitted" else "Resubmit" }}</a>
+        {%- else %}
+        <a href="/kyc" class="btn btn-outline-secondary">View submission</a>
+        {%- endif %}
+      </div>
+    </section>
+    {% endif %}
+  </div>
+
+  {% if not user.is_admin and (user.can_send or user.can_receive) %}
+  <div class="col-lg-6 d-flex flex-column gap-4">
+    {% if user.can_send %}
+    <section class="card" aria-labelledby="limits-title">
+      <div class="card-body">
+        <div class="ds-card-head mb-3">
+          <h2 class="ds-section-title" id="limits-title">Sending limits</h2>
+          {% if tier %}<span class="badge ds-status ds-status--neutral">{{ tier.tier_name|capitalize }} tier</span>{% endif %}
+        </div>
+        {% if tier %}
+        {%- macro _tone(pct) %}{{ "danger" if pct >= 90 else ("warning" if pct >= 70 else "") }}{% endmacro -%}
+        <div class="d-flex flex-column gap-3">
+          {{ stat_tile("Used today", amount(daily_used, "ZAR"),
+                       amount(daily_remaining, "ZAR", size="sm") ~ " left of " ~ amount(daily_limit, "ZAR", size="sm") ~ " daily limit",
+                       pct=daily_pct, tone=_tone(daily_pct)|trim or none) }}
+          {{ stat_tile("Used this month", amount(monthly_used, "ZAR"),
+                       amount(monthly_remaining, "ZAR", size="sm") ~ " left of " ~ amount(monthly_limit, "ZAR", size="sm") ~ " monthly limit",
+                       pct=monthly_pct, tone=_tone(monthly_pct)|trim or none) }}
+        </div>
+        {% else %}
+        {{ empty_state("No limits set", "Sending limits haven't been configured yet.", icon="sliders") }}
+        {% endif %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if user.can_receive %}
+    <section class="card" aria-labelledby="wallet-title">
+      <div class="card-body">
+        <div class="ds-card-head mb-3">
+          <h2 class="ds-section-title" id="wallet-title">XRPL wallet</h2>
+          {% if wallet %}<a href="/wallet" class="btn btn-sm ds-btn-ghost">Open wallet <i class="bi bi-arrow-right" aria-hidden="true"></i></a>{% endif %}
+        </div>
+        {% if wallet %}
+        <p class="ds-hero__label">XRPL Testnet address</p>
+        <div class="ds-address">
+          <span class="ds-address__value">{{ wallet.xrpl_address }}</span>
+          <button type="button" class="btn btn-outline-secondary btn-sm ds-hash__copy" data-copy="{{ wallet.xrpl_address }}" aria-label="Copy wallet address">
+            <span data-copy-label>Copy</span>
+          </button>
+        </div>
+        <p class="small mb-3">
+          <a href="{{ explorer_tx_url|replace("/transactions/", "/accounts/") }}{{ wallet.xrpl_address }}" target="_blank" rel="noopener">
+            View on explorer <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span class="visually-hidden"> (opens in a new tab)</span>
+          </a>
+        </p>
+        <dl class="ds-facts">
+          <dt>Trust line</dt>
+          <dd>{{ "Set up to the UCTUSD issuer" if wallet.trust_set_complete else "Not set up yet" }}</dd>
+          <dt>Network</dt><dd>XRPL Testnet</dd>
+        </dl>
+        {% else %}
+        {{ empty_state("No wallet yet", "Your XRPL Testnet wallet is created when your first transfer arrives.", icon="wallet2") }}
+        {% endif %}
+      </div>
+    </section>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

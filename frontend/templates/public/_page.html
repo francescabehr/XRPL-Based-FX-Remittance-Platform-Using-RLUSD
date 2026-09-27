@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{#- Layout for the footer's info pages (app/routers/public.py). Always the
+    signed-out layout: the route never passes `user`, only `home` (the dashboard
+    link for a visitor who happens to be signed in). Pages fill in heading,
+    lead and body; the placeholder note is shared. -#}
+{% block title %}{{ self.heading() }} · XRPL Remit{% endblock %}
+{% block public_main_class %} ds-public-main--wide{% endblock %}
+{% block site_footer %}{% include "components/site_footer.html" %}{% endblock %}
+
+{% block public_actions %}
+{%- if home %}
+<a class="btn btn-primary" href="{{ home }}">{{ "Go to the overview" if home == "/admin" else "Go to your dashboard" }}</a>
+{%- else %}
+<a class="btn ds-btn-ghost ds-public-header__secondary" href="/login">Log in</a>
+<a class="btn btn-primary" href="/register">Create account</a>
+{%- endif %}
+{% endblock %}
+
+{% block content %}
+<article class="ds-prose">
+  <h1>{% block heading %}{% endblock %}</h1>
+  <p class="ds-prose__lead">{% block lead %}{% endblock %}</p>
+  {% block body %}{% endblock %}
+  <p class="ds-prose__note"><i class="bi bi-mortarboard" aria-hidden="true"></i><span>XRPL Remit is an academic prototype. This page is placeholder text written for the project; it is not a statement by a real company and not legal advice.</span></p>
+  {%- block related %}{% endblock %}
+</article>
+{% endblock %}

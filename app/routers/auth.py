@@ -4,17 +4,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_current_user, get_flash, set_flash
-from app.services.auth_service import authenticate_user, create_user
+from app.services.auth_service import (
+    EMAIL_INVALID, MOBILE_INVALID, authenticate_user, create_user, email_is_valid, mobile_is_valid, password_problems,
+)
 from app.templating import make_templates
 
 router = APIRouter()
 templates = make_templates()
 
 
+@router.get("/", response_class=HTMLResponse)
+async def landing(request: Request, user=Depends(get_current_user)):
+    if user:
+        return RedirectResponse(url="/dashboard" if not user.is_admin else "/admin", status_code=302)
+    return templates.TemplateResponse("public/landing.html", {"request": request, "flash": get_flash(request)})
+
+
 @router.get("/login", response_class=HTMLResponse)
 async def login_form(request: Request, user=Depends(get_current_user)):
     if user:
-        return RedirectResponse(url="/dashboard" if not user.is_admin else "/admin/kyc", status_code=302)
+        return RedirectResponse(url="/dashboard" if not user.is_admin else "/admin", status_code=302)
     return templates.TemplateResponse("auth/login.html", {"request": request, "flash": get_flash(request)})
 
 
@@ -33,7 +42,7 @@ async def login(
             status_code=401,
         )
     request.session["user_id"] = str(user.id)
-    return RedirectResponse(url="/admin/kyc" if user.is_admin else "/dashboard", status_code=302)
+    return RedirectResponse(url="/admin" if user.is_admin else "/dashboard", status_code=302)
 
 
 @router.get("/register", response_class=HTMLResponse)
@@ -53,17 +62,20 @@ async def register(
     confirm_password: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
+    # Format rules shared with profile edits (checked here, not in create_user, so
+    # seed scripts are unaffected).
     errors = []
-    if password != confirm_password:
-        errors.append("Passwords do not match.")
-    if len(password) < 8:
-        errors.append("Password must be at least 8 characters.")
+    if not email_is_valid(email.lower().strip()):
+        errors.append(EMAIL_INVALID)
+    if not mobile_is_valid(mobile.strip()):
+        errors.append(MOBILE_INVALID)
+    errors += password_problems(password, confirm_password)
 
     if not errors:
         try:
             user = await create_user(db, full_name=full_name, email=email, mobile=mobile, password=password)
             request.session["user_id"] = str(user.id)
-            set_flash(request, "Account created — welcome! Please complete your KYC to send money.", "success")
+            set_flash(request, "Account created. Welcome! Complete your KYC to start sending money.", "success")
             return RedirectResponse(url="/dashboard", status_code=302)
         except ValueError as exc:
             errors.append(str(exc))

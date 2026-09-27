@@ -1,0 +1,11 @@
+{% extends "public/_page.html" %}
+{#- Legal pages link to one another at the foot. -#}
+{% block related %}
+<nav class="ds-prose__related" aria-label="Legal pages">
+  <ul>
+    {%- for slug, label in legal_pages %}
+    <li><a href="/legal/{{ slug }}"{% if request.url.path == "/legal/" ~ slug %} aria-current="page"{% endif %}>{{ label }}</a></li>
+    {%- endfor %}
+  </ul>
+</nav>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "public/_legal.html" %}
+{% block heading %}Data security{% endblock %}
+{% block lead %}How the prototype protects the data you give it.{% endblock %}
+{% block body %}
+<h2>What we store</h2>
+<p>Your account details (name, email, mobile), your identity verification details, your recipients and your transfer history. We don't store card numbers: only the last four digits are kept for display.</p>
+
+<h2>How it's protected</h2>
+<ul>
+  <li>Passwords are stored only as salted hashes, never in plain text.</li>
+  <li>The keys to each recipient's wallet are encrypted, and the encryption key is kept separately from the database.</li>
+  <li>Wallet keys are never shown on any page or sent in any response.</li>
+  <li>Sessions are signed and expire after a few hours.</li>
+</ul>
+
+<h2>Who can see it</h2>
+<p>Only you and the platform's administrators, who need it to review identity checks and confirm payments. Transfers on the XRPL Testnet are public by design: anyone can see a transaction's amount and wallet addresses, but not your name.</p>
+{% endblock %}

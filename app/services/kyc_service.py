@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime, timezone
 from typing import Optional
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -28,6 +28,14 @@ async def get_pending_submissions(db: AsyncSession) -> list[KYCSubmission]:
         .order_by(KYCSubmission.submitted_at.asc())
     )
     return list(result.scalars().all())
+
+
+async def count_pending_submissions(db: AsyncSession) -> int:
+    """Admin overview tile (read-only)."""
+    result = await db.execute(
+        select(func.count()).select_from(KYCSubmission).where(KYCSubmission.status == KYCSubmissionStatus.pending)
+    )
+    return result.scalar_one()
 
 
 async def get_submission_by_id(

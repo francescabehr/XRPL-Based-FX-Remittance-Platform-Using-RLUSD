@@ -15,7 +15,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from typing import Callable, Optional
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -528,6 +528,30 @@ async def list_pending_cashins(db: AsyncSession) -> list[Transaction]:
         .order_by(Transaction.created_at.asc())
     )
     return list((await db.execute(stmt)).scalars().all())
+
+
+# --- admin overview counts (read-only) ---
+
+async def _count(db: AsyncSession, *conditions) -> int:
+    result = await db.execute(select(func.count()).select_from(Transaction).where(*conditions))
+    return result.scalar_one()
+
+
+async def count_pending_cashins(db: AsyncSession) -> int:
+    return await _count(db, Transaction.cashin_status == CashInStatus.pending)
+
+
+async def count_failed_settlements(db: AsyncSession) -> int:
+    return await _count(db, Transaction.settlement_status == SettlementStatus.failed)
+
+
+async def count_settled_since(db: AsyncSession, start: datetime) -> int:
+    """Settlements validated on-ledger at or after `start` (a UTC instant)."""
+    return await _count(
+        db,
+        Transaction.settlement_status == SettlementStatus.completed,
+        Transaction.settled_at >= start,
+    )
 
 
 async def list_settlement_issues(db: AsyncSession) -> list[Transaction]:

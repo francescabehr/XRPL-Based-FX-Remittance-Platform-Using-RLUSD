@@ -280,7 +280,7 @@ async def approve(
     amount = Decimal(req.uctusd_amount)
     if Decimal(wallet.balance_uctusd) < amount:
         raise CashOutError(
-            f"Balance is only {Decimal(wallet.balance_uctusd):,.6f} UCTUSD — not enough to "
+            f"Balance is only {Decimal(wallet.balance_uctusd):,.6f} UCTUSD, not enough to "
             f"reserve {amount:,.6f}. The recipient may have cashed out since this was requested."
         )
 
@@ -478,6 +478,22 @@ async def list_for_recipient(db: AsyncSession, recipient_id: uuid.UUID) -> list[
         .order_by(CashOutRequest.created_at.desc())
     )
     return list((await db.execute(stmt)).scalars().all())
+
+
+async def count_open(db: AsyncSession) -> dict[str, int]:
+    """Admin overview tile (read-only): requests awaiting a decision, and approved
+    burns whose outcome is unknown — the SQL form of awaiting_ledger_confirmation."""
+    requested = await db.execute(
+        select(func.count()).select_from(CashOutRequest).where(CashOutRequest.status == CashOutStatus.requested)
+    )
+    awaiting = await db.execute(
+        select(func.count()).select_from(CashOutRequest).where(
+            CashOutRequest.status == CashOutStatus.approved,
+            CashOutRequest.xrpl_burn_tx_hash.is_not(None),
+            CashOutRequest.failure_reason.like("outcome_unknown%"),
+        )
+    )
+    return {"requested": requested.scalar_one(), "awaiting_ledger": awaiting.scalar_one()}
 
 
 async def list_open(db: AsyncSession) -> list[CashOutRequest]:

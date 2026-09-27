@@ -1,0 +1,27 @@
+{% extends "public/_page.html" %}
+{% block heading %}Help and support{% endblock %}
+{% block lead %}How to get started, and answers to the questions people ask most.{% endblock %}
+{% block body %}
+<h2 id="getting-started">Getting started</h2>
+<ul>
+  <li><a href="/register">Create an account</a> with your email and mobile number.</li>
+  <li>Verify your identity. An admin reviews your details before you can send.</li>
+  <li>Add a recipient, enter an amount in rand and review the quote.</li>
+  <li>Pay with the simulated card, then follow the transfer on its status page.</li>
+</ul>
+
+<h2 id="faqs">FAQs</h2>
+<h3 class="h6 fw-bold mt-3">Is this real money?</h3>
+<p>No. Card payments, exchange rates and fiat payouts are simulated, and UCTUSD is a test token on the XRPL Testnet with no real value.</p>
+<h3 class="h6 fw-bold mt-3">How long does a transfer take?</h3>
+<p>Once an admin confirms your payment, settlement on the XRPL Testnet usually takes a few seconds. The status page updates on its own.</p>
+<h3 class="h6 fw-bold mt-3">Why can't I send money yet?</h3>
+<p>Sending is switched on once your identity verification is approved. You can check its status under Verification after you log in.</p>
+<h3 class="h6 fw-bold mt-3">How do I cash out?</h3>
+<p>Recipients choose Cash out in their wallet, enter an amount and pick USD or ZAR. The UCTUSD is burned on the ledger and the payout is simulated.</p>
+<h3 class="h6 fw-bold mt-3">I forgot my password</h3>
+<p>Password resets aren't available in this prototype. <a href="/contact">Contact us</a> and we'll help.</p>
+
+<h2>Still stuck?</h2>
+<p><a href="/contact">Contact us</a> and we'll get back to you.</p>
+{% endblock %}

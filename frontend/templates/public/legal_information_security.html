@@ -1,0 +1,17 @@
+{% extends "public/_legal.html" %}
+{% block heading %}Information security{% endblock %}
+{% block lead %}The practices we follow to keep the platform and its ledger activity safe.{% endblock %}
+{% block body %}
+<h2>Access</h2>
+<p>Admin tools sit behind a single access check, and every admin page requires an administrator account. Users can only see their own transfers, wallets and cash-outs.</p>
+
+<h2>Ledger activity</h2>
+<ul>
+  <li>Each payment is recorded before it is submitted, so a transfer is never sent twice.</li>
+  <li>A payment whose outcome is unclear is never retried automatically; it is checked against the ledger first.</li>
+  <li>Balances change only after the ledger confirms a transaction.</li>
+</ul>
+
+<h2>Reporting a problem</h2>
+<p>If you think you've found a security issue, email <a href="mailto:security@example.com">security@example.com</a> with the steps to reproduce it. Please don't test against other people's accounts.</p>
+{% endblock %}
