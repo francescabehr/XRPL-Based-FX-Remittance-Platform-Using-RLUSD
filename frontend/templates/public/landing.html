@@ -2,7 +2,7 @@
 {% from "components/money.html" import amount %}
 {% from "components/status.html" import status_badge %}
 {% from "components/ui.html" import check_draw %}
-{% block title %}XRPL Remit · Send rand, settle on the XRPL Testnet{% endblock %}
+{% block title %}XRPL Remit · Send money across borders on the XRPL Testnet{% endblock %}
 {% block public_main_class %} ds-public-main--wide{% endblock %}
 
 {% block public_actions %}
@@ -17,11 +17,12 @@
   <div class="ds-landing-hero__copy ds-slide-up">
     <p class="ds-landing-eyebrow"><i class="bi bi-mortarboard" aria-hidden="true"></i>XRPL Testnet prototype</p>
     <h1 class="ds-landing-hero__title" id="landing-title">
-      Send rand home. They receive <span class="ds-highlight-word">dollars</span> on the XRPL.
+      Send money <span class="ds-highlight-word">across borders</span> on the XRPL.
     </h1>
     <p class="ds-landing-hero__lead">
-      Pay in ZAR by card. Your recipient gets UCTUSD in their own XRPL Testnet wallet within seconds,
-      then cashes out to USD or ZAR whenever they like.
+      Pay in rand by card. Once your payment is confirmed, your recipient receives UCTUSD, a dollar test
+      token, in their own XRPL Testnet wallet in about 15 seconds. They can cash out to USD or ZAR
+      whenever they like.
     </p>
     <div class="ds-landing-hero__actions">
       <a class="btn btn-primary btn-lg" href="/register">Create account</a>

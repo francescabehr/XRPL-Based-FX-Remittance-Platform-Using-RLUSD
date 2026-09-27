@@ -89,7 +89,7 @@ async def test_landing_globe_is_decorative(client: AsyncClient):
     assert 'aria-hidden="true"' in svg
     assert page.count('class="ds-globe__route"') == 3
     assert page.count("<h1") == 1
-    assert "<title>XRPL Remit · Send rand" in page
+    assert "<title>XRPL Remit · Send money across borders" in page
 
 
 async def test_register_flash_has_no_em_dash(client: AsyncClient):
