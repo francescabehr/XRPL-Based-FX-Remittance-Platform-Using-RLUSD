@@ -1,3 +1,51 @@
+# Internal code audit (26 items)
+
+> **Status note.** An internal code review written by the team in September 2026 (committed
+> 24 September in 4e3f855) as a fix-it brief for Claude Code. It is not an external audit. The
+> Status column was last checked against the code on **28 September 2026** by reading the source
+> and tests named below: 20 fixed, 6 open. The original findings follow the table, unchanged.
+
+| # | Tier | Issue | Status | Evidence (current code) | Test |
+|---|---|---|---|---|---|
+| 1 | 1 | `_result_code` misreads a timeout's prelim tesSUCCESS → wrong cash-out restore | **Fixed** | `xrpl_service.py` `_classify` + `XRPLResult.resolution`; `cashout_worker.py` branches on resolution; timeouts and ter* are UNKNOWN (held, never restored) | test_xrpl.py::test_submission_timeout_is_unknown_whatever_the_prelim_result, ::test_timeout_result_is_unknown_not_a_failure; test_cashout.py::test_reliable_submission_timeout_holds_and_never_restores |
+| 2 | 1 | No minimum send → negative UCTUSD, ZAR taken anyway | **Fixed** | `fx_service.calculate_quote` raises AmountTooSmall; `fee_config.min_send_zar` (migration 0008, default R50) checked in `quote_for` and `create_remittance`; `InvalidAmountError` is terminal in both workers | test_fx.py::test_quote_refuses_amounts_the_fee_consumes, ::test_quote_for_enforces_the_configured_minimum; test_cashin.py::test_send_below_the_minimum_is_refused_and_books_nothing; test_queue.py::test_an_unusable_amount_fails_at_once_without_retrying |
+| 3 | 1 | Settlement retry treats elapsed time as proof → double payment | **Fixed** | Migration 0009 (settlement ledger range); `cashin_service._refuse_unless_provably_dead`; `send_from_treasury(on_signed_tx=…)`; `LEDGER_EXPIRY_MARGIN` removed | test_queue.py::test_admin_retry_waits_while_a_signed_payment_could_still_land, ::test_admin_retry_refuses_while_the_server_has_a_history_gap, ::test_admin_retry_refuses_an_attempt_with_no_recorded_range |
+| 4 | 1 | Cash-out stranded forever with balance debited | **Fixed** | `cashout_service.sweep_unpublished` also revives stale claims (hash IS NULL guard); `main.py` sweeps at startup and every 120 s | test_cashout.py::test_sweep_revives_a_row_claimed_by_a_worker_that_died, ::test_sweep_never_revives_a_row_that_was_signed (no test of the periodic loop itself) |
+| 5 | 1 | Rate-drift guard silently bypassable | **Fixed** | `routers/transactions.py` price-lock fields are required `Form(...)`, and unreadable values are refused; `cashin_service.AcceptedQuote` compares rate, fee and UCTUSD | test_cashin.py::test_post_remittance_refuses_a_missing_price_lock_field, ::test_changed_fee_is_refused_even_when_the_rate_is_unchanged |
+| 6 | 2 | `fail_settlement` is the only unguarded transition | **Fixed** | `settlement_worker.fail_settlement` conditional UPDATE on `from_statuses` | test_queue.py::test_fail_settlement_cannot_drag_back_a_requeued_row |
+| 7 | 2 | `_publish` failure write can clobber a live worker | **Fixed** | `cashin_service._publish` fails only from `queued` | test_queue.py::test_publish_failure_cannot_clobber_a_live_worker |
+| 8 | 2 | `complete_settlement` can die mid-transition | **Fixed** | `settlement_worker.complete_settlement` handles a missing wallet row | test_queue.py::test_completing_without_a_wallet_row_does_not_strand_the_transaction |
+| 9 | 2 | approve_kyc / reject_kyc have no state guard | **Fixed** | `kyc_service._review` conditional on `status = pending` | test_kyc.py::test_approve_after_reject_is_refused_and_changes_nothing, ::test_only_one_of_two_concurrent_reviews_wins |
+| 10 | 2 | `parse_amount` lets InvalidOperation escape → 500 on /cashout/preview | **Fixed** | `cashout_service.parse_amount` quantises inside try → CashOutError | test_cashout.py::test_parse_amount_refuses_an_overflowing_amount, ::test_preview_refuses_bad_amounts_without_a_500 |
+| 11 | 2 | Decimal overflow crashes POST /remittances | **Fixed** | `routers/transactions.py` catches ArithmeticError | test_cashin.py::test_post_remittance_survives_an_absurd_amount |
+| 12 | 2 | DivisionByZero not caught | **Fixed** | `routers/transactions.py` catches ArithmeticError on every quote path | test_cashin.py::test_a_zero_effective_rate_is_a_503_not_a_500 |
+| 13 | 2 | `retry_settlement` erases the prior attempt's hash | **Fixed** | Migration 0010 (`settlement_previous_attempts`); `cashin_service._archived_attempts` | test_queue.py::test_retry_archives_the_prior_attempt_hash_and_range |
+| 14 | 2 | Settlement claim lacks the `xrpl_tx_hash IS NULL` guard | **Fixed** | `settlement_worker.claim` | test_queue.py::test_a_row_that_was_signed_can_never_be_claimed_again |
+| 15 | 2 | Concurrent workers collide on the treasury sequence | **Fixed** | `queue_service.treasury_lock` (Redis lock) around treasury signing + submit. Side effect: real-ledger settlement is serialised | test_queue.py::test_the_payment_is_signed_inside_the_treasury_lock, ::test_treasury_lock_is_one_blocking_named_lock |
+| 16 | 2 | Limit windows are UTC, display is SAST | **Fixed** | `limit_service.day_start_utc` / `display_tz`; admin date filter uses it | test_limits.py::test_a_send_just_after_local_midnight_counts_against_the_new_day, ::test_admin_date_filter_covers_the_whole_local_day |
+| 17 | 2 | Abandoned pending cash-ins consume allowance | **Fixed** | `cashin_service.expire_stale_cashins` (24 h), run by the `main.py` sweep | test_cashin.py::test_an_abandoned_cashin_stops_consuming_allowance |
+| 18 | 2 | Admin seeding doesn't normalise the email | **Fixed** | `app/scripts/seed_admin.py` lowercases and strips | test_auth.py::test_seeded_admin_email_is_normalised |
+| 19 | 2 | Rounding inconsistency / zero amount in cash-out parsing | **Fixed** | `cashout_service.parse_amount` uses ROUND_HALF_UP and refuses amounts that round to 0 | test_cashout.py::test_parse_amount_rounds_half_up_like_fx_service, ::test_parse_amount_refuses_an_amount_that_rounds_away |
+| 20 | 3 | `RETRY_DELAYS[burn_attempts-1]` could index -1 | **Open** | `cashout_worker._retry_or_fail` still `burn_attempts - 1` (the settlement twin is guarded). Unreachable today | none |
+| 21 | 3 | `_pricing_matches` returns True when accepted is None | **Open** | `cashout_service._pricing_matches` / `create_request(accepted=None)` unchanged; the only caller passes it | none |
+| 22 | 3 | No settlement equivalent of `sweep_unpublished` | **Open (manual mitigation)** | Commit-then-publish in `mark_cashin_received`; recovery is manual via `/admin/settlements` (re-queue after 10 min) | none |
+| 23 | 3 | Faucet-funded account orphaned if commit fails | **Open** | `xrpl_service.provision_wallet` logs the address only after commit | none |
+| 24 | 3 | cashout_payout deviates from FR-CO-02 as written | **Fixed (spec side)** | Code unchanged by design; requirements.md v1.3 FR-CO-02 now reads (UCTUSD − fee) × rate, fee charged in USD | test_cashout.py::test_zar_payout_converts_after_the_fee |
+| 25 | 3 | `measure_xrpl.py` IndexError with 0 payments | **Open** | `perf/measure_xrpl.py` still indexes `[0]` | none |
+| 26 | 3 | `require_admin` emits a JSON 302 | **Open** | `dependencies.py` still `HTTPException(302, …)` | test_admin.py::test_unauthenticated_redirected_from_admin asserts only the status code |
+
+**Also open: concurrency risks found by reading the code, not reproduced** (from a separate
+specification review, 22 September 2026):
+- `xrpl_service.provision_wallet` is not serialised per recipient, so two simultaneous first
+  transfers to one recipient could each create a faucet account. The unique `wallets.user_id`
+  constraint keeps a single row.
+- `cashout_service.approve` locks the wallet row `FOR UPDATE` without `populate_existing`, so a
+  wallet object already loaded in the session could carry a stale balance into the debit.
+
+---
+
+## Original findings (unchanged)
+
 Work through this audit and fix each issue. Read the code and VERIFY before
 changing — for anything touching XRPL result-code parsing or boundary amounts,
 reproduce it by running the actual code/regex first (that's how the worst bug

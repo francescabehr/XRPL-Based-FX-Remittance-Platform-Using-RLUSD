@@ -2,12 +2,14 @@ XRPL-Based FX Remittance Platform
 Functional Requirements & UI Design Document
 ECO5040W — Financial Software Engineering
 University of Cape Town
-Version 1.2
-Prepared: 20 August 2026 (v1.0) · Revised: 18 September 2026 (v1.1) · 21 September 2026 (v1.2)
+Version 1.3
+Prepared: 20 August 2026 (v1.0) · Revised: 18 September 2026 (v1.1) · 21 September 2026 (v1.2) · 28 September 2026 (v1.3)
 Feeds into: Business and Technical Specification (Project Brief, Section 7.i)
 
+Revision Note — Version 1.3 (28 September 2026): corrected the FR-CO-02 formula, the §7.2 performance figures and the §9.2 settlement-throughput note to match the code and the 28 September performance run; SPECIFICATION.md is no longer in the repository, as the formal specification is submitted separately.
+
 Revision Note — Version 1.1 (18 September 2026)
-This addendum records decisions confirmed since v1.0. The body of this document below is unchanged and remains accurate as at 20 August 2026; wherever it refers to "UCTUSD", read "UCTUSD". The living source of truth for implementation is CLAUDE.md and BUILD_PLAN.md.
+This addendum records decisions confirmed since v1.0. The body of this document below is unchanged and remains accurate as at 20 August 2026; wherever it refers to "RLUSD", read "UCTUSD". The living source of truth for implementation is CLAUDE.md and BUILD_PLAN.md (now docs/process/BUILD_PLAN.md).
 
 Settlement asset changed: RLUSD → UCTUSD
 ●	The platform now settles in UCTUSD, a UCT-issued test IOU on the XRPL Testnet.
@@ -50,7 +52,7 @@ Feeds into: Business and Technical Specification (Project Brief, Section 7.i)
 
  1. Introduction & Purpose
 This document defines the functional requirements and user-interface structure for the XRPL-based FX remittance platform described in the ECO5040W project brief (released 14 August 2026). It translates the brief's user journey and functional scope into testable requirements, each with an ID, an acceptance criterion and a priority, plus a screen-by-screen inventory of the web application's UI.
-This document does not replace the full Business and Technical Specification required by Section 7.i of the brief. It intentionally excludes database schema design, a graphical architecture diagram, detailed security architecture and the regulatory discussion — those are written up in SPECIFICATION.md, which builds on the requirements defined here.
+This document does not replace the full Business and Technical Specification required by Section 7.i of the brief. It intentionally excludes database schema design, a graphical architecture diagram, detailed security architecture and the regulatory discussion — those are written up in the Business and Technical Specification, submitted separately, which builds on the requirements defined here.
 1.1 Priority Key
 ●	Must — required for the core marked deliverable (registration, KYC, quoting, cash-in, settlement, wallet, cash-out, admin approvals).
 ●	Should — expected for a complete, well-rounded submission but not core to the demo.
@@ -149,7 +151,7 @@ FR-WAL-07	A failed XRPL transaction is surfaced with a reason and does not alter
 5.9 Simulated Cash-Out (USD / ZAR)
 ID	Requirement	Acceptance Criteria	Priority
 FR-CO-01	Recipient requests a cash-out specifying an UCTUSD amount and target currency (USD or ZAR).	Request cannot exceed available UCTUSD balance.	Must
-FR-CO-02	System calculates the fiat payout using the applicable exchange rate less the configured cash-out fee.	Displayed payout matches (UCTUSD amount x rate) minus fee, for the selected currency.	Must
+FR-CO-02	System calculates the fiat payout using the applicable exchange rate less the configured cash-out fee.	Displayed payout matches (UCTUSD amount − fee) × rate for the selected currency, the fee being charged in USD before conversion.	Must
 FR-CO-03	Cash-out request follows the status flow Requested to Approved to Completed/Failed.	Status can only move forward through the defined sequence; no skipped or reversed states.	Must
 FR-CO-04	Recipient views real-time status of pending and past cash-out requests.	Status shown matches the latest admin action.	Must
 FR-CO-05	Administrator approves, completes or fails a cash-out request.	Action is timestamped and attributed to the admin.	Must
@@ -359,7 +361,7 @@ Full detail belongs in the Business and Technical Specification; these are the c
 ●	All traffic served over HTTPS; admin screens require an authenticated admin role, not just a logged-in session.
 7.2 Performance
 ●	API response times, requests/second, queue throughput and XRPL transaction processing time must be measured and reported (see Project Brief Section 7.iv). Measured and reported in perf/REPORT.md (Phase 9).
-●	UI screens should remain responsive (sub-second interaction feedback) under the team's defined concurrent-user test load. Met at 50 concurrent users (15 ms median, 330 ms 95th percentile, 0 failures) for every screen except login and the wallet page; both causes and fixes are in perf/REPORT.md.
+●	UI screens should remain responsive (sub-second interaction feedback) under the team's defined concurrent-user test load. Measured at 50 concurrent users in a 3-minute reference run (6,872 requests, 0 failures, 16 ms median, 390 ms 95th percentile). Every screen is sub-second at the 95th percentile except login (10,000 ms), the send-amount page (5,000 ms, stalled behind concurrent logins) and the wallet page (1,400 ms); causes and fixes are in perf/REPORT.md.
 7.3 Reliability
 ●	Message queue processing must be idempotent — no duplicate crediting on redelivery (FR-MQ-04).
 ●	Failed XRPL transactions must be handled gracefully and never silently drop a transaction's status.
@@ -389,6 +391,6 @@ The questions raised in v1.0 have all been settled by the build. They are record
 ●	An unregistered beneficiary cannot be paid. FR-BEN-04's acceptance criterion anticipates an invite or placeholder record; the build instead refuses the send with a message asking the sender to invite the recipient, because a recipient's XRPL wallet belongs to a registered user account. A beneficiary added before the recipient registered is linked automatically at send time.
 ●	Notifications are in-application only (FR-CI-04, FR-CO-04). Failed cash-ins and cash-out status changes appear in the user's transaction views; no email or SMS is sent.
 ●	KYC is a manual form review with basic validation (adulthood, ID-number length). There is no identity-verification vendor, per Section 8.
-●	Settlement throughput is bounded by worker count: roughly 4 transfers per minute per worker against XRPL Testnet, where a payment takes about 14 seconds. See perf/REPORT.md.
+●	Settlement throughput is roughly 4 transfers per minute against XRPL Testnet, where a payment takes about 14 seconds. Every treasury payment is signed and submitted under one Redis lock (one treasury account, one sequence number), so adding workers does not raise real-ledger settlement throughput; the near-linear worker scaling in perf/REPORT.md was measured with a simulated ledger. See perf/REPORT.md.
 ●	Recipient XRPL accounts are funded by the Testnet faucet. A mainnet deployment would have to fund each new account's XRP reserve from the treasury.
 ●	The fee, margin and limit values shipped in the database are placeholders pending a team decision, not researched market rates.

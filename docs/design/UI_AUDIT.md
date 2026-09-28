@@ -1,6 +1,6 @@
 # UI Audit (Phase 1)
 
-Read-only audit of `frontend/` against UI_REDESIGN.md. Nothing else changed.
+Read-only audit of `frontend/` against [UI_REDESIGN.md](UI_REDESIGN.md). Nothing else changed.
 
 ## 1. Templates, routes and roles
 
@@ -190,7 +190,7 @@ Empty states are applied everywhere.
   outgoing movement) live on `/cashout/history`.
 - **Admin row fade-out:** admin actions are form POST → redirect → full reload, so the row just
   disappears. Animating it needs JS `fetch` interception or a flash-driven "just-removed" row.
-- **Unlisted reference:** `design_references/base-processing.png` (a centred "Processing / Do not close
+- **Unlisted reference:** `base-processing.png` (a local-only reference screenshot, not included in the repository; a centred "Processing / Do not close
   this window" card) isn't in the brief's table. It suits the "Settling on XRPL…" state.
 - **Existing framework:** the brief says to work with an existing framework. Its class names `.btn`,
   `.card`, `.badge` and `.flash` collide with Bootstrap's `.btn`, `.card` and `.badge`.

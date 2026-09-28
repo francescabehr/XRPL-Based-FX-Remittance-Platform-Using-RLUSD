@@ -1,6 +1,9 @@
 # BUILD_PLAN.md — Detailed Phase Guide (UCTUSD)
 
-Companion to `CLAUDE.md`. Expands the remaining phases (4–9) into ordered, checkable steps.
+> Historical: the phase-by-phase guide used during the build. All phases are done; test counts
+> and other figures below are as they stood when each phase closed. Current state: [CLAUDE.md](../../CLAUDE.md).
+
+Companion to [CLAUDE.md](../../CLAUDE.md). Expands the remaining phases (4–9) into ordered, checkable steps.
 Phases 0–3 are done. **Do one phase at a time**; do not start a phase until the one above it has
 passing tests. Each phase ends with a **Done when** gate — treat it as the definition of complete.
 
@@ -38,7 +41,7 @@ limit tracking and feeds cash-in.
      `(uctusd_amount - cashout_fee_est) * market_rate`  *(FR-FX-06)*
    - **Worked example** (sanity check your rounding): zar_send=1000, fixed=25, pct=1.5%,
      margin=2%, market=18.50 → fee=40, net=960, eff=18.87, **uctusd≈50.874404**.
-4. **Transaction model** (`models/transaction.py`) per CLAUDE.md, with `uctusd_amount`,
+4. **Transaction model** (`models/transaction.py`) per [CLAUDE.md](../../CLAUDE.md), with `uctusd_amount`,
    `exchange_rate`, `fx_margin`, `transaction_fee`, `net_zar_converted`, `idempotency_key`
    (UUID UNIQUE), `cashin_status` default `pending`, `settlement_status` default `not_queued`.
    Generate the Alembic migration.

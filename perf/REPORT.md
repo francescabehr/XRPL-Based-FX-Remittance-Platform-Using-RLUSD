@@ -13,8 +13,8 @@ Throughput scales near-linearly to 100 users (54 rps) with no sign of server sat
 Two capacity constraints stand out:
 
 1. **bcrypt runs on the async event loop.** Each login stalls the server for ~230 ms. With 50
-   simultaneous users median login time reaches 6.6 s; at 100 users it reaches 9.7 s, and the
-   stall bleeds into every other endpoint waiting in the queue. The fix is one line — offload
+   simultaneous users (the 2-minute 50-user tier) median login time reaches 6.6 s; at 100 users
+   it reaches 9.7 s, and the stall bleeds into every other endpoint waiting in the queue. The fix is one line — offload
    hashing to a thread pool. bcrypt's cost itself should not be lowered.
 
 2. **One settlement worker cannot drain the queue.** The web tier confirms cash-ins at roughly
@@ -108,9 +108,9 @@ message — has a 22 ms median and a 52 ms p95. The declined-card path (`POST /r
 (declined)`) is within 1 ms of the success path at both percentiles, confirming the failure branch
 adds no overhead.
 
-**The sub-second interaction target (NFR 7.2) is met by every screen except login and the wallet
-page.** Every maximum above 1 s traces back to one of two causes: a login stalling the event loop,
-or a wallet page waiting on the XRPL network — both diagnosed in §7.
+**The sub-second interaction target (NFR 7.2) is met at p95 by every screen except login, the
+wallet page and `GET /send` (p95 5,000 ms; see bottleneck #5 in §8).** Every maximum above 1 s
+traces back to one of two causes: a login stalling the event loop, or a wallet page waiting on the XRPL network — both diagnosed in §7.
 
 ---
 
@@ -150,7 +150,9 @@ throughput at essentially no cost per worker added.
 
 With 1 worker running during the reference run, the admin confirmed cash-ins at ~5 per
 second (1,018 confirmations in 3 minutes). The worker settled 0.15 per second. The queue
-grew to 833 waiting messages by the end of the run and never began to drain.
+grew to 833 waiting messages by the end of the run and never began to drain. The worker rate and
+queue depth come from the queue sampling in the 21 September run (`queue.csv`); the sampler was
+not re-run alongside the 28 September reference run, whose confirmation count is quoted above.
 
 ### Real-ledger capacity (derived)
 
@@ -164,6 +166,17 @@ At the measured 14.1 s per on-chain payment (§5):
 
 These figures assume no Testnet rate limiting, which the sample was too small to probe.
 Real throughput could be lower under sustained load.
+
+> **Note: multi-worker figures do not carry over to the real ledger.** The 1- and 4-worker
+> queue measurements (`queue.csv`, `queue_4workers.csv`, `throughput.png`) date from the
+> 21 September run and were not repeated on 28 September. They were taken before
+> `queue_service.treasury_lock` was added (25 September), so those workers signed
+> concurrently. Every settlement is now signed and submitted under that single Redis lock,
+> held for the whole ledger round trip, because all payments come from one treasury account
+> and share its sequence number. Real-ledger treasury payments are therefore serialised: about
+> 4 per minute (60 s ÷ 14.1 s) however many workers run, so the 4- and 8-worker rows in the
+> table above are upper bounds that the current code does not reach. Only wallet provisioning
+> (faucet account and TrustSet) runs outside the lock.
 
 ---
 
@@ -296,9 +309,10 @@ failure branch adds no overhead even under concurrent load.
 
 ### Wallet page live-ledger call grows with concurrency
 
-`GET /wallet` fetches the on-chain balance on every page load. The median is pinned at the
-network round-trip (~1.2 s); the p95 grows as requests queue behind each other's in-flight
-ledger calls:
+`GET /wallet` fetches the on-chain balance on every page load. In the concurrency tiers the
+median sits at about the network round-trip (~1.2 s) and the p95 grows as requests queue behind
+each other's in-flight ledger calls. The 3-minute reference run (§2) did not show this: its
+`/wallet` median was 20 ms, with a 1,400 ms p95.
 
 | Users | Wallet median (ms) | Wallet p95 (ms) |
 | ---: | ---: | ---: |
@@ -313,8 +327,9 @@ ledger calls:
 
 **1. bcrypt blocks the async event loop — the most impactful issue.**
 `auth_service.verify_password` runs synchronously inside an `async def` handler, blocking
-Uvicorn's single event loop thread. At 50 users the median login time is 6.6 s and the
-worst case is 12.4 s. The stall propagates to every other endpoint waiting behind a login.
+Uvicorn's single event loop thread. In the 2-minute 50-user tier the median login time is 6.6 s
+and the worst case is 12.4 s (the 3-minute reference run in §2 shows a 6,200 ms median and a
+10,830 ms maximum). The stall propagates to every other endpoint waiting behind a login.
 Fix: wrap the call in `asyncio.to_thread` (or Starlette's `run_in_threadpool`). bcrypt's
 work factor should not be reduced — the cost is the security guarantee.
 
@@ -326,9 +341,10 @@ Running 4 workers raises throughput ~4× (measured). Capacity planning should us
 real-ledger rate of ~4 settlements per minute per worker.
 
 **3. The wallet page makes a synchronous ledger call.**
-`GET /wallet` fetches the live on-chain balance on every request, adding a guaranteed 1.2 s
-to every wallet page load regardless of concurrency. The cached `balance_uctusd` column is
-already in the database. Rendering the page from that value and refreshing the live figure
+`GET /wallet` fetches the live on-chain balance on every request. In the concurrency tiers this
+put the median at ~1.2 s at every load level; in the reference run the median was 20 ms but the
+p95 was 1,400 ms, so the call dominates the slow tail rather than every load. The cached
+`balance_uctusd` column is already in the database. Rendering the page from that value and refreshing the live figure
 asynchronously (or on a short TTL) would reduce the median to the same range as every other
 page (10–20 ms).
 

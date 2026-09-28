@@ -13,3 +13,10 @@ build/
 *.db
 *.sqlite3
 .DS_Store
+
+# Local-only: third-party design screenshots and editor settings
+design_references/
+.vscode/
+
+# Local-only: historical RLUSD → UCTUSD cleanup brief
+docs/process/reconciliation.md

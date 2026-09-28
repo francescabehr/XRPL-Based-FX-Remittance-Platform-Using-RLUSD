@@ -11,7 +11,7 @@ This brief is for Claude Code. It explains how to redesign the front end of our 
 
 ## 1. Design references
 
-Reference screenshots are in the `design_references/` folder in the project root. Open every image in it before designing. If a file name differs from the table below, match the image to its row by what it shows.
+Reference screenshots were kept in a `design_references/` folder in the project root. Open every image in it before designing. If a file name differs from the table below, match the image to its row by what it shows.
 
 | File | Product | What to take from it |
 |---|---|---|
@@ -24,6 +24,8 @@ Reference screenshots are in the `design_references/` folder in the project root
 | `uvodo-onboarding.png` | Uvodo | A "Let's get you started" checklist card with a progress bar and completed and pending steps. |
 | `base-processing.png` | Base | A calm, centred "Processing — do not close this window" state. Use it for the **"Settling on XRPL…"** state (queued/processing settlements). |
 
+The screenshots were used locally during design and are not included in the repository.
+
 **Rules for using the references:**
 - Borrow **patterns and layout ideas only**.
 - Never copy logos, product names, illustrations, wordmarks or exact brand colours.
@@ -34,7 +36,7 @@ Reference screenshots are in the `design_references/` folder in the project root
 The look should be calm, confident and precise: a trustworthy money app, not a crypto casino.
 
 - **Background:** Near-white app background (`--bg` #F7F7FA), with white cards (`--surface` #FFFFFF) on top separated by very subtle borders or shadows.
-- **Palette:** Palette 3, "coastal": Amaranth brand, Thulian Pink highlight, Brook Green (sage) soft accent, Chalk warm tint, Pomelo Olive neutral. The source images are in `ui themes/`, and the tokens are in `design-system.css`.
+- **Palette:** Palette 3, "coastal": Amaranth brand, Thulian Pink highlight, Brook Green (sage) soft accent, Chalk warm tint, Pomelo Olive neutral. The source images are in [`docs/design/palette/`](palette/), and the tokens are in `frontend/static/css/design-system.css`.
 
   | Role | Token(s) | Value | Use |
   |---|---|---|---|
@@ -62,10 +64,10 @@ Before any edits:
 1. **Templates:** List every template, the route that renders it, and which role sees it (sender, recipient, admin, public).
 2. **Styling:** Record how styling currently works: inline styles, a CSS file, a framework such as Bootstrap or Tailwind, or a mix.
 3. **Components:** Identify repeated UI pieces that should become shared macros or partials, such as buttons, cards, status badges, tables, forms, flash messages and amount displays.
-4. **Navigation:** Flag dead links and inconsistencies. (The Phase 1 audit found no dead links: `/admin/cashout` and `/admin/transactions` are live routes. See UI_AUDIT.md §4.)
+4. **Navigation:** Flag dead links and inconsistencies. (The Phase 1 audit found no dead links: `/admin/cashout` and `/admin/transactions` are live routes. See [UI_AUDIT.md](UI_AUDIT.md) §4.)
 5. **Plan:** Propose which screens fall under the demo path (Phase 4) and which are secondary (Phase 5).
 
-Write the audit to `UI_AUDIT.md` in the project root, then stop and wait for approval.
+Write the audit to `UI_AUDIT.md` (now [docs/design/UI_AUDIT.md](UI_AUDIT.md)), then stop and wait for approval.
 
 ## 4. Phase 2: Design system foundation
 
