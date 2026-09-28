@@ -26,7 +26,9 @@ from app.config import settings
 from app.database import AsyncSessionLocal, engine
 from app.models.transaction import SettlementStatus, Transaction
 
-COLUMNS = ["t", "queue_depth", "jobs_running", "jobs_finished", "queued", "processing", "completed", "failed"]
+# `epoch` is wall-clock time, so a sample can be lined up with the runner's own
+# timestamps (perf/run_all.py times the worker-scaling drain against it).
+COLUMNS = ["t", "epoch", "queue_depth", "jobs_running", "jobs_finished", "queued", "processing", "completed", "failed"]
 
 
 async def sample_db(db) -> dict:
@@ -59,6 +61,7 @@ async def main(path: Path) -> None:
                     states = await sample_db(db)
                 writer.writerow({
                     "t": round(time.time() - start, 1),
+                    "epoch": round(time.time(), 2),
                     "queue_depth": len(queue),
                     "jobs_running": len(started),
                     "jobs_finished": len(finished),

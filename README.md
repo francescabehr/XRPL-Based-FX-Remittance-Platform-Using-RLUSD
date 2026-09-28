@@ -178,7 +178,8 @@ account can both send and receive. An account becomes a recipient when its XRPL 
 provisioned, on the first transfer to it.
 
 - **Public:** landing page at `/`, footer pages (`/about`, `/contact`, `/help`, `/legal/…`), and `/register` and `/login`.
-- **Sender:** submits KYC, saves beneficiaries (who must be registered users), then sends money through Details → Review → Pay → Status. The quote is live, the minimum send is R50, tier limits apply, and a server-side price lock refuses any change. Live status and hashes are on `/transactions`; the profile is at `/profile`.
+- **Sender:** submits KYC, saves beneficiaries (who must be registered users), then sends money through 
+Details → Review → Pay → Status. The quote is live, the minimum send is R50, tier limits apply, and a server-side price lock refuses any change. Live status and hashes are on `/transactions`; the profile is at `/profile`.
 - **Recipient:** sees the UCTUSD balance and incoming and outgoing activity on `/wallet`, and cashes out to USD or ZAR from a priced preview. The full amount is burned; the fee comes off the fiat payout, charged in USD before conversion.
 - **Admin:** every route under `/admin` depends on `dependencies.py:require_admin`, and a test walks the route table to assert it.
 
@@ -282,7 +283,7 @@ The team used Claude Code as a development assistant, working under the conventi
 
 ## Further documentation
 
-Functional requirements are in [requirements.md](requirements.md), and measured performance is in [perf/REPORT.md](perf/REPORT.md). Design and development notes (UI design brief, build plan, internal code audit) are in docs/. The Business and Technical Specification (Brief §7.i) is submitted separately.
+Functional requirements are in [requirements.md](requirements.md), and measured performance is in [perf/REPORT.md](perf/REPORT.md). Design and development notes (UI design brief, build plan, internal code audit) are in docs/. The Business and Technical Specification is submitted separately.
 
 ---
 

@@ -1,4 +1,4 @@
-.PHONY: dev worker test migrate migration seed-admin install lint perf-seed perf-worker perf-run perf-report
+.PHONY: dev worker test migrate migration seed-admin install lint perf-seed perf-worker perf-run perf-report perf-all
 
 install:
 	pip install -r requirements.txt
@@ -43,3 +43,11 @@ perf-run:
 
 perf-report:
 	python perf/analyze.py
+
+# One command for every figure in perf/REPORT.md: fresh perf DB + Redis DB 14,
+# reseed before each run, reference run, tiers, worker scaling, analyze.
+# Calls the venv interpreter directly, so shell aliases for python don't matter.
+# Real Testnet timings only with PERF_REAL_XRPL=1 (spends UCTUSD).
+perf-all:
+	@test -x .venv/bin/python || { echo "perf-all: .venv/bin/python not found. Create it: python3 -m venv .venv && .venv/bin/python -m pip install -r requirements.txt"; exit 1; }
+	.venv/bin/python perf/run_all.py

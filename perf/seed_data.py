@@ -37,6 +37,7 @@ from app.models.wallet import Wallet
 from app.security.hashing import get_password_hash
 
 PREFIX = "perf."
+PATTERN = f"{PREFIX}%@loadtest.local"
 PASSWORD = "PerfTest123!"
 DEFAULT_PAIRS = 200
 
@@ -51,7 +52,7 @@ def _mobile(n: int) -> str:
 async def purge() -> None:
     async with AsyncSessionLocal() as db:
         ids = (
-            await db.execute(select(User.id).where(User.email.like(f"{PREFIX}%")))
+            await db.execute(select(User.id).where(User.email.like(PATTERN)))
         ).scalars().all()
         if not ids:
             print("No seeded accounts found.")
@@ -78,7 +79,7 @@ async def seed(pairs: int) -> None:
 
     async with AsyncSessionLocal() as db:
         existing = (
-            await db.execute(select(func.count()).select_from(User).where(User.email.like(f"{PREFIX}%")))
+            await db.execute(select(func.count()).select_from(User).where(User.email.like(PATTERN)))
         ).scalar_one()
         if existing:
             print(f"{existing} seeded accounts already exist — purge first to reseed.")

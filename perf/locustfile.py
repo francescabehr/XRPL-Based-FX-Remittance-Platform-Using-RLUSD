@@ -17,11 +17,13 @@ Every task names its request explicitly, so a URL containing an id does not
 scatter across hundreds of rows in the statistics.
 """
 
+import csv
 import os
 import random
 import re
 
 from locust import HttpUser, between, events, task
+from locust.stats import PERCENTILES_TO_REPORT, StatsCSV
 
 PASSWORD = "PerfTest123!"
 PAIRS = int(os.environ.get("PERF_PAIRS", "200"))
@@ -242,3 +244,31 @@ def _summary(environment, **_):
     print(f"\nRequests: {stats.num_requests}  failures: {stats.num_failures}  "
           f"median: {stats.median_response_time} ms  p95: {stats.get_response_time_percentile(0.95)} ms  "
           f"rps: {stats.total_rps:.1f}")
+
+
+_locust = {}
+
+
+@events.init.add_listener
+def _keep_environment(environment, **_):
+    _locust["environment"] = environment
+
+
+@events.quit.add_listener
+def _final_csv(**_):
+    """Rewrite the --csv files from the final statistics.
+
+    Locust's own CSV writer runs once a second and is stopped at shutdown, so its
+    last write misses requests that finished in the final second (seen as a
+    _stats.csv total lower than the console's). `quit` fires after the runner has
+    stopped, when the statistics are final.
+    """
+    environment = _locust.get("environment")
+    prefix = getattr(getattr(environment, "parsed_options", None), "csv_prefix", None)
+    if not prefix:
+        return
+    writer = StatsCSV(environment, PERCENTILES_TO_REPORT)
+    for suffix, write in (("stats", writer.requests_csv), ("failures", writer.failures_csv),
+                          ("exceptions", writer.exceptions_csv)):
+        with open(f"{prefix}_{suffix}.csv", "w", newline="") as handle:
+            write(csv.writer(handle))
