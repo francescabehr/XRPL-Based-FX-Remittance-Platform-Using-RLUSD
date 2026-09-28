@@ -1,0 +1,3 @@
+Purged 400 seeded accounts (and their beneficiaries/transactions).
+Seeded 200 sender/recipient pairs (400 accounts), password 'PerfTest123!'.
+Senders: perf.sender0..199@loadtest.local (KYC approved, one beneficiary each)

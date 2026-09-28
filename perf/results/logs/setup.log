@@ -1,0 +1,13 @@
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001, Init users and KYC tables
+INFO  [alembic.runtime.migration] Running upgrade 0001 -> 0002, Add beneficiaries and limit_tiers tables; seed default tiers
+INFO  [alembic.runtime.migration] Running upgrade 0002 -> 0003, Add transactions and fee_config tables; seed default fee config
+INFO  [alembic.runtime.migration] Running upgrade 0003 -> 0004, Add wallets table (per-recipient XRPL accounts)
+INFO  [alembic.runtime.migration] Running upgrade 0004 -> 0005, Add cash-in and settlement tracking fields to transactions
+INFO  [alembic.runtime.migration] Running upgrade 0005 -> 0006, Add cashout_requests table (recipient UCTUSD -> fiat, burned on-ledger)
+INFO  [alembic.runtime.migration] Running upgrade 0006 -> 0007, Add transactions.aml_flagged (admin AML review flag)
+INFO  [alembic.runtime.migration] Running upgrade 0007 -> 0008, Add fee_config.min_send_zar (minimum remittance amount)
+INFO  [alembic.runtime.migration] Running upgrade 0008 -> 0009, Add the settlement reliable-submission recovery pair
+INFO  [alembic.runtime.migration] Running upgrade 0009 -> 0010, Add transactions.settlement_previous_attempts (retired settlement attempts)
+Admin created: admin@example.com

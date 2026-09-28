@@ -1,0 +1,3 @@
+/Users/ClaireCampell/FSE Project/XRPL-Based-FX-Remittance-Platform-Using-RLUSD/perf/analyze.py:175: UserWarning: This figure includes Axes that are not compatible with tight_layout, so results might be incorrect.
+  fig.tight_layout()
+Wrote /Users/ClaireCampell/FSE Project/XRPL-Based-FX-Remittance-Platform-Using-RLUSD/perf/results/summary.md and charts /Users/ClaireCampell/FSE Project/XRPL-Based-FX-Remittance-Platform-Using-RLUSD/perf/results/*.png

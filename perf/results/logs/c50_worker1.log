@@ -1,0 +1,80 @@
+perf worker: simulated ledger, 4.0s payment latency. Real XRPL calls are NOT made.
+14:02:20 Worker rq:worker:c7f6fe8517134635aeee2adcd414627f started with PID 28908, version 2.0.0
+14:02:20 Subscribing to channel rq:pubsub:c7f6fe8517134635aeee2adcd414627f
+14:02:20 *** Listening on settlement...
+14:02:20 Cleaning registries for queue: settlement
+14:02:34 settlement: settle transaction c598e0d9-7fff-496a-b2c8-f11904aefb6b (34f1bc52-5edb-4612-94ca-5b3b6dc36d70)
+14:02:40 Successfully completed settle transaction c598e0d9-7fff-496a-b2c8-f11904aefb6b job in 0:00:06.147391s on worker c7f6fe8517134635aeee2adcd414627f
+14:02:40 settlement: Job OK (34f1bc52-5edb-4612-94ca-5b3b6dc36d70)
+14:02:40 Result is kept for 500 seconds
+14:02:40 settlement: settle transaction 666a21f8-1ecc-4fd2-b066-a6497b2d72fd (40fcdc81-cadd-4ed8-baa3-b2c318f7ab60)
+14:02:46 Successfully completed settle transaction 666a21f8-1ecc-4fd2-b066-a6497b2d72fd job in 0:00:06.153602s on worker c7f6fe8517134635aeee2adcd414627f
+14:02:46 settlement: Job OK (40fcdc81-cadd-4ed8-baa3-b2c318f7ab60)
+14:02:46 Result is kept for 500 seconds
+14:02:46 settlement: settle transaction 24af607e-1865-41cc-bae1-d49f4007263c (7383057b-8e2e-4773-ae61-258993e28bcb)
+14:02:52 Successfully completed settle transaction 24af607e-1865-41cc-bae1-d49f4007263c job in 0:00:06.150599s on worker c7f6fe8517134635aeee2adcd414627f
+14:02:52 settlement: Job OK (7383057b-8e2e-4773-ae61-258993e28bcb)
+14:02:52 Result is kept for 500 seconds
+14:02:52 settlement: settle transaction 09523372-44a9-4a90-8ca1-37b2a7c07095 (5c696624-e413-4122-9414-a4d183fb55dd)
+14:02:58 Successfully completed settle transaction 09523372-44a9-4a90-8ca1-37b2a7c07095 job in 0:00:06.138699s on worker c7f6fe8517134635aeee2adcd414627f
+14:02:58 settlement: Job OK (5c696624-e413-4122-9414-a4d183fb55dd)
+14:02:58 Result is kept for 500 seconds
+14:02:58 settlement: settle transaction 6bc353e7-3e9e-42a0-8f54-f39329719adc (d622f024-f33b-4b45-8ee7-df0d6068b7da)
+14:03:04 Successfully completed settle transaction 6bc353e7-3e9e-42a0-8f54-f39329719adc job in 0:00:06.174692s on worker c7f6fe8517134635aeee2adcd414627f
+14:03:04 settlement: Job OK (d622f024-f33b-4b45-8ee7-df0d6068b7da)
+14:03:04 Result is kept for 500 seconds
+14:03:04 settlement: settle transaction 40d6b28f-926d-42c9-96f9-65194fc0d99a (283a2a10-7185-4e1d-ba3b-fbe57ac518da)
+14:03:11 Successfully completed settle transaction 40d6b28f-926d-42c9-96f9-65194fc0d99a job in 0:00:06.141405s on worker c7f6fe8517134635aeee2adcd414627f
+14:03:11 settlement: Job OK (283a2a10-7185-4e1d-ba3b-fbe57ac518da)
+14:03:11 Result is kept for 500 seconds
+14:03:11 settlement: settle transaction efacfe13-4e59-4030-9495-612132ec2416 (1570d2f0-e879-4bdf-a333-ccc8718bdb8c)
+14:03:17 Successfully completed settle transaction efacfe13-4e59-4030-9495-612132ec2416 job in 0:00:06.139552s on worker c7f6fe8517134635aeee2adcd414627f
+14:03:17 settlement: Job OK (1570d2f0-e879-4bdf-a333-ccc8718bdb8c)
+14:03:17 Result is kept for 500 seconds
+14:03:17 settlement: settle transaction b6c0b682-46cc-47a1-9d10-42233364ace5 (01a7b96d-2509-4733-a282-d62c9d29742f)
+14:03:23 Successfully completed settle transaction b6c0b682-46cc-47a1-9d10-42233364ace5 job in 0:00:06.138409s on worker c7f6fe8517134635aeee2adcd414627f
+14:03:23 settlement: Job OK (01a7b96d-2509-4733-a282-d62c9d29742f)
+14:03:23 Result is kept for 500 seconds
+14:03:23 settlement: settle transaction fdf39c7d-960c-45be-bd5c-5cd82e6dc630 (3f5f1e38-f5ff-452b-8882-b10438240425)
+14:03:29 Successfully completed settle transaction fdf39c7d-960c-45be-bd5c-5cd82e6dc630 job in 0:00:06.148721s on worker c7f6fe8517134635aeee2adcd414627f
+14:03:29 settlement: Job OK (3f5f1e38-f5ff-452b-8882-b10438240425)
+14:03:29 Result is kept for 500 seconds
+14:03:29 settlement: settle transaction f2a53ba9-7b29-49d0-9d66-db74dbdbf733 (d7dd8481-d68b-4fb9-b800-37847d9bb0f0)
+14:03:35 Successfully completed settle transaction f2a53ba9-7b29-49d0-9d66-db74dbdbf733 job in 0:00:06.155313s on worker c7f6fe8517134635aeee2adcd414627f
+14:03:35 settlement: Job OK (d7dd8481-d68b-4fb9-b800-37847d9bb0f0)
+14:03:35 Result is kept for 500 seconds
+14:03:35 settlement: settle transaction 2f16517c-eef7-4a1f-9f7f-275cd815f4d8 (ed6e9180-0a75-4ef7-b142-bbd3e0d50090)
+14:03:41 Successfully completed settle transaction 2f16517c-eef7-4a1f-9f7f-275cd815f4d8 job in 0:00:06.130796s on worker c7f6fe8517134635aeee2adcd414627f
+14:03:41 settlement: Job OK (ed6e9180-0a75-4ef7-b142-bbd3e0d50090)
+14:03:41 Result is kept for 500 seconds
+14:03:41 settlement: settle transaction a2e74944-3df6-411c-9e9b-520b7bc3ca44 (7f00df0b-7dd1-4dc9-8e41-e7da13f6096d)
+14:03:47 Successfully completed settle transaction a2e74944-3df6-411c-9e9b-520b7bc3ca44 job in 0:00:06.108950s on worker c7f6fe8517134635aeee2adcd414627f
+14:03:47 settlement: Job OK (7f00df0b-7dd1-4dc9-8e41-e7da13f6096d)
+14:03:47 Result is kept for 500 seconds
+14:03:47 settlement: settle transaction f8750ad2-0b1d-4df9-a2fd-01276f9bdef2 (9d699459-aa44-4966-b5fc-c3eadf2d5f50)
+14:03:54 Successfully completed settle transaction f8750ad2-0b1d-4df9-a2fd-01276f9bdef2 job in 0:00:06.131753s on worker c7f6fe8517134635aeee2adcd414627f
+14:03:54 settlement: Job OK (9d699459-aa44-4966-b5fc-c3eadf2d5f50)
+14:03:54 Result is kept for 500 seconds
+14:03:54 settlement: settle transaction 8ca4980e-2fa4-483b-aaef-463a9ec2f500 (e4dc3de5-a23e-49ef-8a16-626e4c15a6fc)
+14:04:00 Successfully completed settle transaction 8ca4980e-2fa4-483b-aaef-463a9ec2f500 job in 0:00:06.126918s on worker c7f6fe8517134635aeee2adcd414627f
+14:04:00 settlement: Job OK (e4dc3de5-a23e-49ef-8a16-626e4c15a6fc)
+14:04:00 Result is kept for 500 seconds
+14:04:00 settlement: settle transaction 61f8dfdb-f079-4c6e-a627-58c386d7505b (8d3370cb-4657-461f-ad9e-19698c4b939f)
+14:04:06 Successfully completed settle transaction 61f8dfdb-f079-4c6e-a627-58c386d7505b job in 0:00:06.153897s on worker c7f6fe8517134635aeee2adcd414627f
+14:04:06 settlement: Job OK (8d3370cb-4657-461f-ad9e-19698c4b939f)
+14:04:06 Result is kept for 500 seconds
+14:04:06 settlement: settle transaction 098c2f42-5202-4704-93fd-8fb5f5c15bd4 (f9895692-abf9-4287-b0a0-dabc4695a90a)
+14:04:12 Successfully completed settle transaction 098c2f42-5202-4704-93fd-8fb5f5c15bd4 job in 0:00:06.148484s on worker c7f6fe8517134635aeee2adcd414627f
+14:04:12 settlement: Job OK (f9895692-abf9-4287-b0a0-dabc4695a90a)
+14:04:12 Result is kept for 500 seconds
+14:04:12 settlement: settle transaction 5a8ae129-f679-450e-9570-a6b8f9030364 (3b377c4c-7171-462e-beb8-1e7f5d93f6a9)
+14:04:18 Successfully completed settle transaction 5a8ae129-f679-450e-9570-a6b8f9030364 job in 0:00:06.132624s on worker c7f6fe8517134635aeee2adcd414627f
+14:04:18 settlement: Job OK (3b377c4c-7171-462e-beb8-1e7f5d93f6a9)
+14:04:18 Result is kept for 500 seconds
+14:04:18 settlement: settle transaction d448b24a-4ce2-4e18-b933-8817a04d5328 (abbad317-ca83-44bb-81cf-9488aae44818)
+14:04:22 Worker c7f6fe8517134635aeee2adcd414627f [PID 28908]: warm shut down requested
+14:04:24 Successfully completed settle transaction d448b24a-4ce2-4e18-b933-8817a04d5328 job in 0:00:06.136561s on worker c7f6fe8517134635aeee2adcd414627f
+14:04:24 settlement: Job OK (abbad317-ca83-44bb-81cf-9488aae44818)
+14:04:24 Result is kept for 500 seconds
+14:04:24 Worker rq:worker:c7f6fe8517134635aeee2adcd414627f: stopping on request
+14:04:24 Unsubscribing from channel rq:pubsub:c7f6fe8517134635aeee2adcd414627f

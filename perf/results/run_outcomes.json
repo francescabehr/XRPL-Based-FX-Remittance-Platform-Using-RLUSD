@@ -1,0 +1,31 @@
+{
+  "run_id": "20260928T115452Z",
+  "sub_run": "run",
+  "taken_at": "2026-09-28T11:58:00+00:00",
+  "cashin_by_settlement": [
+    {
+      "cashin": "failed",
+      "settlement": "not_queued",
+      "count": 172
+    },
+    {
+      "cashin": "pending",
+      "settlement": "not_queued",
+      "count": 3
+    },
+    {
+      "cashin": "received",
+      "settlement": "completed",
+      "count": 27
+    },
+    {
+      "cashin": "received",
+      "settlement": "queued",
+      "count": 826
+    }
+  ],
+  "completed_without_hash": 0,
+  "settlement_attempts_max": 1,
+  "settlement_attempts_mean": 0.032,
+  "cashout_by_status": {}
+}

@@ -1,0 +1,28 @@
+faucet account rKrwRnoXJRQKq7p8jTgrJefYyNBdL6oQPo: 12.1s
+trust line: 15.3s (tesSUCCESS)
+payment 1: 13.9s (tesSUCCESS) 44587ECD1E623C70211FCE0DADC3B99FEA3F5F553611D96CA8155E15EEC51C81
+payment 2: 14.0s (tesSUCCESS) FDFA1445636D9B3E6A3B55AC67E78956E9763AA1EC7B9367EA8F83E09E4AD312
+payment 3: 13.5s (tesSUCCESS) 85ECD26E44ABB721B90253C9122D6B5B247C4653321E54677E0EBEC3130E9BF8
+
+{
+  "faucet_account": {
+    "samples": 1,
+    "min_s": 12.06,
+    "mean_s": 12.06,
+    "max_s": 12.06
+  },
+  "trust_line": {
+    "samples": 1,
+    "min_s": 15.27,
+    "mean_s": 15.27,
+    "max_s": 15.27
+  },
+  "payment": {
+    "samples": 3,
+    "min_s": 13.48,
+    "mean_s": 13.8,
+    "max_s": 13.99
+  },
+  "first_transfer_total_s": 41.25
+}
+Written to perf/results/xrpl_timings.json

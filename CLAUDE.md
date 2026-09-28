@@ -141,15 +141,18 @@ Phase 8  Admin Portal                  ✅ DONE   FR-ADM-01..07
 
 Phase 9  Performance Tests             ✅ DONE   Brief §7.iv
          perf/: Faker seeder (200 pairs), Locust profile (sender/recipient/admin),
-         queue sampler, real-Testnet timer, chart/table generator. Reference run
-         (28 Sep, 50 users, 3 min): 6,872 requests, 0 failures, 38.5 rps, 16 ms
-         median, 390 ms p95; concurrency tiers at 10/25/50/100 users. Bottlenecks
-         in perf/REPORT.md — blocking bcrypt in the async login handler (~230 ms,
-         stalls the loop), single-worker queue drain (9/min simulated, ~4/min real;
-         treasury signing is serialised by treasury_lock, so real-ledger throughput
-         does not scale with workers),
-         live-ledger call on /wallet. Load tests use perf/perf_worker.py (SIMULATED
-         ledger); real XRPL timings measured separately (payment ~14 s).
+         queue sampler, backlog builder, real-Testnet timer, analyze.py → summary.md.
+         One command, `make perf-all` (perf/run_all.py): own DB remittance_perf +
+         Redis DB 14, purge/re-seed and queue flush before every sub-run, uvicorn
+         without --reload, run_meta.json. Run 20260928T115452Z (28 Sep): reference
+         50 users/3 min — 6,962 requests, 0 failures, 38.7 rps, 10 ms median, 62 ms
+         p95; tiers 10/25/50/100 users — 8.2 → 68.3 rps, 0 failures; drain of one
+         30-settlement backlog — 9.7/min with 1 worker, 14.6/min with 4 (1.51×,
+         treasury_lock); real payment 13.8 s mean → ~4.3/min ceiling for any worker
+         count. Bottlenecks in perf/REPORT.md — synchronous bcrypt in the async
+         login handler (login median 1.7 s at 10 users, 5.4 s at 100), settlement
+         far slower than cash-in, live-ledger call on /wallet. Load tests use
+         perf/perf_worker.py (SIMULATED ledger).
 ```
 
 ---
@@ -195,8 +198,9 @@ xrpl-remittance/
 │       ├── crypto.py             # Fernet encrypt/decrypt for XRPL private keys
 │       └── hashing.py            # bcrypt hash/verify
 │
-├── perf/                         # (Phase 9) seed_data · locustfile · perf_worker ·
-│                                 #   sampler · measure_xrpl · analyze · REPORT.md
+├── perf/                         # (Phase 9) run_all (make perf-all) · seed_data · backlog ·
+│                                 #   locustfile · perf_worker · sampler · measure_xrpl ·
+│                                 #   analyze · REPORT.md
 ├── docs/
 │   ├── design/                   # UI_REDESIGN.md (UI brief) · UI_AUDIT.md · palette/ (source images)
 │   └── process/                  # BUILD_PLAN.md · AUDIT.md (code review + status)

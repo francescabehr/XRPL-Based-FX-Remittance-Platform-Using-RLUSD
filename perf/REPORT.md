@@ -1,251 +1,270 @@
 # Performance Report — XRPL FX Remittance Platform
 
-**Measured:** 28 September 2026 · **Brief §7.iv** · Raw CSVs in `perf/results/`
+**Note** ·
+
+Every figure in this report comes from one run of `make perf-all`. The tables are
+generated into [`results/summary.md`](results/summary.md) by `perf/analyze.py`. The raw files
+are in [`results/`](results/) and the run's metadata in
+[`results/run_meta.json`](results/run_meta.json). Each figure names the sub-run it comes from:
+
+| Sub-run | What it is |
+| --- | --- |
+| `run` | Reference load run: 50 users for 3 minutes |
+| `c10`, `c25`, `c50`, `c100` | Concurrency tiers: 10, 25, 50 and 100 users for 2 minutes each |
+| `workers1`, `workers4` | The same 30-settlement backlog drained by 1 worker, then by 4 |
+| `xrpl` | Real XRPL Testnet timings (`measure_xrpl.py`): 1 account, 1 trust line, 3 payments |
+
+Figures marked *derived* are calculated using measured values and their formula is given.
 
 ---
 
 ## Executive Summary
 
-The web tier is fast and stable under realistic load. At 50 concurrent users the platform
-serves **38 requests per second** with a **16 ms median** response time and **zero HTTP errors**.
-Throughput scales near-linearly to 100 users (54 rps) with no sign of server saturation.
+The web tier is fast and stable. In the reference run (`run`) 50 concurrent users generated
+**6,962 requests at 38.7 requests per second with 0 failures**, a **10 ms median** and a
+**62 ms 95th percentile**. Across all five load sub-runs, 23,173 requests produced no failed
+request. Throughput rose from 8.2 requests per second at 10 users to 68.3 at 100.
 
-Two capacity constraints stand out:
+Three constraints stand out:
 
-1. **bcrypt runs on the async event loop.** Each login stalls the server for ~230 ms. With 50
-   simultaneous users (the 2-minute 50-user tier) median login time reaches 6.6 s; at 100 users
-   it reaches 9.7 s, and the stall bleeds into every other endpoint waiting in the queue. The fix is one line — offload
-   hashing to a thread pool. bcrypt's cost itself should not be lowered.
+1. **Login blocks the server.** Password verification (bcrypt) runs synchronously inside the
+   async login handler, so it holds Uvicorn's single event loop. Login median time grew from
+   1,700 ms at 10 users to 5,400 ms at 100, and the slowest responses of otherwise-fast
+   endpoints fall in the same range.
+2. **Settlement is far slower than cash-in.** In `run` the admins confirmed 853 cash-ins in
+   180 seconds while one simulated worker settled 8.6 per minute and 826 messages were still
+   waiting at the end. On the real ledger the ceiling is lower still: every payment is signed
+   under `treasury_lock`, so settlement cannot exceed 60 ÷ 13.8 s = **4.3 per minute** whatever
+   the number of workers (*derived*).
+3. **The wallet page waits on the ledger.** `GET /wallet` makes a live Testnet balance call
+   whenever the recipient has a wallet and those views take about 1.3 s.
 
-2. **One settlement worker cannot drain the queue.** The web tier confirms cash-ins at roughly
-   5 per second; one worker settles ~9 per minute. The backlog grows throughout any sustained run.
-   Four workers raise throughput 4× and are the straightforward fix.
-
-Neither is a design fault — both are deployment sizing decisions. All other indicators are
-healthy: the money-moving path has a 22 ms median, settlement has a 0 % failure rate, and
-database row-level locking shows no contention at realistic concurrency.
+Money-moving paths are correct under load: 0 of 159 settlements failed, every completed
+settlement has a hash, no settlement needed a retry, and concurrent duplicate cash-in
+confirmations never published a second settlement message.
 
 ---
 
 ## 1. Test Environment and Method
 
-### Hardware and runtime
+### Environment (from `run_meta.json`)
 
 | Item | Value |
 | --- | --- |
-| Machine | Apple M2, 8 cores, 8 GB RAM, macOS 25.6.0 |
-| Python | 3.13.11 |
-| Web server | Uvicorn, single process, `--reload` (file-watch overhead present) |
-| Database | PostgreSQL 15 in Docker, default configuration |
-| Cache / queue | Redis 7 in Docker |
-| Load driver | Locust 2.32.4 |
+| Machine | Apple M2, 8 cores, 8.0 GB RAM, macOS 26.3.1 (arm64) |
+| Topology | App, PostgreSQL, Redis, workers and Locust all on this one host |
+| Python | 3.11.16 (project virtualenv) |
+| Web server | Uvicorn 0.32.1, FastAPI 0.115.5; one process, no `--reload`, `--no-access-log` |
+| Database | PostgreSQL 16.15 (Homebrew); SQLAlchemy 2.0.36, asyncpg 0.30.0 |
+| Queue | Redis 8.10.2; RQ 2.0.0 |
+| Load driver | Locust 2.32.4, spawn rate 5 users per second |
+| XRPL client | xrpl-py 4.0.0 |
+| Code | Commit `1c668c0` on `main`; only `perf/results/` differed from the commit |
 
-### Synthetic data
+### Isolation and fresh state
 
-`perf/seed_data.py 200` created 200 sender/recipient pairs (400 accounts total). Each sender has
-KYC approved, one pre-linked beneficiary, and the platform's default daily and monthly send limits.
-All accounts use the password `PerfTest123!`.
+The run used its own database (`remittance_perf`, recreated at the start) and its own Redis
+database (`redis://localhost:6379/14`), never the application's. Before **every** sub-run the
+runner stopped all processes, flushed that Redis database (so no run inherits another's queue),
+and purged and re-seeded 200 synthetic sender/recipient pairs (so no run inherits another's
+used-up daily limits). Each load sub-run started a fresh Uvicorn process, one settlement worker
+and the queue sampler. Database outcome counts were saved at the end of each sub-run.
 
-### Load profile
+### Simulated and real ledger
 
-`perf/locustfile.py` mixes three user types weighted to match real usage:
+Load and worker-scaling sub-runs used `perf/perf_worker.py`: the real queue, claim, database
+writes, wallet credit and `treasury_lock`, with the two XRPL calls replaced by fixed delays —
+2.0 s for wallet provisioning (outside the lock) and 4.0 s for the treasury payment (inside it).
+Real on-chain timings were measured separately in the same session (sub-run `xrpl`).
+`GET /wallet` still made its normal read-only balance call to the public Testnet during load.
+
+### Load profile (`perf/locustfile.py`)
 
 | User type | Weight | Behaviour |
 | --- | ---: | --- |
-| SenderUser | 6 | Login → dashboard → quote → send (approved card) → send (declined card) → history |
-| RecipientUser | 3 | Login → wallet → cash-out preview → cash-out request |
-| AdminUser | 1 | Confirm cash-in queue in batches; check settlement and transaction monitors |
+| SenderUser | 6 | Login, open the send page, then: dashboard, quote, full send with the approved test card, send with the declined card `4000000000000002` (weight 1 of 15), history |
+| RecipientUser | 3 | Login, then: wallet, cash-out history, cash-out preview (and request when a balance exists) |
+| AdminUser | 1 | Login, then: confirm up to 10 pending cash-ins per visit to the queue, settlement and transaction monitors |
 
-The sender tasks include a `send_money_declined` subtask (weight 1 within SenderUser, so roughly
-1-in-6 sends) that deliberately uses the declined test card `4000000000000002`. This exercises the
-failure path under load and is tracked as a separate row in the statistics.
-
-### Runs conducted
-
-| Run | Users | Spawn rate | Duration | Purpose |
-| --- | ---: | ---: | --- | --- |
-| Reference | 50 | 5/s | 3 min | Full per-endpoint statistics, queue depth sampling |
-| Concurrency — 10u | 10 | 5/s | 2 min | Baseline |
-| Concurrency — 25u | 25 | 5/s | 2 min | Light load |
-| Concurrency — 50u | 50 | 5/s | 2 min | Moderate load |
-| Concurrency — 100u | 100 | 5/s | 2 min | Heavy load |
-
-All five runs used `perf/perf_worker.py` — a simulated settlement worker that exercises the real
-queue, claim logic and database writes but replaces the two XRPL network calls with a fixed
-4-second delay. Real on-chain timings are measured separately (§5).
+Locust assigns user types by weight, so about one user in ten is an admin: one at 10 users,
+several at 25 and above.
 
 ---
 
-## 2. API Performance
+## 2. API Response Times
 
 ![Response time by endpoint](results/response_times.png)
 
-Per-endpoint figures from the 3-minute reference run (50 concurrent users).
+Reference run `run` — 50 users, 3 minutes (`run_stats.csv`):
 
-| Endpoint | Requests | Median (ms) | p95 (ms) | Max (ms) | Failures |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| **All requests** | 6,872 | 16 | 390 | 10,830 | 0 |
-| POST /admin/cashin/{id}/received | 1,018 | 22 | 50 | 185 | 0 |
-| GET /send/pay | 979 | 9 | 26 | 844 | 0 |
-| GET /send/review | 979 | 11 | 45 | 4,356 | 0 |
-| POST /remittances | 836 | 22 | 52 | 736 | 0 |
-| POST /remittances (declined) | 143 | 21 | 49 | 166 | 0 |
-| GET /quote (API) | 643 | 11 | 51 | 3,886 | 0 |
-| GET /wallet | 515 | 20 | 1,400 | 4,595 | 0 |
-| GET /dashboard | 483 | 16 | 66 | 494 | 0 |
-| GET /transactions | 350 | 11 | 63 | 670 | 0 |
-| POST /cashout/preview | 346 | 15 | 83 | 6,776 | 0 |
-| GET /cashout/history | 229 | 15 | 99 | 8,350 | 0 |
-| GET /admin/cashin | 198 | 13 | 360 | 4,079 | 0 |
-| POST /login | 50 | 6,200 | 10,000 | 10,830 | 0 |
-| GET /admin/transactions | 36 | 31 | 99 | 130 | 0 |
-| GET /admin/settlements | 37 | 8 | 110 | 258 | 0 |
-| GET /send | 30 | 830 | 5,000 | 5,788 | 0 |
+| Endpoint | Requests | Failures | Median (ms) | p95 (ms) | p99 (ms) | Max (ms) | Req/s |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| **All requests** | 6,962 | 0 | 10 | 62 | 2,400 | 8,068 | 38.7 |
+| GET /send/pay | 1,029 | 0 | 6 | 12 | 36 | 1,630 | 5.7 |
+| GET /send/review | 1,029 | 0 | 7 | 20 | 150 | 4,179 | 5.7 |
+| POST /admin/cashin/{id}/received | 909 | 0 | 13 | 23 | 35 | 48 | 5.1 |
+| POST /remittances | 856 | 0 | 14 | 24 | 61 | 626 | 4.8 |
+| GET /quote (API) | 637 | 0 | 7 | 32 | 1,500 | 3,022 | 3.5 |
+| GET /wallet | 581 | 0 | 17 | 1,300 | 2,100 | 3,221 | 3.2 |
+| GET /dashboard | 497 | 0 | 11 | 25 | 71 | 1,738 | 2.8 |
+| POST /cashout/preview | 340 | 0 | 9 | 25 | 180 | 4,757 | 1.9 |
+| GET /transactions | 333 | 0 | 9 | 23 | 63 | 564 | 1.9 |
+| GET /cashout/history | 218 | 0 | 10 | 36 | 3,500 | 4,880 | 1.2 |
+| GET /admin/cashin | 198 | 0 | 10 | 40 | 2,100 | 2,657 | 1.1 |
+| POST /remittances (declined) | 172 | 0 | 14 | 24 | 48 | 1,355 | 1.0 |
+| POST /login | 50 | 0 | 4,300 | 7,100 | 8,100 | 8,068 | 0.3 |
+| GET /admin/transactions | 48 | 0 | 49 | 130 | 3,500 | 3,511 | 0.3 |
+| GET /admin/settlements | 35 | 0 | 6 | 13 | 25 | 25 | 0.2 |
+| GET /send | 30 | 0 | 1,600 | 3,800 | 4,400 | 4,376 | 0.2 |
 
-**The money-moving path is fast.** `POST /remittances` — which locks the sender's row, re-prices
-the quote, checks daily and monthly limits, inserts the transaction and enqueues a settlement
-message — has a 22 ms median and a 52 ms p95. The declined-card path (`POST /remittances
-(declined)`) is within 1 ms of the success path at both percentiles, confirming the failure branch
-adds no overhead.
+**The money-moving path is fast.** `POST /remittances` locks the sender's row, re-prices the
+quote, checks daily and monthly limits, inserts the transaction and returns: 14 ms median,
+24 ms p95. The declined-card path has the same median and p95.
 
-**The sub-second interaction target (NFR 7.2) is met at p95 by every screen except login, the
-wallet page and `GET /send` (p95 5,000 ms; see bottleneck #5 in §8).** Every maximum above 1 s
-traces back to one of two causes: a login stalling the event loop, or a wallet page waiting on the XRPL network — both diagnosed in §7.
+**Sub-second at p95:** every endpoint in `run` meets it except
+`POST /login` (7,100 ms), `GET /send` (3,800 ms) and `GET /wallet` (1,300 ms). `GET /send`
+is requested once per sender, at start-up, while all the logins are running. In `c10`, where only 10 logins run, its median is 11 ms and its p95 43 ms.
 
 ---
 
 ## 3. Requests per Second
 
-| Run | Users | RPS | Notes |
-| --- | ---: | ---: | --- |
-| 10u | 10 | 7.1 | Logins spaced out; no contention |
-| 25u | 25 | 18.0 | 2.5× users → 2.5× RPS |
-| 50u | 50 | 33.3 | Near-linear scaling continues |
-| Reference (50u, 3 min) | 50 | 38.5 | Longer run with more stable send activity |
-| 100u | 100 | 54.0 | Scaling slows slightly but server not saturated |
+| Sub-run | Users | Duration | Requests | Req/s |
+| --- | ---: | --- | ---: | ---: |
+| `c10` | 10 | 2 min | 983 | 8.2 |
+| `c25` | 25 | 2 min | 2,351 | 19.6 |
+| `c50` | 50 | 2 min | 4,691 | 39.2 |
+| `run` | 50 | 3 min | 6,962 | 38.7 |
+| `c100` | 100 | 2 min | 8,186 | 68.3 |
 
-Throughput grows near-linearly from 10 to 50 users. At 100 users the multiplier drops slightly
-(54 rps instead of the ~70 that strict linearity would predict), which is consistent with the
-bcrypt stalls adding queuing delay at the highest load tier. Even so, the server has not hit a
-ceiling: CPU and memory were not the constraint.
+Ten times the users produced 8.3 times the throughput (68.3 ÷ 8.2, *derived*). The two
+50-user sub-runs agree (39.2 and 38.7). No sub-run showed a failed request, so the server had
+not reached a point where it refused or errored under this load.
 
 ---
 
 ## 4. Settlement Queue and Worker Throughput
 
-![Queue depth under load](results/queue_depth.png)
+![Queue depth during the reference run](results/queue_depth.png)
+
+### Under load, one simulated worker (`queue_<sub-run>.csv`, `<sub-run>_outcomes.json`)
+
+| Sub-run | Users | Cash-ins received (DB) | Settled while sampled | Settled per minute | Queue depth at end |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `c10` | 10 | 119 | 18 | 8.9 | 100 |
+| `c25` | 25 | 272 | 18 | 8.9 | 253 |
+| `c50` | 50 | 584 | 17 | 8.5 | 566 |
+| `run` | 50 | 853 | 26 | 8.6 | 826 |
+| `c100` | 100 | 935 | 15 | 7.5 | 918 |
+
+In `run`, cash-ins were confirmed at about 4.7 per second (853 ÷ 180 s, *derived*) and settled
+at 8.6 per minute. The queue grew for the whole run in every sub-run. At 100 users the single
+worker's rate dropped to 7.5 per minute. The worker shares the machine with the web server and
+100 simulated users.
+
+### Worker scaling — the same backlog (`run_meta.json`, `workers<N>_outcomes.json`)
+
 ![Settlement throughput by worker count](results/throughput.png)
 
-### Simulated-ledger throughput (measured)
+Each drain started from 30 confirmed cash-ins for 30 recipients with no wallet yet, booked through
+the real cash-in code after a purge and re-seed, and was timed from "all workers registered" to
+"all 30 settled".
 
-| Configuration | Settlements per minute |
-| --- | ---: |
-| 1 worker | 9.2 |
-| 4 workers | 37.3 |
-| Scaling factor | 4.05× |
+| Sub-run | Workers | Drain time (s) | Completed | Settlements per minute | vs 1 worker |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `workers1` | 1 | 186.2 | 30 | 9.7 | 1.00× |
+| `workers4` | 4 | 123.6 | 30 | 14.6 | 1.51× |
 
-Scaling is nearly linear because each settlement job claims its own transaction row before
-doing any work. Workers contend on nothing except their own rows, so adding workers adds
-throughput at essentially no cost per worker added.
+Four workers gave 1.51 times the throughput of one, not four times. This is `treasury_lock` at
+work: each settlement takes 2.0 s of provisioning, which workers can overlap, and 4.0 s of
+payment, which they cannot. The ceilings implied by those simulated delays (*derived*) are
+60 ÷ 6.0 = 10.0 per minute for one worker and 60 ÷ 4.0 = 15.0 per minute for any number. The
+measured 9.7 and 14.6 sit just below them.
 
-With 1 worker running during the reference run, the admin confirmed cash-ins at ~5 per
-second (1,018 confirmations in 3 minutes). The worker settled 0.15 per second. The queue
-grew to 833 waiting messages by the end of the run and never began to drain. The worker rate and
-queue depth come from the queue sampling in the 21 September run (`queue.csv`); the sampler was
-not re-run alongside the 28 September reference run, whose confirmation count is quoted above.
+### Real-ledger capacity (*derived*)
 
-### Real-ledger capacity (derived)
-
-At the measured 14.1 s per on-chain payment (§5):
-
-| Workers | Estimated settlements per minute (real ledger) |
-| ---: | ---: |
-| 1 | ~4.3 |
-| 4 | ~17 |
-| 8 | ~34 |
-
-These figures assume no Testnet rate limiting, which the sample was too small to probe.
-Real throughput could be lower under sustained load.
-
-> **Note: multi-worker figures do not carry over to the real ledger.** The 1- and 4-worker
-> queue measurements (`queue.csv`, `queue_4workers.csv`, `throughput.png`) date from the
-> 21 September run and were not repeated on 28 September. They were taken before
-> `queue_service.treasury_lock` was added (25 September), so those workers signed
-> concurrently. Every settlement is now signed and submitted under that single Redis lock,
-> held for the whole ledger round trip, because all payments come from one treasury account
-> and share its sequence number. Real-ledger treasury payments are therefore serialised: about
-> 4 per minute (60 s ÷ 14.1 s) however many workers run, so the 4- and 8-worker rows in the
-> table above are upper bounds that the current code does not reach. Only wallet provisioning
-> (faucet account and TrustSet) runs outside the lock.
+With the measured real payment time of 13.8 s, the lock caps real settlement at
+60 ÷ 13.8 = **4.3 per minute regardless of worker count**. Extra workers can only overlap wallet
+provisioning (faucet account and TrustSet, 12.06 s + 15.27 s for a new recipient). At that
+ceiling the 826 messages left in `run` would take at least 826 × 13.8 s ≈ 3.2 hours to settle.
 
 ---
 
 ## 5. XRPL Processing Time
 
-Measured with `perf/measure_xrpl.py` against the public XRPL Testnet in a separate run.
-The load tests do not touch the real network.
+Sub-run `xrpl`: `perf/measure_xrpl.py` against the public XRPL Testnet, in the same session
+(`xrpl_timings.json`).
 
 | Step | Samples | Min (s) | Mean (s) | Max (s) |
 | --- | ---: | ---: | ---: | ---: |
-| Create recipient account (faucet) | 1 | 11.6 | 11.6 | 11.6 |
-| TrustSet to issuer | 1 | 14.1 | 14.1 | 14.1 |
-| Treasury → recipient payment | 3 | 13.0 | 14.1 | 16.3 |
-| **First transfer to a new recipient (total)** | 1 | — | **42.0** | — |
+| Create recipient account (faucet) | 1 | 12.06 | 12.06 | 12.06 |
+| TrustSet to issuer | 1 | 15.27 | 15.27 | 15.27 |
+| Treasury → recipient payment | 3 | 13.48 | 13.8 | 13.99 |
+| **First transfer to a new recipient** | 1 | — | **41.25** | — |
 
-A recipient's first-ever transfer costs ~42 seconds end-to-end: the worker must create the
-XRPL account and submit a TrustSet before the payment can be sent. Subsequent transfers to
-the same recipient cost ~14 seconds — ledger validation latency only. This matches the
-end-to-end Phase 6 smoke test (39 s) closely.
-
-Nearly all of the 14-second payment time is spent waiting for the ledger to close and
-validate the transaction. The platform cannot reduce this; it is inherent to the XRPL
-consensus mechanism. The worker's reliable-submission pattern (hash stored before submit,
-LastLedgerSequence tracked, reconcile resolves unknowns) handles the cases where validation
-is delayed or the result is uncertain.
+A recipient's first transfer took 41.25 s end to end, because the worker must create and fund
+the account and set its trust line before paying. Later transfers to the same recipient cost
+only the payment: 13.8 s on average. Each timing includes waiting for a validated ledger.
 
 ---
 
 ## 6. Success and Failure Rates
 
-All figures come from a direct PostgreSQL query after all five test runs completed.
+### HTTP
 
-### Cash-in outcomes (2,535 transactions total)
+No request failed in any load sub-run: 0 of 23,173 (6,962 + 983 + 2,351 + 4,691 + 8,186).
+The exception files are empty and no traceback appears in any server, worker or sampler log
+(`run_meta.json`).
 
-| Status | Count | % of total | Reason |
-| --- | ---: | ---: | --- |
-| received — card approved | 2,074 | 81.8 % | Normal sends |
-| failed — card declined | 421 | 16.6 % | Intentional declined test card |
-| pending — awaiting admin | 40 | 1.6 % | Final run still in queue |
+### Cash-in outcomes (`<sub-run>_outcomes.json`, end of each sub-run)
 
-The 421 card-declined failures are entirely intentional: they are the `send_money_declined`
-task sends using the known-declined card `4000000000000002`. The count (421) matches exactly
-the sum of declined sends across all five runs (143 + 27 + 59 + 70 + 122). No card-approved
-transaction was ever rejected by the platform; the admin-confirmed cash-in success rate is
-**100 %**.
+| Sub-run | Card declined (failed) | Received | Pending | Declined-card sends (Locust) |
+| --- | ---: | ---: | ---: | ---: |
+| `run` | 172 | 853 | 3 | 172 |
+| `c10` | 32 | 119 | 5 | 32 |
+| `c25` | 54 | 272 | 3 | 54 |
+| `c50` | 121 | 584 | 2 | 121 |
+| `c100` | 192 | 935 | 8 | 192 |
 
-### Settlement outcomes (of 2,074 received cash-ins)
+Every failed cash-in is an intentional declined-card send: the counts equal the declined-card
+requests in each sub-run. Approved-card sends equal received plus pending in every sub-run
+(for example `run`: 856 = 853 + 3). Pending rows are sends no admin had confirmed when the
+sub-run ended.
 
-| Status | Count | % of received |
-| --- | ---: | ---: |
-| completed | 187 | 9.0 % |
-| queued — not yet reached | 1,886 | 90.9 % |
-| processing — claimed, in flight | 1 | < 0.1 % |
-| failed | 0 | **0.0 %** |
+### Settlement outcomes
 
-**Settlement failure rate: 0 %.** Every transaction the worker reached completed on its
-first attempt. All 187 completed rows carry an XRPL transaction hash from the simulated
-worker; none are hash-less. No settlement was retried (max attempts = 1; mean = 0.09 across
-all received rows).
+| Sub-run | Completed | Queued (backlog) | Failed | Completed without a hash | Max attempts |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `run` | 27 | 826 | 0 | 0 | 1 |
+| `c10` | 19 | 100 | 0 | 0 | 1 |
+| `c25` | 19 | 253 | 0 | 0 | 1 |
+| `c50` | 18 | 566 | 0 | 0 | 1 |
+| `c100` | 16 | 919 | 0 | 0 | 1 |
+| `workers1` | 30 | 0 | 0 | 0 | 1 |
+| `workers4` | 30 | 0 | 0 | 0 | 1 |
 
-The 1,886 queued rows are backlog, not failures. The simulated worker processes ~9 per
-minute while the test confirmed hundreds per minute. The queue is FIFO with persistent
-messages; no work has been lost, and the backlog would drain completely if the worker were
-left running.
+**Settlement failure rate: 0 of 159.** Every settlement a worker reached completed on its first
+attempt and carries a transaction hash. Queued rows are backlog, not failures.
 
-### HTTP errors
+### Concurrent admins and duplicate confirmations
 
-Zero HTTP 4xx or 5xx responses were recorded in any run. The Locust-level failures reported
-at 25–100 users (see §7) are application-level daily-limit enforcements, not server errors.
+Locust counted more confirmation requests than the database recorded received cash-ins:
+
+| Sub-run | Confirmations (Locust) | Received (DB) | Refused as already processed (*derived*) |
+| --- | ---: | ---: | ---: |
+| `c10` | 119 | 119 | 0 |
+| `c25` | 302 | 272 | 30 |
+| `c50` | 650 | 584 | 66 |
+| `run` | 909 | 853 | 56 |
+| `c100` | 1,101 | 935 | 166 |
+
+Only `c10` had a single admin. Above that, several admin users worked the same queue and
+posted confirmations for the same rows. The confirmation is a conditional update
+(`pending → received`), so the second request for a row changes nothing and is answered
+"already processed" with a redirect, which Locust records as a success. No duplicate reached
+the queue: the queue depth at the end matches the database's queued rows in `run` (826 = 826),
+`c10` (100 = 100), `c25` (253 = 253) and `c50` (566 = 566), and differs by one in `c100`
+(918 against 919), where one message was in flight when sampling stopped.
 
 ---
 
@@ -253,112 +272,99 @@ at 25–100 users (see §7) are application-level daily-limit enforcements, not 
 
 ![Concurrency scaling](results/concurrency_scaling.png)
 
-### Aggregated results across tiers
+### All requests by tier (`c<N>_stats.csv`)
 
-| Users | Requests | Locust failures | Failure % | Median (ms) | p95 (ms) | Max (ms) | RPS |
-| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 10 | 845 | 0 | 0.0 % | 19 | 1,200 | 2,944 | 7.1 |
-| 25 | 2,150 | 5 | 0.2 % | 17 | 1,200 | 6,895 | 18.0 |
-| 50 | 3,983 | 173 | 4.3 % | 17 | 1,300 | 12,398 | 33.3 |
-| 100 | 6,457 | 343 | 5.3 % | 35 | 1,500 | 19,882 | 54.0 |
+| Users | Requests | Failures | Median (ms) | p95 (ms) | Max (ms) | Req/s |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 10 | 983 | 0 | 13 | 1,200 | 2,594 | 8.2 |
+| 25 | 2,351 | 0 | 12 | 32 | 5,781 | 19.6 |
+| 50 | 4,691 | 0 | 10 | 110 | 7,964 | 39.2 |
+| 100 | 8,186 | 0 | 9 | 1,200 | 9,757 | 68.3 |
 
-### What the Locust failures represent
+The median stays between 9 and 13 ms at every tier. The p95 depends on how much of the traffic
+is slow. At 10 users, 72 of 983 requests (7.3 %, *derived*) were wallet views, mostly making the
+~1.3 s ledger call, so the p95 lands on them. At 100 users, logins (100), send-page loads (60)
+and the slow 5 % of 720 wallet views together make up about 2.4 % of 8,186 requests (*derived*),
+yet 5 % of requests took 1,200 ms or more: otherwise-fast requests were also delayed.
 
-Every failure at every tier is a mark on `GET /send/pay`, not an HTTP error. The locustfile
-marks that request failed when the page does not contain a rendered quote form — which
-happens when a sender has hit their daily limit and the server responds with a redirect
-instead. This is correct application behaviour. The failure count rises with concurrency
-because more users cycling through the same 200 seeded senders depletes daily allowances
-faster, and because earlier runs in the same UTC day had already consumed some allowance.
+### Login (`POST /login`)
 
-### Login degrades near-linearly (bcrypt bottleneck)
+| Sub-run | Users | Median (ms) | p95 (ms) | Max (ms) |
+| --- | ---: | ---: | ---: | ---: |
+| `c10` | 10 | 1,700 | 2,600 | 2,594 |
+| `c25` | 25 | 2,800 | 5,800 | 5,781 |
+| `c50` | 50 | 4,000 | 6,400 | 7,964 |
+| `run` | 50 | 4,300 | 7,100 | 8,068 |
+| `c100` | 100 | 5,400 | 7,500 | 9,394 |
 
-`verify_password` blocks the single event loop thread for ~230 ms. At low concurrency the
-logins are spaced out; at high concurrency they queue behind each other:
+Login time rises with the number of users logging in at once. `authenticate_user` calls
+`verify_password` (bcrypt, deliberately slow) directly inside an `async` request, so while a
+hash is being checked the event loop serves nothing else. That is also why the slowest
+responses of fast endpoints match login times: in `c100`, `POST /remittances` had a 13 ms median
+but a 9,582 ms maximum, against a 9,394 ms maximum login.
 
-| Users | Login median (ms) | Login p95 (ms) | Login max (ms) |
-| ---: | ---: | ---: | ---: |
-| 10 | 1,900 | 2,900 | 2,944 |
-| 25 | 4,700 | 6,900 | 6,895 |
-| 50 | 6,600 | 11,000 | 12,398 |
-| 100 | 9,700 | 17,000 | 19,882 |
+### Money-moving endpoints (`POST /remittances`)
 
-The median grows approximately 1,000–2,000 ms per 25-user increment, consistent with a
-fixed-cost queue: each additional concurrent login adds one bcrypt slot. This stall is also
-responsible for the tail latency on otherwise-fast endpoints — a `POST /remittances` that
-arrives while three users are logging in waits ~690 ms before it is even scheduled.
+| Sub-run | Users | Requests | Median (ms) | p95 (ms) | Max (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `c10` | 10 | 124 | 17 | 23 | 44 |
+| `c25` | 25 | 275 | 16 | 21 | 90 |
+| `c50` | 50 | 586 | 14 | 23 | 1,317 |
+| `run` | 50 | 856 | 14 | 24 | 626 |
+| `c100` | 100 | 943 | 13 | 31 | 9,582 |
 
-### Money-moving endpoints hold up under load
+Median and p95 stay flat from 10 to 100 users: the sender-row lock (`SELECT … FOR UPDATE`)
+showed no contention. Each seeded sender is a separate row, so this does not test many users
+sending from one account.
 
-Row-level locking (`SELECT FOR UPDATE` on sender and wallet rows) shows no contention at
-realistic concurrency. The remittance endpoint stays flat through 50 users:
+### Wallet page (`GET /wallet`)
 
-| Users | POST /remittances median (ms) | POST /remittances p95 (ms) |
-| ---: | ---: | ---: |
-| 10 | 25 | 40 |
-| 25 | 24 | 42 |
-| 50 | 23 | 81 |
-| 100 | 39 | 750 |
+| Sub-run | Users | Requests | Median (ms) | p95 (ms) | Max (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `c10` | 10 | 72 | 1,300 | 1,400 | 1,639 |
+| `c25` | 25 | 186 | 17 | 1,500 | 2,570 |
+| `c50` | 50 | 381 | 15 | 1,300 | 3,957 |
+| `run` | 50 | 581 | 17 | 1,300 | 3,221 |
+| `c100` | 100 | 720 | 10 | 1,400 | 4,870 |
 
-The p95 jump at 100 users (81 → 750 ms) is login-stall collateral, not lock contention.
-Under a workload concentrated on a single sender — which was not tested — contention would
-appear and would be the right target for follow-up measurement.
+The page calls the ledger only when the recipient already has a wallet, which is created on
+their first settlement. The medians are consistent with that: in `c10` (3 recipients, 19
+settlements) most views made the call (median 1,300 ms). In `c100`, 16 settlements could have
+given wallets to at most 16 of the 30 logged-in recipients, and the median was 10 ms, with the
+call showing in the p95.
 
-The declined-card path tracks the success path within 2–3 ms at every tier, confirming the
-failure branch adds no overhead even under concurrent load.
+### Send page (`GET /send`)
 
-### Wallet page live-ledger call grows with concurrency
+| Sub-run | Users | Median (ms) | p95 (ms) |
+| --- | ---: | ---: | ---: |
+| `c10` | 10 | 11 | 43 |
+| `c25` | 25 | 250 | 1,800 |
+| `c50` | 50 | 1,400 | 2,800 |
+| `run` | 50 | 1,600 | 3,800 |
+| `c100` | 100 | 2,300 | 3,800 |
 
-`GET /wallet` fetches the on-chain balance on every page load. In the concurrency tiers the
-median sits at about the network round-trip (~1.2 s) and the p95 grows as requests queue behind
-each other's in-flight ledger calls. The 3-minute reference run (§2) did not show this: its
-`/wallet` median was 20 ms, with a 1,400 ms p95.
-
-| Users | Wallet median (ms) | Wallet p95 (ms) |
-| ---: | ---: | ---: |
-| 10 | 1,200 | 1,400 |
-| 25 | 1,200 | 1,800 |
-| 50 | 1,200 | 1,900 |
-| 100 | 1,300 | 2,400 |
+Each sender loads this page once, straight after logging in, so its time tracks the login queue.
 
 ---
 
 ## 8. Bottlenecks
 
-**1. bcrypt blocks the async event loop — the most impactful issue.**
-`auth_service.verify_password` runs synchronously inside an `async def` handler, blocking
-Uvicorn's single event loop thread. In the 2-minute 50-user tier the median login time is 6.6 s
-and the worst case is 12.4 s (the 3-minute reference run in §2 shows a 6,200 ms median and a
-10,830 ms maximum). The stall propagates to every other endpoint waiting behind a login.
-Fix: wrap the call in `asyncio.to_thread` (or Starlette's `run_in_threadpool`). bcrypt's
-work factor should not be reduced — the cost is the security guarantee.
+**1. Synchronous bcrypt on the event loop.** `verify_password` runs inside the async login
+handler and blocks Uvicorn's single event loop. Login median rose from 1,700 ms (`c10`) to
+5,400 ms (`c100`), and fast endpoints inherited the stall (a 9,582 ms maximum on
+`POST /remittances` in `c100`). `GET /send`, loaded straight after login, is slow for the same
+reason.
 
-**2. One settlement worker cannot drain the queue.**
-The web tier accepts and confirms cash-ins far faster than one worker can settle them
-(~5/s confirmed vs ~0.15/s settled). The queue is a correct buffer — no messages are
-dropped — but recipients wait minutes for a transfer the ledger takes seconds to process.
-Running 4 workers raises throughput ~4× (measured). Capacity planning should use the
-real-ledger rate of ~4 settlements per minute per worker.
+**2. Settlement throughput.** Under every load, one worker settled well under 10 per minute
+while cash-ins were received at between 1.0 per second (`c10`, 119 ÷ 120 s) and 7.8 per second
+(`c100`, 935 ÷ 120 s) (*derived*), so the backlog grew throughout. More
+workers help only with wallet provisioning: with `treasury_lock`, 4 simulated workers reached
+14.6 per minute against 9.7 for one (1.51×), and the real ledger is capped at 4.3 per minute
+by the 13.8 s payment.
 
-**3. The wallet page makes a synchronous ledger call.**
-`GET /wallet` fetches the live on-chain balance on every request. In the concurrency tiers this
-put the median at ~1.2 s at every load level; in the reference run the median was 20 ms but the
-p95 was 1,400 ms, so the call dominates the slow tail rather than every load. The cached
-`balance_uctusd` column is already in the database. Rendering the page from that value and refreshing the live figure
-asynchronously (or on a short TTL) would reduce the median to the same range as every other
-page (10–20 ms).
+**3. Live ledger call on the wallet page.** Views that make the call take about 1.3 s (`c10` median 1,300 ms). In every sub-run it sets the wallet page's p95 (1,300-1,500 ms).
 
-**4. No database lock contention observed.**
-Row locks on `sender` and `wallet` rows did not contribute to latency at the tested
-concurrency levels. The 200 seeded senders distributed the load across enough distinct rows
-that no queue formed at the database. A concentrated test (many users sharing one sender)
-would be needed to probe this further.
-
-**5. `GET /send` p95 is login-stall collateral.**
-The send-amount page is loaded once per user at startup, exactly when all 50 users are
-also logging in. Its p95 (5,000 ms) reflects the login queue, not a query problem; its
-median (830 ms) is the same beneficiary list query as `/send/review` (11 ms median) plus
-the login contention.
+**4. No database contention observed.** `POST /remittances` stayed at a 13–17 ms median and a 21–31 ms p95 from 10 to 100 users.
 
 ---
 
@@ -366,77 +372,51 @@ the login contention.
 
 | Priority | Change | Expected effect |
 | ---: | --- | --- |
-| 1 | Wrap `verify_password` and `get_password_hash` in `asyncio.to_thread` | Login median falls to ~250 ms; stall disappears from all other endpoints |
-| 2 | Run 3–4 settlement workers in production | Queue drains instead of growing; recipient wait time drops proportionally |
-| 3 | Serve `GET /wallet` from cached `balance_uctusd`; fetch live figure in background | Wallet median falls from 1.2 s to ~20 ms |
-| 4 | Run Uvicorn with multiple workers (`--workers 4`) in production | Spreads CPU work across cores; also dilutes login stalls |
+| 1 | Run `verify_password` and `get_password_hash` off the event loop (`asyncio.to_thread` or Starlette's `run_in_threadpool`); keep bcrypt's cost | Logins no longer stall other requests; login time reflects bcrypt alone |
+| 2 | Raise real-ledger settlement throughput at the treasury, not with more workers: hold `treasury_lock` only while the sequence is allocated and the payment signed and submitted, tracking the treasury sequence locally, and wait for validation outside the lock; or split payments across several treasury accounts, each with its own lock | Lifts the 4.3-per-minute ceiling, which currently no number of workers can move |
+| 3 | Keep 2–4 workers for the provisioning overlap only | Measured 1.51× with 4 simulated workers; real-ledger payment throughput unchanged |
+| 4 | Render `GET /wallet` from the cached `balance_uctusd` and fetch the ledger balance in the background or with a short cache | Removes the ~1.3 s call from page loads |
+| 5 | In production, run several Uvicorn processes | Spreads CPU work across cores; a blocked loop affects only its own process |
+
+For the test itself: give `AdminUser` `fixed_count = 1` so there is exactly one admin at every
+tier, and take a larger real-ledger sample.
 
 ---
 
 ## 10. Limitations and Caveats
 
-**Simulated ledger.** All load-test settlement used a simulated worker with a fixed 4-second
-delay instead of real XRPL network calls. Queue depth, claim logic, database writes and
-wallet credits are real; XRPL latency and rate limits are not. Real throughput is lower
-(~4 settlements/min/worker vs ~9 simulated).
+**Simulated ledger.** Load and worker-scaling sub-runs replaced the XRPL calls with fixed
+delays (2.0 s provisioning, 4.0 s payment). Queue behaviour, claims, database writes, wallet
+credits and `treasury_lock` are real, while ledger latency, variance and rate limits are not. The
+simulated settlement rates are not real-ledger rates. Section 4 gives the real-ledger ceiling separately.
 
-**Small XRPL sample.** Real-ledger timings are 3 payment transactions, 1 account creation
-and 1 trust line — sufficient for an order-of-magnitude estimate, not a statistical
-distribution. Payment latency varies with Testnet load, which is a shared public network.
+**Small XRPL sample.** Sub-run `xrpl` measured 1 account creation, 1 trust line and 3 payments on
+the shared public Testnet. That is enough for an order of magnitude, not a distribution.
 
-**Single-machine run.** The application, PostgreSQL, Redis and Locust all ran on the same
-8-core laptop, sharing CPU, memory and the loopback interface. In a production deployment
-these components would run on separate machines; measured latencies would likely be lower
-(no resource contention between load driver and app) and throughput higher.
+**Single machine.** The application, PostgreSQL, Redis, workers and Locust shared one 8-core,
+8 GB laptop. Latencies include that contention and the lower single-worker rate at 100 users may reflect it.
 
-**`--reload` mode.** The dev server was started with `make dev` (`uvicorn --reload`), which
-runs a WatchFiles process alongside the app and adds a small amount of file-system overhead
-on every request. A production deployment (`--workers N`, no `--reload`) would be faster.
+**Short sub-runs with a login ramp.** Every sub-run starts with all users logging in at 5 per
+second, and the tiers last 2 minutes, so the login stall is a noticeable share of each tier.
 
-**Daily limit accumulation.** The five runs were conducted in the same UTC day against the
-same seeded accounts. Senders accumulated sends against their daily limits across runs,
-which is the source of the rising Locust failure count at higher concurrency tiers. These
-failures are correct application-level enforcements, not server errors, but they inflate the
-failure percentage for the 50- and 100-user tiers relative to a clean-slate run.
+**Live Testnet reads.** `GET /wallet` called the public Testnet during load, so its timings
+depend on that network at the time of the run.
 
-**Concurrency ceiling not found.** The 100-user run showed no sign of server saturation
-(RPS still growing, no HTTP errors). The point at which the system actually breaks was not
-tested. A follow-up run at 200–500 users would establish the real ceiling, though the
-bcrypt bottleneck would dominate the results until it is fixed.
+**Several admins above 10 users.** Locust's weighting produced more than one admin from 25
+users up, so confirmation counts from Locust include refused duplicates and database counts
+are used throughout.
 
 ---
 
 ## Appendix: Reproducing the Results
 
 ```bash
-# Seed synthetic users (run once; --purge to reset and re-seed)
-python perf/seed_data.py 200
-
-# Terminal 1 — web server
-make dev
-
-# Terminal 2 — simulated settlement worker (never use `make worker` for load tests)
-python perf/perf_worker.py
-
-# Terminal 3 — queue depth sampler (reference run only)
-python perf/sampler.py perf/results/queue.csv
-
-# Reference run (50 users, 3 minutes)
-locust -f perf/locustfile.py --headless -u 50 -r 5 -t 3m \
-       -H http://127.0.0.1:8000 --csv perf/results/run
-
-# Concurrency tiers (2 minutes each)
-for u in 10 25 50 100; do
-  locust -f perf/locustfile.py --headless -u $u -r 5 -t 2m \
-         -H http://127.0.0.1:8000 --csv perf/results/c${u}
-done
-
-# Real Testnet timings (separate run; spends ~1.5 UCTUSD from the treasury)
-python perf/measure_xrpl.py 3
-
-# Regenerate all charts
-python perf/analyze.py
+# Postgres and Redis running with the project virtualenv installed from requirements.txt.
+make perf-all                     # simulated ledger only + keeps the existing xrpl_timings.json
+PERF_REAL_XRPL=1 make perf-all    # also re-measures Testnet timings (spends about 1.5 UCTUSD)
 ```
 
-> **Do not run a load test with `make worker`.** It would attempt hundreds of real Testnet
-> payments and drain the treasury wallet.
+`perf/run_all.py` documents every parameter. It writes all files to `perf/results/`,
+`results/summary.md` holds every table in this report, and `results/run_meta.json` holds the
+environment, parameters, per-sub-run records and a manifest of every file. This run took
+18 minutes 14 seconds with the real-ledger step included.

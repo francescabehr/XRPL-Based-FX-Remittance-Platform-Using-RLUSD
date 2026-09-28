@@ -141,7 +141,7 @@ other.
    send R100 at `/send` (Details → Review → Pay). Pay with card `4242 4242 4242 4242`, any
    future expiry (MM/YY) and any 3-digit CVV.
 6. **Admin:** at `/admin/cashin`, click **Received**. This queues the settlement, and the worker
-   pays the recipient from the treasury. The first transfer to a new recipient takes about 40 s,
+   pays the recipient from the treasury. The first transfer to a new recipient takes about 41 s,
    because the worker creates and funds the recipient's XRPL account, sets its trust line, and
    then pays. Progress shows on the sender's `/transactions` and on `/admin/settlements`.
 7. **Recipient:** open `/wallet` to see the UCTUSD balance and the transaction hash, linked to the
@@ -233,25 +233,26 @@ Only the worker signs transactions, the web app never does.
 
 ## Performance
 
-Reference run: 50 users for 3 minutes, 200 synthetic sender/recipient pairs,
-simulated-ledger worker (`perf/results/run_stats.csv`). Method, charts and the 10–100 user tiers: [perf/REPORT.md](perf/REPORT.md).
+All figures come from one run of `make perf-all`.
+Method, every table, bottlenecks and caveats: [perf/REPORT.md](perf/REPORT.md).
 
-| Measure | Result |
+| Measure (sub-run) | Result |
 |---|---|
-| Requests / failures | 6,872 / 0 |
-| Throughput | 38.5 requests per second |
-| Response time (all requests) | 16 ms median, 390 ms p95 |
-| `POST /remittances` | 22 ms median, 52 ms p95 |
-| Slowest p95 | `POST /login` 10,000 ms · `GET /send` 5,000 ms · `GET /wallet` 1,400 ms |
-| XRPL payment, real Testnet (3 samples) | 14.1 s mean (13.0–16.3 s) |
-| First transfer to a new recipient | 42 s (faucet account + trust line + payment) |
-| Settlement drain, simulated ledger, 1 worker | ~9 per minute |
+| Reference run, 50 users for 3 min (`run`) | 6,962 requests, 0 failures, 38.7 requests per second |
+| Response time, all requests (`run`) | 10 ms median, 62 ms p95 |
+| `POST /remittances` (`run`) | 14 ms median, 24 ms p95 |
+| Slowest p95 (`run`) | `POST /login` 7,100 ms · `GET /send` 3,800 ms · `GET /wallet` 1,300 ms |
+| Throughput at 10 → 100 users (`c10`, `c100`) | 8.2 → 68.3 requests per second, 0 failures |
+| Settlement drain, simulated ledger (`workers1`, `workers4`) | 9.7 per minute with 1 worker, 14.6 with 4 |
+| XRPL payment, real Testnet, 3 samples (`xrpl`) | 13.8 s mean (13.48–13.99 s) |
+| First transfer to a new recipient (`xrpl`) | 41.25 s (faucet account + trust line + payment) |
 
-Bottlenecks: bcrypt blocks the event loop on login; one worker cannot drain the queue (and real
-treasury payments are serialised at about 4 per minute); `/wallet` waits on a live ledger call.
+Bottlenecks: bcrypt blocks the event loop on login; settlement is far slower than cash-in, and
+because treasury payments are serialised the real ledger allows about 4.3 per minute however
+many workers run; `/wallet` waits on a live ledger call.
 
 > **Never load-test against `make worker`.** It would attempt real Testnet payments and drain the
-> treasury. Use `make perf-worker`, which simulates the ledger.
+> treasury. `make perf-all` uses a simulated-ledger worker, its own database and its own Redis DB.
 
 ---
 
@@ -263,7 +264,7 @@ treasury payments are serialised at about 4 per minute); `/wallet` waits on a li
 - Sessions cannot be revoked before their 8-hour expiry, and the cookie is re-issued on activity.
 - Recipient accounts are funded by the Testnet faucet. Mainnet would need treasury-funded XRP
   reserves.
-- Treasury payments are signed one at a time, so real settlement tops out near 4 per minute.
+- Treasury payments are signed one at a time, so real settlement tops out at about 4.3 per minute.
 - Unregistered beneficiaries cannot be paid.
 - Recipients are not KYC-checked; a production service would verify them before allowing cash-out.
 - A burn whose worker dies after signing, but before the outcome is recorded, has no Reconcile

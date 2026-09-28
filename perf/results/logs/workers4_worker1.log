@@ -1,0 +1,34 @@
+perf worker: simulated ledger, 4.0s payment latency. Real XRPL calls are NOT made.
+14:09:48 Worker rq:worker:fda3f3edb9124f8bb1d665d492f22be5 started with PID 30462, version 2.0.0
+14:09:48 Subscribing to channel rq:pubsub:fda3f3edb9124f8bb1d665d492f22be5
+14:09:48 *** Listening on settlement...
+14:09:48 settlement: settle transaction d8f16413-abe5-400f-811c-d9d25d53e8bf (0c18a06d-0503-42f7-befa-f525ff4da7b9)
+14:09:54 Successfully completed settle transaction d8f16413-abe5-400f-811c-d9d25d53e8bf job in 0:00:06.164201s on worker fda3f3edb9124f8bb1d665d492f22be5
+14:09:54 settlement: Job OK (0c18a06d-0503-42f7-befa-f525ff4da7b9)
+14:09:54 Result is kept for 500 seconds
+14:09:54 settlement: settle transaction fd17f243-0b01-4feb-8e9a-d0f096f04fd0 (58f8915e-e51b-46f4-a77a-1277a2350f5f)
+14:10:06 Successfully completed settle transaction fd17f243-0b01-4feb-8e9a-d0f096f04fd0 job in 0:00:12.115564s on worker fda3f3edb9124f8bb1d665d492f22be5
+14:10:06 settlement: Job OK (58f8915e-e51b-46f4-a77a-1277a2350f5f)
+14:10:06 Result is kept for 500 seconds
+14:10:06 settlement: settle transaction 99fc2bac-b222-4c89-aa4a-09a1936ceeea (1352fe32-5686-42b4-a4b0-38da56eb6907)
+14:10:27 Successfully completed settle transaction 99fc2bac-b222-4c89-aa4a-09a1936ceeea job in 0:00:20.252459s on worker fda3f3edb9124f8bb1d665d492f22be5
+14:10:27 settlement: Job OK (1352fe32-5686-42b4-a4b0-38da56eb6907)
+14:10:27 Result is kept for 500 seconds
+14:10:27 settlement: settle transaction 6ca336aa-d4d7-4da9-9fe5-6fc19453f0dc (1bbc308b-0778-4ec0-9a74-68da2e7c9f09)
+14:10:43 Successfully completed settle transaction 6ca336aa-d4d7-4da9-9fe5-6fc19453f0dc job in 0:00:16.202066s on worker fda3f3edb9124f8bb1d665d492f22be5
+14:10:43 settlement: Job OK (1bbc308b-0778-4ec0-9a74-68da2e7c9f09)
+14:10:43 Result is kept for 500 seconds
+14:10:43 settlement: settle transaction fd741192-ac19-4b7c-8b3d-182ae43175ef (48d23fc6-03c7-4118-a0dc-362feb2ffb71)
+14:11:11 Successfully completed settle transaction fd741192-ac19-4b7c-8b3d-182ae43175ef job in 0:00:28.401626s on worker fda3f3edb9124f8bb1d665d492f22be5
+14:11:11 settlement: Job OK (48d23fc6-03c7-4118-a0dc-362feb2ffb71)
+14:11:11 Result is kept for 500 seconds
+14:11:11 settlement: settle transaction afcac4a8-7ee4-4f8b-af32-e2d82ad5c758 (96be480a-5cc5-43ae-bf51-6cd545455050)
+14:11:24 Successfully completed settle transaction afcac4a8-7ee4-4f8b-af32-e2d82ad5c758 job in 0:00:12.177422s on worker fda3f3edb9124f8bb1d665d492f22be5
+14:11:24 settlement: Job OK (96be480a-5cc5-43ae-bf51-6cd545455050)
+14:11:24 Result is kept for 500 seconds
+14:11:24 settlement: settle transaction 47ccead1-4631-4274-ae6b-099c93c2269c (1e3e0b93-e5bd-4ff2-990c-776061706c2d)
+14:11:48 Successfully completed settle transaction 47ccead1-4631-4274-ae6b-099c93c2269c job in 0:00:24.231601s on worker fda3f3edb9124f8bb1d665d492f22be5
+14:11:48 settlement: Job OK (1e3e0b93-e5bd-4ff2-990c-776061706c2d)
+14:11:48 Result is kept for 500 seconds
+14:11:54 Worker fda3f3edb9124f8bb1d665d492f22be5 [PID 30462]: warm shut down requested
+14:11:54 Unsubscribing from channel rq:pubsub:fda3f3edb9124f8bb1d665d492f22be5
