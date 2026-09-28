@@ -2,7 +2,11 @@
 Phase 9 step 4: turn the measured runs into the report's tables and charts.
 
 Reads what the runs produced:
-    perf/results/run_stats.csv        Locust per-endpoint statistics
+    perf/results/run_stats.csv        Locust per-endpoint statistics (reference 50-user run)
+    perf/results/c10_stats.csv        concurrency tier — 10 users
+    perf/results/c25_stats.csv        concurrency tier — 25 users
+    perf/results/c50_stats.csv        concurrency tier — 50 users
+    perf/results/c100_stats.csv       concurrency tier — 100 users
     perf/results/queue.csv            queue + settlement sampler, 1 worker, under load
     perf/results/queue_4workers.csv   the same while 4 workers drained the backlog
     perf/results/xrpl_timings.json    real Testnet timings
@@ -75,10 +79,66 @@ def chart_response_times(rows):
     ax.set_yticks(range(len(names)), names, fontsize=9)
     ax.set_ylim(-0.7, len(names) - 0.3)
     ax.legend(frameon=False, loc="lower right", fontsize=9)
-    _style(ax, "Response time by endpoint — 50 concurrent users", "milliseconds (log scale)")
+    _style(ax, "Response time by endpoint — 50 concurrent users (28 Sep 2026)", "milliseconds (log scale)")
     ax.grid(axis="x", lw=0.8, alpha=0.9)
     fig.tight_layout()
     fig.savefig(RESULTS / "response_times.png")
+
+
+def chart_concurrency(tier_stats):
+    """Median and p95 vs concurrency for overall and key endpoints."""
+    users = [10, 25, 50, 100]
+
+    def _pick(rows, name, col):
+        for r in rows:
+            if r["Name"] == name:
+                v = float(r[col])
+                return max(v, 1)
+        return None
+
+    agg_med  = [_pick(s, "Aggregated",                  "50%")  for s in tier_stats]
+    agg_p95  = [_pick(s, "Aggregated",                  "95%")  for s in tier_stats]
+    rem_med  = [_pick(s, "POST /remittances",            "50%")  for s in tier_stats]
+    login_med = [_pick(s, "POST /login",                 "50%")  for s in tier_stats]
+    wallet_p95 = [_pick(s, "GET /wallet",                "95%")  for s in tier_stats]
+
+    GREEN = "#2a9d5c"
+    PURPLE = "#7b4dbd"
+    RED = "#c0392b"
+
+    fig, (ax_top, ax_bot) = plt.subplots(2, 1, figsize=(8, 7), sharex=True,
+                                          gridspec_kw={"hspace": 0.38})
+
+    # Top: overall median + p95
+    ax_top.plot(users, agg_med, marker="o", lw=2, color=BLUE,   label="overall median")
+    ax_top.plot(users, agg_p95, marker="o", lw=2, color=ORANGE, label="overall p95")
+    for u, m, p in zip(users, agg_med, agg_p95):
+        ax_top.annotate(f"{m:.0f}", (u, m), textcoords="offset points", xytext=(0, 8),
+                        ha="center", fontsize=8, color=MUTED)
+        ax_top.annotate(f"{p:.0f}", (u, p), textcoords="offset points", xytext=(0, 8),
+                        ha="center", fontsize=8, color=MUTED)
+    ax_top.set_ylabel("milliseconds", color=MUTED)
+    ax_top.legend(frameon=False, fontsize=9)
+    _style(ax_top, "Overall latency vs concurrency")
+    ax_top.grid(axis="y", lw=0.8, alpha=0.9)
+
+    # Bottom: three spotlight endpoints on a log scale
+    ax_bot.plot(users, login_med,  marker="o", lw=2, color=RED,    label="POST /login (median)")
+    ax_bot.plot(users, wallet_p95, marker="o", lw=2, color=PURPLE, label="GET /wallet (p95)")
+    ax_bot.plot(users, rem_med,    marker="o", lw=2, color=GREEN,  label="POST /remittances (median)")
+    for u, v in zip(users, login_med):
+        ax_bot.annotate(f"{v/1000:.1f}s", (u, v), textcoords="offset points",
+                        xytext=(0, 8), ha="center", fontsize=8, color=MUTED)
+    ax_bot.set_yscale("log")
+    ax_bot.set_ylabel("milliseconds (log scale)", color=MUTED)
+    ax_bot.set_xlabel("concurrent users", color=MUTED)
+    ax_bot.set_xticks(users, [str(u) for u in users])
+    ax_bot.legend(frameon=False, fontsize=9)
+    _style(ax_bot, "Key endpoint latency vs concurrency")
+    ax_bot.grid(axis="y", lw=0.8, alpha=0.9)
+
+    fig.tight_layout()
+    fig.savefig(RESULTS / "concurrency_scaling.png")
 
 
 def chart_queue(rows):
@@ -156,10 +216,12 @@ def main() -> None:
     queue_1 = _read("queue.csv")
     queue_4 = _read("queue_4workers.csv")
     xrpl = json.loads((RESULTS / "xrpl_timings.json").read_text())
+    tier_stats = [_read(f"c{u}_stats.csv") for u in (10, 25, 50, 100)]
 
     chart_response_times(stats)
     chart_queue(queue_1)
     chart_throughput(rate_per_minute(queue_1), rate_per_minute(queue_4), xrpl)
+    chart_concurrency(tier_stats)
     markdown_tables(stats, xrpl)
 
     print(f"\n1 worker: {rate_per_minute(queue_1):.1f} settlements/min "

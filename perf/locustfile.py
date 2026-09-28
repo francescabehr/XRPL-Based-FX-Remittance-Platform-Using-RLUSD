@@ -29,8 +29,15 @@ ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@example.com")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "ChangeMe123!")
 
 CARD = {"card_number": "4242 4242 4242 4242", "card_expiry": "12/30", "card_cvv": "123", "card_name": "Load Test"}
+DECLINED_CARD = {"card_number": "4000000000000002", "card_expiry": "12/30", "card_cvv": "123", "card_name": "Load Test"}
 CASHIN_ROW = re.compile(r'/admin/cashin/([0-9a-f-]{36})/received')
-RATE_FIELD = re.compile(r'name="exchange_rate" value="([\d.]+)"')
+# Captures the three price-lock hidden fields that POST /remittances now requires.
+PRICE_LOCK_FIELDS = re.compile(
+    r'name="exchange_rate" value="([\d.]+)".*?'
+    r'name="transaction_fee" value="([\d.]+)".*?'
+    r'name="uctusd_amount" value="([\d.]+)"',
+    re.S,
+)
 CASHOUT_FIELDS = re.compile(
     r'name="market_rate" value="([\d.]+)".*?name="cashout_fee_usd" value="([\d.]+)".*?name="net_payout" value="([\d.]+)"',
     re.S,
@@ -107,18 +114,53 @@ class SenderUser(_LoggedIn):
 
         self.client.get(f"/send/review?{query}", name="GET /send/review")
         with self.client.get(f"/send/pay?{query}", name="GET /send/pay", catch_response=True) as response:
-            rate = RATE_FIELD.search(response.text)
-            if not rate:
+            price_lock = PRICE_LOCK_FIELDS.search(response.text)
+            if not price_lock:
                 response.failure("pay page carried no quote")
                 return
 
-        form = {"beneficiary_id": self.beneficiary_id, "zar_amount": str(amount),
-                "exchange_rate": rate.group(1), **CARD}
+        exchange_rate, transaction_fee, uctusd_amount = price_lock.groups()
+        form = {
+            "beneficiary_id": self.beneficiary_id,
+            "zar_amount": str(amount),
+            "exchange_rate": exchange_rate,
+            "transaction_fee": transaction_fee,
+            "uctusd_amount": uctusd_amount,
+            **CARD,
+        }
         with self.client.post("/remittances", data=form, name="POST /remittances", catch_response=True) as response:
             # A daily-limit refusal re-renders the pay page: expected under load,
             # not a server failure, but it must not be counted as a successful send.
             if "Daily limit exceeded" in response.text or "Monthly limit" in response.text:
                 response.failure("limit reached (expected once a seeded sender is spent)")
+
+    @task(1)
+    def send_money_declined(self):
+        """Exercises the failure path: a known-declined card should produce a failed transaction."""
+        if not self.beneficiary_id:
+            return
+        amount = random.choice([100, 150, 200, 250])
+        query = f"beneficiary_id={self.beneficiary_id}&zar_amount={amount}"
+
+        self.client.get(f"/send/review?{query}", name="GET /send/review")
+        with self.client.get(f"/send/pay?{query}", name="GET /send/pay", catch_response=True) as response:
+            price_lock = PRICE_LOCK_FIELDS.search(response.text)
+            if not price_lock:
+                response.failure("pay page carried no quote")
+                return
+
+        exchange_rate, transaction_fee, uctusd_amount = price_lock.groups()
+        form = {
+            "beneficiary_id": self.beneficiary_id,
+            "zar_amount": str(amount),
+            "exchange_rate": exchange_rate,
+            "transaction_fee": transaction_fee,
+            "uctusd_amount": uctusd_amount,
+            **DECLINED_CARD,
+        }
+        with self.client.post("/remittances", data=form, name="POST /remittances (declined)", catch_response=True) as response:
+            if "Payment failed" not in response.text and "Card declined" not in response.text:
+                response.failure("declined card did not produce a failure message")
 
     @task(2)
     def history(self):
